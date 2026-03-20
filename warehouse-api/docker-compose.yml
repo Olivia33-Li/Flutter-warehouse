@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: warehouse-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/warehouse
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - PORT=3000
+    depends_on:
+      - mongo
+    networks:
+      - warehouse-net
+
+  mongo:
+    image: mongo:7
+    container_name: warehouse-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - warehouse-net
+    # 不暴露端口到公网，仅内部访问
+
+volumes:
+  mongo_data:
+
+networks:
+  warehouse-net:
+    driver: bridge

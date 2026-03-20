@@ -1,0 +1,17 @@
+# NestJS
+warehouse-api/node_modules/
+warehouse-api/dist/
+warehouse-api/.env
+
+# Flutter
+flutter_warehouse/.dart_tool/
+flutter_warehouse/.flutter-plugins
+flutter_warehouse/.flutter-plugins-dependencies
+flutter_warehouse/build/
+flutter_warehouse/.packages
+flutter_warehouse/pubspec.lock
+
+# General
+*.log
+.DS_Store
+Thumbs.db
