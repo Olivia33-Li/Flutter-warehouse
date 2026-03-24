@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/inventory_service.dart';
@@ -130,6 +132,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  // 导出 Excel
+  Future<void> _exportExcel() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('正在生成 Excel，请稍候...')));
+
+      final response = await ApiService.instance.dio.get(
+        '/export/excel',
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final now = DateTime.now();
+      final filename =
+          'warehouse_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
+
+      final blob = html.Blob(
+        [response.data as List<int>],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', filename)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已下载: $filename')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 
   // CSV 格式说明
@@ -375,6 +416,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: _showCsvFormatDialog,
             ),
+
+          // 导出 Excel
+          ListTile(
+            leading: const Icon(Icons.download),
+            title: const Text('导出 Excel'),
+            subtitle: const Text('导出全部 SKU、库位、库存及流水记录'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _exportExcel,
+          ),
 
           const Divider(),
 

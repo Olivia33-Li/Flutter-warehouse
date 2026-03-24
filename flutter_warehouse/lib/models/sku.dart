@@ -1,14 +1,24 @@
 class SkuLocation {
   final String locationId;
   final String locationCode;
-  final int qty;
+  final int boxes;
+  final int unitsPerBox;
+  final int totalQty;
 
-  SkuLocation({required this.locationId, required this.locationCode, required this.qty});
+  SkuLocation({
+    required this.locationId,
+    required this.locationCode,
+    required this.boxes,
+    required this.unitsPerBox,
+    required this.totalQty,
+  });
 
   factory SkuLocation.fromJson(Map<String, dynamic> json) => SkuLocation(
         locationId: json['locationId'] ?? '',
         locationCode: json['locationCode'] ?? '',
-        qty: json['qty'] ?? 0,
+        boxes: (json['boxes'] as num?)?.toInt() ?? 0,
+        unitsPerBox: (json['unitsPerBox'] as num?)?.toInt() ?? 1,
+        totalQty: (json['totalQty'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -18,6 +28,7 @@ class Sku {
   final String? name;
   final String? barcode;
   final int? cartonQty;
+  final int? minStock;
   final List<SkuLocation> locations;
   final int totalQty;
 
@@ -27,6 +38,7 @@ class Sku {
     this.name,
     this.barcode,
     this.cartonQty,
+    this.minStock,
     this.locations = const [],
     this.totalQty = 0,
   });
@@ -37,11 +49,12 @@ class Sku {
         name: json['name'],
         barcode: json['barcode'],
         cartonQty: json['cartonQty'],
+        minStock: json['minStock'],
         locations: (json['locations'] as List?)
                 ?.map((e) => SkuLocation.fromJson(e))
                 .toList() ??
             [],
-        totalQty: json['totalQty'] ?? 0,
+        totalQty: (json['totalQty'] as num?)?.toInt() ?? 0,
       );
 
   Map<String, dynamic> toJson() => {

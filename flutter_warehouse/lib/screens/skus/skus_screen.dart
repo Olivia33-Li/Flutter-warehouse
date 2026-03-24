@@ -75,27 +75,15 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
         ),
       ),
       floatingActionButton: user?.canEdit == true
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FloatingActionButton.small(
-                  heroTag: 'add_sku',
-                  tooltip: '新增 SKU',
-                  onPressed: () => context.push('/skus/new').then((_) => _load()),
-                  child: const Icon(Icons.qr_code_2),
-                ),
-                const SizedBox(height: 10),
-                FloatingActionButton(
-                  heroTag: 'add_inventory',
-                  tooltip: '手动录入库存',
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const InventoryAddScreen())).then((ok) {
-                    if (ok == true) _load();
-                  }),
-                  child: const Icon(Icons.add_box),
-                ),
-              ],
+          ? FloatingActionButton(
+              heroTag: 'add_inventory',
+              tooltip: '手动录入库存',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const InventoryAddScreen())).then((ok) {
+                if (ok == true) _load();
+              }),
+              child: const Icon(Icons.add_box),
             )
           : null,
       body: _loading
@@ -125,7 +113,7 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
                                             style: const TextStyle(
                                                 fontWeight: FontWeight.bold, fontSize: 15)),
                                       ),
-                                      Text('共 ${sku.totalQty} 箱',
+                                      Text('共 ${sku.totalQty} 件',
                                           style: TextStyle(
                                               color: sku.totalQty > 0
                                                   ? Colors.green.shade700
@@ -144,7 +132,7 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
                                       spacing: 6,
                                       runSpacing: 4,
                                       children: sku.locations.map((loc) => Chip(
-                                        label: Text('${loc.locationCode}  ${loc.qty}箱',
+                                        label: Text('${loc.locationCode}  ${loc.totalQty}件',
                                             style: const TextStyle(fontSize: 12)),
                                         visualDensity: VisualDensity.compact,
                                         padding: EdgeInsets.zero,

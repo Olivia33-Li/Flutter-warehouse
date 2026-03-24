@@ -9,6 +9,7 @@ import '../../services/location_service.dart';
 import '../../models/inventory.dart';
 import '../../models/location.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/inventory_detail_sheet.dart';
 
 class SkuDetailScreen extends ConsumerStatefulWidget {
   final String id;
@@ -44,7 +45,11 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
 
   Future<void> _showInventoryDialog({InventoryRecord? existing}) async {
     final locSearchCtrl = TextEditingController();
-    final qtyCtrl = TextEditingController(text: existing?.quantity.toString() ?? '');
+    final boxesCtrl = TextEditingController(text: existing?.boxes.toString() ?? '');
+    final unitsCtrl = TextEditingController(
+      text: existing?.unitsPerBox.toString() ??
+          (_data?['cartonQty']?.toString() ?? '1'),
+    );
     final newLocCodeCtrl = TextEditingController();
     final newLocDescCtrl = TextEditingController();
 
@@ -252,13 +257,25 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
 
                     // 箱数
                     TextField(
-                      controller: qtyCtrl,
+                      controller: boxesCtrl,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        labelText: '数量（箱）',
+                        labelText: '箱数',
                         border: OutlineInputBorder(),
                         isDense: true,
                         suffixText: '箱',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // 每箱数量
+                    TextField(
+                      controller: unitsCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '每箱数量',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        suffixText: '件/箱',
                       ),
                     ),
 
@@ -274,9 +291,14 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
               TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
               FilledButton(
                 onPressed: () async {
-                  final qty = int.tryParse(qtyCtrl.text) ?? 0;
-                  if (qty <= 0) {
+                  final boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                  final unitsPerBox = int.tryParse(unitsCtrl.text) ?? 0;
+                  if (boxes <= 0) {
                     setS(() => dialogError = '请输入有效箱数');
+                    return;
+                  }
+                  if (unitsPerBox <= 0) {
+                    setS(() => dialogError = '请输入每箱数量');
                     return;
                   }
                   String? locId = selectedLocationId;
@@ -299,11 +321,20 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       setS(() => dialogError = '请选择或新建库位');
                       return;
                     }
-                    await _inventoryService.upsert(
-                      skuId: widget.id,
-                      locationId: locId,
-                      quantity: qty,
-                    );
+                    if (existing != null) {
+                      await _inventoryService.update(
+                        existing.id,
+                        boxes: boxes,
+                        unitsPerBox: unitsPerBox,
+                      );
+                    } else {
+                      await _inventoryService.create(
+                        skuCode: _data!['sku'],
+                        locationId: locId,
+                        boxes: boxes,
+                        unitsPerBox: unitsPerBox,
+                      );
+                    }
                     if (ctx.mounted) ctx.pop();
                     _load();
                   } catch (e) {
@@ -379,8 +410,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   if (data['cartonQty'] != null)
                     _info('每箱个数', '${data['cartonQty']} 件'),
                   const Divider(),
-                  _info('总库存', '${data['totalQty'] ?? 0} 箱'
-                      '${data['totalPcs'] != null ? ' / ${data['totalPcs']} 件' : ''}'),
+                  _info('总库存', '${data['totalQty'] ?? 0} 件'),
                 ],
               ),
             ),
@@ -401,12 +431,28 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: loc?.description != null ? Text(loc!.description!) : null,
                 onTap: locId != null
-                    ? () => context.push('/locations/$locId').then((_) => _load())
+                    ? () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        builder: (_) => InventoryDetailSheet(
+                          skuCode: data['sku'] as String,
+                          skuId: widget.id,
+                          locationId: locId,
+                          locationCode: loc?.code ?? '',
+                          totalQty: record.totalQty,
+                          showLocNav: true,
+                          canEdit: user?.canEdit == true,
+                          onStockIn: _load,
+                        ),
+                      )
                     : null,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${record.quantity} 箱',
+                    Text('${record.boxes}箱 × ${record.unitsPerBox} = ${record.totalQty}件',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                     if (user?.canEdit == true) ...[
                       IconButton(

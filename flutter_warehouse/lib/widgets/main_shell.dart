@@ -10,8 +10,9 @@ class MainShell extends StatelessWidget {
     final location = GoRouterState.of(context).uri.path;
 
     int selectedIndex = 0;
-    if (location.startsWith('/skus')) selectedIndex = 0;
-    else if (location.startsWith('/locations')) selectedIndex = 1;
+    if (location.startsWith('/skus')) {
+      selectedIndex = 0;
+    } else if (location.startsWith('/locations')) selectedIndex = 1;
     else if (location.startsWith('/scanner')) selectedIndex = 2;
     else if (location.startsWith('/history')) selectedIndex = 3;
     else if (location.startsWith('/settings')) selectedIndex = 4;

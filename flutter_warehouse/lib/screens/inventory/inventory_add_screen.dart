@@ -114,7 +114,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
     setState(() { _saving = true; _error = null; });
     try {
       final cartonQty = int.tryParse(_cartonQtyCtrl.text);
-      String skuId;
+      String skuCode;
 
       if (_isNewSku) {
         // 创建新 SKU
@@ -124,20 +124,36 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
           barcode: _skuBarcodeCtrl.text.trim().isEmpty ? null : _skuBarcodeCtrl.text.trim(),
           cartonQty: cartonQty,
         );
-        skuId = newSku.id;
+        skuCode = newSku.sku;
       } else {
-        skuId = _selectedSku!.id;
+        skuCode = _selectedSku!.sku;
         // 如填了每箱件数且与现有不同，更新 SKU
         if (cartonQty != null && cartonQty > 0 && cartonQty != _selectedSku!.cartonQty) {
-          await SkuService().update(skuId, cartonQty: cartonQty);
+          await SkuService().update(_selectedSku!.id, cartonQty: cartonQty);
         }
       }
 
-      await InventoryService().upsert(
-        skuId: skuId,
-        locationId: _selectedLoc!.id,
-        quantity: qty,
-      );
+      try {
+        await InventoryService().create(
+          skuCode: skuCode,
+          locationId: _selectedLoc!.id,
+          boxes: qty,
+          unitsPerBox: cartonQty ?? 1,
+        );
+      } on DioException catch (e) {
+        // 已有库存记录 → 自动转为入库操作
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 409) {
+          await InventoryService().stockIn(
+            skuCode: skuCode,
+            locationId: _selectedLoc!.id,
+            boxes: qty,
+            unitsPerBox: cartonQty ?? 1,
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

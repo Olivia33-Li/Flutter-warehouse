@@ -136,7 +136,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                                 title: Text(loc.locationCode,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600)),
-                                trailing: Text('${loc.qty} 箱',
+                                trailing: Text('${loc.totalQty} 件',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 15)),

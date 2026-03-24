@@ -1,26 +1,35 @@
-import 'sku.dart';
 import 'location.dart';
 
 class InventoryRecord {
   final String id;
-  final dynamic skuId; // String or Sku object
-  final dynamic locationId; // String or Location object
-  final int quantity;
+  final String skuCode;
+  final String? skuId;
+  final String? skuName;
+  final dynamic locationId; // String or populated Location object
+  final int boxes;
+  final int unitsPerBox;
 
   InventoryRecord({
     required this.id,
-    required this.skuId,
+    required this.skuCode,
+    this.skuId,
+    this.skuName,
     required this.locationId,
-    required this.quantity,
+    required this.boxes,
+    required this.unitsPerBox,
   });
 
-  Sku? get sku => skuId is Map ? Sku.fromJson(skuId) : null;
+  int get totalQty => boxes * unitsPerBox;
+
   Location? get location => locationId is Map ? Location.fromJson(locationId) : null;
 
   factory InventoryRecord.fromJson(Map<String, dynamic> json) => InventoryRecord(
         id: json['_id'] ?? '',
-        skuId: json['skuId'],
+        skuCode: json['skuCode'] ?? '',
+        skuId: json['skuId']?.toString(),
+        skuName: json['skuName'],
         locationId: json['locationId'],
-        quantity: json['quantity'] ?? 0,
+        boxes: (json['boxes'] as num?)?.toInt() ?? 0,
+        unitsPerBox: (json['unitsPerBox'] as num?)?.toInt() ?? 1,
       );
 }

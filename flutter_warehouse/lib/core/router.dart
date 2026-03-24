@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
@@ -35,12 +34,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // 详情页放在 ShellRoute 外，返回键正确回到上一页
       GoRoute(
-        path: '/skus/:id',
-        builder: (_, state) => SkuDetailScreen(id: state.pathParameters['id']!),
-      ),
-      GoRoute(
         path: '/skus/new',
         builder: (_, state) => SkuFormScreen(initial: state.extra as Map<String, dynamic>?),
+      ),
+      GoRoute(
+        path: '/skus/:id',
+        builder: (_, state) => SkuDetailScreen(id: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/locations/:id',

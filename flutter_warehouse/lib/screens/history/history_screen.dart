@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../services/history_service.dart';
 import '../../models/change_record.dart';
@@ -57,20 +58,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Color _actionColor(String action) {
     switch (action) {
-      case 'add': return Colors.green;
-      case 'edit': return Colors.blue;
+      case 'create': return Colors.green;
+      case 'update': return Colors.blue;
       case 'delete': return Colors.red;
-      case 'import': return Colors.orange;
       default: return Colors.grey;
     }
   }
 
   String _actionLabel(String action) {
     switch (action) {
-      case 'add': return '新增';
-      case 'edit': return '编辑';
+      case 'create': return '新增';
+      case 'update': return '编辑';
       case 'delete': return '删除';
-      case 'import': return '导入';
       default: return action;
     }
   }
@@ -79,17 +78,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('操作记录 (${_total})'),
+        title: Text('操作记录 ($_total)'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(100),
+          preferredSize: const Size.fromHeight(104),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
             child: Column(
               children: [
                 SearchBar(
                   controller: _keywordCtrl,
-                  hintText: '搜索关键词...',
+                  hintText: '搜索操作描述或用户名...',
                   leading: const Icon(Icons.search),
+                  trailing: [
+                    if (_keywordCtrl.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () { _keywordCtrl.clear(); _load(); },
+                      ),
+                  ],
                   onChanged: (_) => _load(),
                 ),
                 const SizedBox(height: 6),
@@ -97,40 +103,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _filterChip('全部操作', null, _filterAction, (v) {
+                      _chip('全部操作', null, _filterAction, (v) {
                         setState(() => _filterAction = v);
                         _load();
                       }),
-                      _filterChip('新增', 'add', _filterAction, (v) {
+                      _chip('新增', 'create', _filterAction, (v) {
                         setState(() => _filterAction = v);
                         _load();
                       }),
-                      _filterChip('编辑', 'edit', _filterAction, (v) {
+                      _chip('编辑', 'update', _filterAction, (v) {
                         setState(() => _filterAction = v);
                         _load();
                       }),
-                      _filterChip('删除', 'delete', _filterAction, (v) {
+                      _chip('删除', 'delete', _filterAction, (v) {
                         setState(() => _filterAction = v);
                         _load();
                       }),
-                      _filterChip('导入', 'import', _filterAction, (v) {
-                        setState(() => _filterAction = v);
-                        _load();
-                      }),
-                      const SizedBox(width: 12),
-                      _filterChip('全部对象', null, _filterEntity, (v) {
+                      const SizedBox(width: 8),
+                      _chip('全部对象', null, _filterEntity, (v) {
                         setState(() => _filterEntity = v);
                         _load();
                       }),
-                      _filterChip('SKU', 'sku', _filterEntity, (v) {
+                      _chip('SKU', 'SKU', _filterEntity, (v) {
                         setState(() => _filterEntity = v);
                         _load();
                       }),
-                      _filterChip('位置', 'location', _filterEntity, (v) {
+                      _chip('库位', '库位', _filterEntity, (v) {
                         setState(() => _filterEntity = v);
                         _load();
                       }),
-                      _filterChip('库存', 'inventory', _filterEntity, (v) {
+                      _chip('库存', '库存', _filterEntity, (v) {
                         setState(() => _filterEntity = v);
                         _load();
                       }),
@@ -147,7 +149,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           : _error != null
               ? ErrorView(message: _error!, onRetry: _load)
               : _records.isEmpty
-                  ? const Center(child: Text('暂无记录'))
+                  ? const Center(child: Text('暂无操作记录'))
                   : ListView.builder(
                       itemCount: _records.length,
                       itemBuilder: (_, i) {
@@ -155,6 +157,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: _actionColor(r.action),
+                            radius: 20,
                             child: Text(
                               _actionLabel(r.action),
                               style: const TextStyle(
@@ -163,16 +166,59 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                           title: Text(r.description),
                           subtitle: Text(
-                            '${r.userName}  •  ${DateFormat('MM-dd HH:mm').format(r.createdAt.toLocal())}',
+                            '${r.entity}  •  ${r.userName}  •  '
+                            '${DateFormat('MM-dd HH:mm').format(r.createdAt.toLocal())}',
+                            style: const TextStyle(fontSize: 12),
                           ),
+                          isThreeLine: r.changes != null && r.changes!.isNotEmpty,
                           dense: true,
+                          onTap: r.changes != null && r.changes!.isNotEmpty
+                              ? () => _showChanges(context, r)
+                              : null,
                         );
                       },
                     ),
     );
   }
 
-  Widget _filterChip(
+  void _showChanges(BuildContext context, ChangeRecord r) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('变更详情'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: r.changes!.entries.map((e) {
+            final before = e.value['before']?.toString() ?? '无';
+            final after = e.value['after']?.toString() ?? '无';
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 70,
+                    child: Text(e.key,
+                        style: const TextStyle(
+                            color: Colors.grey, fontSize: 13)),
+                  ),
+                  Expanded(
+                    child: Text('$before → $after',
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(onPressed: () => ctx.pop(), child: const Text('关闭')),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(
     String label,
     String? value,
     String? current,

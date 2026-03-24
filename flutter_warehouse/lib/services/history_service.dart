@@ -5,15 +5,13 @@ class HistoryService {
   final _api = ApiService.instance.dio;
 
   Future<Map<String, dynamic>> getAll({
-    String? userId,
     String? action,
     String? entity,
     String? keyword,
     int page = 1,
     int limit = 50,
   }) async {
-    final response = await _api.get('/history', queryParameters: {
-      if (userId != null) 'userId': userId,
+    final response = await _api.get('/audit-logs', queryParameters: {
       if (action != null) 'action': action,
       if (entity != null) 'entity': entity,
       if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,

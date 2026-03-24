@@ -6,8 +6,8 @@ import '../../services/location_service.dart';
 import '../../services/inventory_service.dart';
 import '../../services/sku_service.dart';
 import '../../models/inventory.dart';
-import '../../models/sku.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/inventory_detail_sheet.dart';
 
 class LocationDetailScreen extends ConsumerStatefulWidget {
   final String id;
@@ -45,61 +45,96 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     final skus = await SkuService().getAll();
     if (!mounted) return;
 
-    String? selectedSkuId = existing?.skuId is Map
-        ? existing!.skuId['_id']
-        : existing?.skuId?.toString();
-    final qtyCtrl = TextEditingController(
-      text: existing?.quantity.toString() ?? '',
-    );
+    String? selectedSkuCode = existing?.skuCode;
+    final boxesCtrl = TextEditingController(text: existing?.boxes.toString() ?? '');
+    final unitsCtrl = TextEditingController(text: existing?.unitsPerBox.toString() ?? '1');
+    String? dialogError;
 
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(existing == null ? '新增库存' : '编辑库存'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<String>(
-              value: selectedSkuId,
-              decoration: const InputDecoration(
-                  labelText: 'SKU', border: OutlineInputBorder()),
-              items: skus
-                  .map((s) => DropdownMenuItem(value: s.id, child: Text(s.sku)))
-                  .toList(),
-              onChanged: (v) => selectedSkuId = v,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: qtyCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: '数量（箱）', border: OutlineInputBorder()),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: Text(existing == null ? '新增库存' : '编辑库存'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (existing == null)
+                DropdownButtonFormField<String>(
+                  value: selectedSkuCode,
+                  decoration: const InputDecoration(
+                      labelText: 'SKU', border: OutlineInputBorder()),
+                  items: skus
+                      .map((s) => DropdownMenuItem(value: s.sku, child: Text(s.sku)))
+                      .toList(),
+                  onChanged: (v) => selectedSkuCode = v,
+                )
+              else
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('SKU', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  subtitle: Text(existing.skuCode, style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: boxesCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: '箱数', border: OutlineInputBorder(), suffixText: '箱'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: unitsCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: '每箱数量', border: OutlineInputBorder(), suffixText: '件/箱'),
+              ),
+              if (dialogError != null) ...[
+                const SizedBox(height: 8),
+                Text(dialogError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+            FilledButton(
+              onPressed: () async {
+                final boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                final unitsPerBox = int.tryParse(unitsCtrl.text) ?? 0;
+                if (boxes <= 0 || unitsPerBox <= 0) {
+                  setS(() => dialogError = '请输入有效的箱数和每箱数量');
+                  return;
+                }
+                if (selectedSkuCode == null) {
+                  setS(() => dialogError = '请选择 SKU');
+                  return;
+                }
+                try {
+                  if (existing != null) {
+                    await _inventoryService.update(
+                      existing.id,
+                      boxes: boxes,
+                      unitsPerBox: unitsPerBox,
+                    );
+                  } else {
+                    await _inventoryService.create(
+                      skuCode: selectedSkuCode!,
+                      locationId: widget.id,
+                      boxes: boxes,
+                      unitsPerBox: unitsPerBox,
+                    );
+                  }
+                  if (ctx.mounted) ctx.pop();
+                  _load();
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setS(() => dialogError = '操作失败: $e');
+                  }
+                }
+              },
+              child: const Text('保存'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
-          FilledButton(
-            onPressed: () async {
-              if (selectedSkuId == null) return;
-              try {
-                await _inventoryService.upsert(
-                  skuId: selectedSkuId!,
-                  locationId: widget.id,
-                  quantity: int.tryParse(qtyCtrl.text) ?? 0,
-                );
-                if (ctx.mounted) ctx.pop();
-                _load();
-              } catch (e) {
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('操作失败: $e')));
-                }
-              }
-            },
-            child: const Text('保存'),
-          ),
-        ],
       ),
     );
   }
@@ -138,7 +173,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     _info('描述', data['description']),
                   const Divider(),
                   _info('SKU 种类', '${data['skuCount'] ?? 0}'),
-                  _info('总库存', '${data['totalQty'] ?? 0} 箱'),
+                  _info('总库存', '${data['totalQty'] ?? 0} 件'),
                 ],
               ),
             ),
@@ -148,16 +183,32 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           ...inventory.map((record) {
-            final sku = record.skuId is Map ? Sku.fromJson(record.skuId) : null;
             return Card(
               child: ListTile(
-                title: Text(sku?.sku ?? '未知 SKU',
+                title: Text(record.skuCode,
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: sku?.name != null ? Text(sku!.name!) : null,
+                subtitle: record.skuName != null ? Text(record.skuName!) : null,
+                onTap: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  builder: (_) => InventoryDetailSheet(
+                    skuCode: record.skuCode,
+                    skuId: record.skuId,
+                    locationId: widget.id,
+                    locationCode: data['code'] ?? '',
+                    totalQty: record.totalQty,
+                    showSkuNav: true,
+                    canEdit: user?.canEdit == true,
+                    onStockIn: _load,
+                  ),
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${record.quantity} 箱',
+                    Text('${record.boxes}箱 × ${record.unitsPerBox} = ${record.totalQty}件',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                     if (user?.canEdit == true) ...[
                       IconButton(

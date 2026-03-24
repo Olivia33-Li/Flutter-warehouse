@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/location_service.dart';
 import '../../models/location.dart';
 import '../../widgets/error_view.dart';
+import '../inventory/inventory_add_screen.dart';
 
 class LocationsScreen extends ConsumerStatefulWidget {
   const LocationsScreen({super.key});
@@ -115,9 +116,27 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         ),
       ),
       floatingActionButton: user?.canEdit == true
-          ? FloatingActionButton(
-              onPressed: _showAddDialog,
-              child: const Icon(Icons.add),
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'add_location',
+                  tooltip: '新增库位',
+                  onPressed: _showAddDialog,
+                  child: const Icon(Icons.add_location_alt),
+                ),
+                const SizedBox(height: 10),
+                FloatingActionButton(
+                  heroTag: 'add_inventory',
+                  tooltip: '录入库存',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const InventoryAddScreen())).then((ok) {
+                    if (ok == true) _load();
+                  }),
+                  child: const Icon(Icons.add_box),
+                ),
+              ],
             )
           : null,
       body: _loading
