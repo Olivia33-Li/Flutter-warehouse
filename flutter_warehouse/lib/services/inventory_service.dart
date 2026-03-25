@@ -43,6 +43,36 @@ class InventoryService {
     });
   }
 
+  Future<void> stockOut({
+    required String skuCode,
+    required String locationId,
+    required int quantity,
+    String? note,
+  }) async {
+    await _api.post('/transactions/out', data: {
+      'skuCode': skuCode,
+      'locationId': locationId,
+      'quantity': quantity,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+  }
+
+  Future<void> stockAdjust({
+    required String skuCode,
+    required String locationId,
+    int? quantity,
+    List<Map<String, int>>? configurations,
+    String? note,
+  }) async {
+    await _api.post('/transactions/adjust', data: {
+      'skuCode': skuCode,
+      'locationId': locationId,
+      if (quantity != null) 'quantity': quantity,
+      if (configurations != null) 'configurations': configurations,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+  }
+
   Future<InventoryRecord> update(String id, {int? boxes, int? unitsPerBox}) async {
     final response = await _api.patch('/inventory/$id', data: {
       if (boxes != null) 'boxes': boxes,

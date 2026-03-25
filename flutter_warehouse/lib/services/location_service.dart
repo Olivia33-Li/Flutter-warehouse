@@ -31,7 +31,39 @@ class LocationService {
     return Location.fromJson(response.data);
   }
 
+  Future<void> check(String id, {required bool checked}) async {
+    await _api.patch('/locations/$id/check', data: {'checked': checked});
+  }
+
   Future<void> delete(String id) async {
     await _api.delete('/locations/$id');
+  }
+
+  Future<Map<String, dynamic>> transfer({
+    required String sourceId,
+    required String targetLocationId,
+    List<String>? skuCodes,
+    String? conflictResolution,
+  }) async {
+    final response = await _api.post('/locations/$sourceId/transfer', data: {
+      'targetLocationId': targetLocationId,
+      if (skuCodes != null) 'skuCodes': skuCodes,
+      if (conflictResolution != null) 'conflictResolution': conflictResolution,
+    });
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> copy({
+    required String sourceId,
+    required String targetLocationId,
+    List<String>? skuCodes,
+    String? conflictResolution,
+  }) async {
+    final response = await _api.post('/locations/$sourceId/copy', data: {
+      'targetLocationId': targetLocationId,
+      if (skuCodes != null) 'skuCodes': skuCodes,
+      if (conflictResolution != null) 'conflictResolution': conflictResolution,
+    });
+    return response.data;
   }
 }

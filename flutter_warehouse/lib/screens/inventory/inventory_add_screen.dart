@@ -384,46 +384,93 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
             const SizedBox(height: 16),
 
             // ── 数量 ──
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('箱数 *', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _qtyCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          hintText: '0',
-                          border: OutlineInputBorder(),
-                          suffixText: '箱',
+            StatefulBuilder(
+              builder: (ctx, setS) {
+                final boxes = int.tryParse(_qtyCtrl.text) ?? 0;
+                final units = int.tryParse(_cartonQtyCtrl.text) ?? 1;
+                final total = boxes * units;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('箱数 *',
+                                  style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _qtyCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  hintText: '0',
+                                  border: OutlineInputBorder(),
+                                  suffixText: '箱',
+                                ),
+                                onChanged: (_) => setS(() {}),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(8, 22, 8, 0),
+                          child: Text('×',
+                              style: TextStyle(fontSize: 18, color: Colors.grey)),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('每箱件数',
+                                  style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _cartonQtyCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  hintText: '1',
+                                  border: OutlineInputBorder(),
+                                  suffixText: '件/箱',
+                                ),
+                                onChanged: (_) => setS(() {}),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (boxes > 0) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.inventory_2_outlined,
+                                size: 14, color: Colors.green),
+                            const SizedBox(width: 6),
+                            Text(
+                              '合计 $total 件',
+                              style: TextStyle(
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('每箱件数', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _cartonQtyCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          hintText: '可选',
-                          border: OutlineInputBorder(),
-                          suffixText: '件/箱',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
 
             if (_error != null) ...[

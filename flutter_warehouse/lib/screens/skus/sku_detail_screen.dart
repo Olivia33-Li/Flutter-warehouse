@@ -353,9 +353,26 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     );
   }
 
-  Future<void> _deleteInventory(String id) async {
+  Future<void> _deleteInventory(InventoryRecord record) async {
+    final loc = record.locationId is Map ? record.locationId['code'] : '?';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定删除 $loc 中的\n${_data?['sku'] ?? ''} 当前库存记录吗？\n此操作不可恢复。'),
+        actions: [
+          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => ctx.pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     try {
-      await _inventoryService.delete(id);
+      await _inventoryService.delete(record.id);
       _load();
     } catch (e) {
       if (mounted) {
@@ -443,17 +460,25 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           locationId: locId,
                           locationCode: loc?.code ?? '',
                           totalQty: record.totalQty,
+                          boxes: record.boxes,
+                          unitsPerBox: record.unitsPerBox,
+                          configurations: record.configurations,
+                          inventoryRecordId: record.id,
                           showLocNav: true,
                           canEdit: user?.canEdit == true,
-                          onStockIn: _load,
+                          onChanged: _load,
                         ),
                       )
                     : null,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${record.boxes}箱 × ${record.unitsPerBox} = ${record.totalQty}件',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      record.configurations.length > 1
+                          ? '共${record.totalQty}件 (${record.configurations.length}种箱规)'
+                          : '${record.boxes}箱×${record.unitsPerBox} = ${record.totalQty}件',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     if (user?.canEdit == true) ...[
                       IconButton(
                         icon: const Icon(Icons.edit, size: 20),
@@ -461,7 +486,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                        onPressed: () => _deleteInventory(record.id),
+                        onPressed: () => _deleteInventory(record),
                       ),
                     ],
                   ],

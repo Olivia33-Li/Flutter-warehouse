@@ -44,6 +44,33 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
     }
   }
 
+  Widget _stockBadge(sku) {
+    final qty = sku.totalQty as int;
+    final min = sku.minStock as int?;
+    final Color color;
+    final String label = '共 $qty 件';
+
+    if (qty == 0) {
+      color = Colors.grey;
+    } else if (min != null && qty <= min) {
+      color = Colors.orange.shade700;
+    } else {
+      color = Colors.green.shade700;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (qty == 0)
+          const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.grey)
+        else if (min != null && qty <= min)
+          Icon(Icons.trending_down, size: 14, color: Colors.orange.shade700),
+        const SizedBox(width: 2),
+        Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
@@ -113,12 +140,7 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
                                             style: const TextStyle(
                                                 fontWeight: FontWeight.bold, fontSize: 15)),
                                       ),
-                                      Text('共 ${sku.totalQty} 件',
-                                          style: TextStyle(
-                                              color: sku.totalQty > 0
-                                                  ? Colors.green.shade700
-                                                  : Colors.grey,
-                                              fontWeight: FontWeight.w500)),
+                                      _stockBadge(sku),
                                     ],
                                   ),
                                   if (sku.name != null) ...[
@@ -132,7 +154,7 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
                                       spacing: 6,
                                       runSpacing: 4,
                                       children: sku.locations.map((loc) => Chip(
-                                        label: Text('${loc.locationCode}  ${loc.totalQty}件',
+                                        label: Text('${loc.locationCode} · ${loc.totalQty}件',
                                             style: const TextStyle(fontSize: 12)),
                                         visualDensity: VisualDensity.compact,
                                         padding: EdgeInsets.zero,
