@@ -17,12 +17,14 @@ class InventoryService {
     required String locationId,
     required int boxes,
     required int unitsPerBox,
+    String? note,
   }) async {
     final response = await _api.post('/inventory', data: {
       'skuCode': skuCode,
       'locationId': locationId,
       'boxes': boxes,
       'unitsPerBox': unitsPerBox,
+      if (note != null && note.isNotEmpty) 'note': note,
     });
     return InventoryRecord.fromJson(response.data);
   }

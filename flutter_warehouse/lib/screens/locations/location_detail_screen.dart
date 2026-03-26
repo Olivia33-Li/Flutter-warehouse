@@ -4,11 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/location_service.dart';
 import '../../services/inventory_service.dart';
+import '../../services/history_service.dart';
 import '../../services/sku_service.dart';
 import '../../models/inventory.dart';
 import '../../models/location.dart';
+import '../../models/change_record.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/inventory_detail_sheet.dart';
+import '../../widgets/audit_log_detail_sheet.dart';
 
 class LocationDetailScreen extends ConsumerStatefulWidget {
   final String id;
@@ -21,7 +24,10 @@ class LocationDetailScreen extends ConsumerStatefulWidget {
 class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
   final _locationService = LocationService();
   final _inventoryService = InventoryService();
+  final _historyService = HistoryService();
   Map<String, dynamic>? _data;
+  ChangeRecord? _latestOp;
+  ChangeRecord? _latestCheck;
   bool _loading = true;
   String? _error;
 
@@ -35,6 +41,25 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       _data = await _locationService.getOne(widget.id);
+      final locationCode = _data?['code'] as String?;
+      if (locationCode != null) {
+        final opResult = await _historyService.getAll(
+          locationCode: locationCode,
+          inventoryChangingOnly: true,
+          page: 1,
+          limit: 1,
+        );
+        final checkResult = await _historyService.getAll(
+          locationCode: locationCode,
+          businessAction: '标记已检查',
+          page: 1,
+          limit: 1,
+        );
+        final opRecords = opResult['records'] as List<ChangeRecord>;
+        final checkRecords = checkResult['records'] as List<ChangeRecord>;
+        _latestOp = opRecords.isNotEmpty ? opRecords.first : null;
+        _latestCheck = checkRecords.isNotEmpty ? checkRecords.first : null;
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -55,7 +80,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: Text(existing == null ? '新增库存' : '编辑库存'),
+          title: Text(existing == null ? '新增库位' : '编辑库位'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -175,18 +200,14 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                   const Divider(),
                   _info('SKU 种类', '${data['skuCount'] ?? 0}'),
                   _info('总库存', '${data['totalQty'] ?? 0} 件'),
-                  if (data['lastInventoryChangedAt'] != null) ...[
-                    const Divider(),
-                    _info('最后变更', _formatDate(data['lastInventoryChangedAt'])),
-                  ],
                   const Divider(),
                   // 已检查开关
                   Row(
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         width: 80,
                         child: Text('已检查',
-                            style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                            style: TextStyle(color: Colors.grey, fontSize: 13)),
                       ),
                       Switch(
                         value: data['checked'] == true,
@@ -197,50 +218,53 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       ),
                     ],
                   ),
-                  if (data['lastCheckedAt'] != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
+                  // 上次检查
+                  _traceRow(
+                    label: '上次检查',
+                    record: _latestCheck,
+                    emptyText: '无检查记录',
+                    icon: Icons.check_circle_outline,
+                    iconColor: Colors.green,
+                  ),
+                  const SizedBox(height: 4),
+                  // 上次变更
+                  _traceRow(
+                    label: '上次变更',
+                    record: _latestOp,
+                    emptyText: '无变更记录',
+                    icon: Icons.edit_outlined,
+                    iconColor: Colors.blue,
+                  ),
+                  // Changed-after-check warning
+                  if (() {
+                    final changedAt = data['lastInventoryChangedAt'] as String?;
+                    final checkedAt = data['lastCheckedAt'] as String?;
+                    if (changedAt == null || checkedAt == null) return false;
+                    final changed = DateTime.tryParse(changedAt);
+                    final checked = DateTime.tryParse(checkedAt);
+                    return changed != null && checked != null && changed.isAfter(checked);
+                  }()) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.orange.shade300),
+                      ),
                       child: Row(
                         children: [
-                          const SizedBox(width: 80),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.check_circle_outline,
-                                        size: 13, color: Colors.green),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _formatDate(data['lastCheckedAt']),
-                                      style: const TextStyle(
-                                          color: Colors.grey, fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                                if (data['lastCheckedBy'] != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.person_outline,
-                                            size: 13, color: Colors.grey),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          data['lastCheckedBy'],
-                                          style: const TextStyle(
-                                              color: Colors.grey, fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                          Icon(Icons.warning_amber_outlined,
+                              size: 14, color: Colors.orange.shade700),
+                          const SizedBox(width: 6),
+                          Text('检查后库存已变更',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -357,30 +381,173 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
   }) async {
     final label = isTransfer ? '转移' : '复制';
     final srcCode = (_data?['code'] ?? '') as String;
+    final accent = isTransfer ? Colors.blue : Colors.orange;
 
     final searchCtrl = TextEditingController();
+    // All selected by default
+    Set<String> selectedSkus = inventory.map((r) => r.skuCode).toSet();
     Location? target;
     List<Location> searchResults = [];
     List<String> conflictSkus = [];
-    String? resolution; // merge/overwrite for transfer; overwrite/stack for copy
+    String? resolution;
     bool searching = false;
     bool loadingTarget = false;
     bool saving = false;
     String? error;
-    bool showConfirm = false; // step 1=select, step 2=confirm
+    int step = 1; // 1=select SKUs, 2=choose location, 3=confirm
 
     await showDialog(
       context: context,
       barrierDismissible: !saving,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          Widget step1Content() => Column(
+          // ── Step 1: SKU Selection ─────────────────────────────────────────
+          Widget step1Content() {
+            final allSelected = selectedSkus.length == inventory.length;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '选择要$label的 SKU（来源：$srcCode）',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      '${inventory.length} 种 SKU · 已选 ${selectedSkus.length} 种',
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => setS(() {
+                        if (allSelected) {
+                          selectedSkus = {};
+                        } else {
+                          selectedSkus =
+                              inventory.map((r) => r.skuCode).toSet();
+                        }
+                      }),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: Text(
+                        allSelected ? '取消全选' : '全选',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 320),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: inventory.length,
+                    itemBuilder: (_, i) {
+                      final r = inventory[i];
+                      final checked = selectedSkus.contains(r.skuCode);
+                      return InkWell(
+                        onTap: () => setS(() {
+                          if (checked) {
+                            selectedSkus.remove(r.skuCode);
+                          } else {
+                            selectedSkus.add(r.skuCode);
+                          }
+                        }),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 5, horizontal: 2),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: checked,
+                                onChanged: (v) => setS(() {
+                                  if (v == true) {
+                                    selectedSkus.add(r.skuCode);
+                                  } else {
+                                    selectedSkus.remove(r.skuCode);
+                                  }
+                                }),
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r.skuCode,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: checked
+                                            ? null
+                                            : Colors.grey.shade400,
+                                      ),
+                                    ),
+                                    Text(
+                                      _configText(r),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: checked
+                                            ? Colors.grey.shade600
+                                            : Colors.grey.shade400,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '${r.totalQty}件',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: checked
+                                      ? null
+                                      : Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          }
+
+          // ── Step 2: Location Search ───────────────────────────────────────
+          Widget step2Content() => Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('将 $srcCode 的库存批量$label到目标库位',
-                      style: const TextStyle(fontSize: 13)),
-                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '已选 ${selectedSkus.length} 种 SKU，请选择目标库位',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: accent,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   TextField(
                     controller: searchCtrl,
                     decoration: InputDecoration(
@@ -407,14 +574,18 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       try {
                         final res =
                             await _locationService.getAll(search: v);
-                        if (ctx.mounted)
+                        if (ctx.mounted) {
                           setS(() {
-                            searchResults =
-                                res.where((l) => l.id != widget.id).toList();
+                            searchResults = res
+                                .where((l) => l.id != widget.id)
+                                .toList();
                             searching = false;
                           });
+                        }
                       } catch (_) {
-                        if (ctx.mounted) setS(() => searching = false);
+                        if (ctx.mounted) {
+                          setS(() => searching = false);
+                        }
                       }
                     },
                   ),
@@ -426,7 +597,8 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     Container(
                       margin: const EdgeInsets.only(top: 4),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        border:
+                            Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Column(
@@ -447,27 +619,27 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                                       error = null;
                                     });
                                     try {
-                                      final data = await _locationService
-                                          .getOne(l.id);
-                                      final tInv = ((data['inventory']
+                                      final tgtData =
+                                          await _locationService
+                                              .getOne(l.id);
+                                      final tInv = ((tgtData[
+                                                      'inventory']
                                                   as List?) ??
                                               [])
                                           .map((e) =>
-                                              InventoryRecord.fromJson(e))
+                                              InventoryRecord
+                                                  .fromJson(e))
                                           .toList();
-                                      final srcCodes = inventory
-                                          .map((r) => r.skuCode)
-                                          .toSet();
                                       final tCodes = tInv
                                           .map((r) => r.skuCode)
                                           .toSet();
                                       setS(() {
-                                        conflictSkus = srcCodes
+                                        conflictSkus = selectedSkus
                                             .intersection(tCodes)
                                             .toList();
                                         resolution = null;
                                         loadingTarget = false;
-                                        showConfirm = true;
+                                        step = 3;
                                       });
                                     } catch (e) {
                                       setS(() {
@@ -480,26 +652,35 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                             .toList(),
                       ),
                     ),
-                  // 新建库位选项：输入内容不为空且搜索结束后显示
-                  if (searchCtrl.text.trim().isNotEmpty && !searching && !loadingTarget &&
+                  // 新建库位
+                  if (searchCtrl.text.trim().isNotEmpty &&
+                      !searching &&
+                      !loadingTarget &&
                       (searchResults.isEmpty ||
                           searchResults.every((l) =>
                               l.code.toUpperCase() !=
-                              searchCtrl.text.trim().toUpperCase()))) ...[
+                              searchCtrl.text
+                                  .trim()
+                                  .toUpperCase()))) ...[
                     const SizedBox(height: 8),
                     InkWell(
                       onTap: () async {
-                        final code = searchCtrl.text.trim().toUpperCase();
-                        setS(() { loadingTarget = true; error = null; });
+                        final code =
+                            searchCtrl.text.trim().toUpperCase();
+                        setS(() {
+                          loadingTarget = true;
+                          error = null;
+                        });
                         try {
-                          final newLoc = await _locationService.create(code: code);
+                          final newLoc =
+                              await _locationService.create(code: code);
                           setS(() {
                             target = newLoc;
                             searchResults = [];
                             conflictSkus = [];
                             resolution = null;
                             loadingTarget = false;
-                            showConfirm = true;
+                            step = 3;
                           });
                         } catch (e) {
                           setS(() {
@@ -515,12 +696,14 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                         decoration: BoxDecoration(
                           color: Colors.green.shade50,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.green.shade300),
+                          border:
+                              Border.all(color: Colors.green.shade300),
                         ),
                         child: Row(
                           children: [
                             Icon(Icons.add_location_alt_outlined,
-                                size: 16, color: Colors.green.shade700),
+                                size: 16,
+                                color: Colors.green.shade700),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -544,22 +727,24 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                 ],
               );
 
-          Widget step2Content() {
-            final noConflict =
-                inventory.where((r) => !conflictSkus.contains(r.skuCode));
+          // ── Step 3: Confirm ───────────────────────────────────────────────
+          Widget step3Content() {
+            final selectedInventory = inventory
+                .where((r) => selectedSkus.contains(r.skuCode))
+                .toList();
+            final noConflict = selectedInventory
+                .where((r) => !conflictSkus.contains(r.skuCode))
+                .toList();
 
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Summary banner
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isTransfer
-                        ? Colors.blue.shade50
-                        : Colors.orange.shade50,
+                    color: accent.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -569,33 +754,22 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                               ? Icons.swap_horiz
                               : Icons.copy_outlined,
                           size: 18,
-                          color: isTransfer
-                              ? Colors.blue.shade700
-                              : Colors.orange.shade700),
+                          color: accent),
                       const SizedBox(width: 8),
                       Text(
                         '$srcCode  →  ${target!.code}',
                         style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: isTransfer
-                                ? Colors.blue.shade700
-                                : Colors.orange.shade700),
+                            fontWeight: FontWeight.w600, color: accent),
                       ),
                       const Spacer(),
-                      Text(
-                        '${inventory.length} 种 SKU',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: isTransfer
-                                ? Colors.blue.shade600
-                                : Colors.orange.shade600),
-                      ),
+                      Text('${selectedSkus.length} 种 SKU',
+                          style:
+                              TextStyle(fontSize: 12, color: accent)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
 
-                // Conflict section
                 if (conflictSkus.isNotEmpty) ...[
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -612,10 +786,13 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                             const Icon(Icons.warning_amber_rounded,
                                 size: 15, color: Colors.red),
                             const SizedBox(width: 6),
-                            Text(
-                              '目标库位已有 ${conflictSkus.length} 种相同 SKU，请选择处理方式：',
-                              style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600),
+                            Expanded(
+                              child: Text(
+                                '目标库位已有 ${conflictSkus.length} 种相同 SKU，请选择处理方式：',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ],
                         ),
@@ -625,18 +802,19 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                           children: conflictSkus
                               .map((s) => Chip(
                                     label: Text(s,
-                                        style:
-                                            const TextStyle(fontSize: 11)),
-                                    visualDensity: VisualDensity.compact,
+                                        style: const TextStyle(
+                                            fontSize: 11)),
+                                    visualDensity:
+                                        VisualDensity.compact,
                                     padding: EdgeInsets.zero,
                                     materialTapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
-                                    backgroundColor: Colors.red.shade100,
+                                    backgroundColor:
+                                        Colors.red.shade100,
                                   ))
                               .toList(),
                         ),
                         const SizedBox(height: 10),
-                        // Resolution radio buttons
                         if (isTransfer) ...[
                           _resolutionTile(
                               '合并',
@@ -670,11 +848,11 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                   const SizedBox(height: 10),
                 ],
 
-                // No-conflict SKUs
                 if (noConflict.isNotEmpty) ...[
                   Text(
                     '无冲突 SKU（${noConflict.length} 种，将直接$label）：',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 4),
                   Wrap(
@@ -682,7 +860,8 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     children: noConflict
                         .map((r) => Chip(
                               label: Text('${r.skuCode} · ${r.totalQty}件',
-                                  style: const TextStyle(fontSize: 11)),
+                                  style:
+                                      const TextStyle(fontSize: 11)),
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               materialTapTargetSize:
@@ -693,7 +872,6 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                   const SizedBox(height: 10),
                 ],
 
-                // Transfer warning
                 if (isTransfer)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -701,14 +879,15 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.amber.shade300),
+                      border:
+                          Border.all(color: Colors.amber.shade300),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
-                        const Icon(Icons.info_outline,
+                        Icon(Icons.info_outline,
                             size: 15, color: Colors.amber),
-                        const SizedBox(width: 6),
-                        const Expanded(
+                        SizedBox(width: 6),
+                        Expanded(
                           child: Text(
                             '转移完成后，原库位对应的 SKU 库存数据将被删除。',
                             style: TextStyle(fontSize: 12),
@@ -732,9 +911,11 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
             title: Row(
               children: [
                 Icon(
-                    isTransfer ? Icons.swap_horiz : Icons.copy_outlined,
+                    isTransfer
+                        ? Icons.swap_horiz
+                        : Icons.copy_outlined,
                     size: 20,
-                    color: isTransfer ? Colors.blue : Colors.orange),
+                    color: accent),
                 const SizedBox(width: 8),
                 Text('批量$label库存'),
               ],
@@ -742,39 +923,69 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
             content: SizedBox(
               width: 360,
               child: SingleChildScrollView(
-                child: showConfirm ? step2Content() : step1Content(),
+                child: switch (step) {
+                  1 => step1Content(),
+                  2 => step2Content(),
+                  _ => step3Content(),
+                },
               ),
             ),
             actions: [
+              // ── Left: Cancel / Back ──────────────────────────────────
               TextButton(
                 onPressed: saving
                     ? null
                     : () {
-                        if (showConfirm) {
+                        if (step == 1) {
+                          ctx.pop();
+                        } else if (step == 2) {
                           setS(() {
-                            showConfirm = false;
+                            step = 1;
+                            error = null;
+                            searchCtrl.clear();
+                            searchResults = [];
+                          });
+                        } else {
+                          setS(() {
+                            step = 2;
                             target = null;
                             conflictSkus = [];
                             resolution = null;
                             error = null;
+                            searchCtrl.clear();
+                            searchResults = [];
                           });
-                        } else {
-                          ctx.pop();
                         }
                       },
-                child: Text(showConfirm ? '← 返回' : '取消'),
+                child: Text(step == 1 ? '取消' : '← 返回'),
               ),
-              if (showConfirm)
+
+              // ── Step 1: Next button ───────────────────────────────────
+              if (step == 1)
                 FilledButton(
                   style: FilledButton.styleFrom(
-                    backgroundColor:
-                        isTransfer ? Colors.blue : Colors.orange,
-                  ),
+                      backgroundColor: accent),
+                  onPressed: selectedSkus.isEmpty
+                      ? null
+                      : () => setS(() => step = 2),
+                  child:
+                      Text('下一步（已选 ${selectedSkus.length} 种）'),
+                ),
+
+              // ── Step 3: Confirm button ────────────────────────────────
+              if (step == 3)
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: accent),
                   onPressed: saving ||
-                          (conflictSkus.isNotEmpty && resolution == null)
+                          (conflictSkus.isNotEmpty &&
+                              resolution == null)
                       ? null
                       : () async {
-                          setS(() { saving = true; error = null; });
+                          setS(() {
+                            saving = true;
+                            error = null;
+                          });
                           try {
                             final Map<String, dynamic> result;
                             final tgtCode = target!.code;
@@ -782,12 +993,14 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                               result = await _locationService.transfer(
                                 sourceId: widget.id,
                                 targetLocationId: target!.id,
+                                skuCodes: selectedSkus.toList(),
                                 conflictResolution: resolution,
                               );
                             } else {
                               result = await _locationService.copy(
                                 sourceId: widget.id,
                                 targetLocationId: target!.id,
+                                skuCodes: selectedSkus.toList(),
                                 conflictResolution: resolution,
                               );
                             }
@@ -812,8 +1025,9 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : Text('确认$label'),
+                              strokeWidth: 2,
+                              color: Colors.white))
+                      : Text('确认$label ${selectedSkus.length} 种'),
                 ),
             ],
           );
@@ -822,6 +1036,15 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     );
 
     searchCtrl.dispose();
+  }
+
+  String _configText(InventoryRecord r) {
+    if (r.configurations.isNotEmpty) {
+      return r.configurations
+          .map((c) => '${c.boxes}箱 × ${c.unitsPerBox}件/箱')
+          .join(' + ');
+    }
+    return '${r.boxes}箱 × ${r.unitsPerBox}件/箱';
   }
 
   Future<void> _showOperationResultDialog({
@@ -976,6 +1199,75 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _traceRow({
+    required String label,
+    required ChangeRecord? record,
+    required String emptyText,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    final (fg, bg, _) = record != null
+        ? AuditLogDetailSheet.badgeStyle(record)
+        : (Colors.grey.shade500, Colors.grey.shade100, Icons.history);
+    final badgeLabel = record != null ? AuditLogDetailSheet.badgeLabel(record) : null;
+
+    return InkWell(
+      onTap: record != null ? () => AuditLogDetailSheet.show(context, record) : null,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 80,
+              child: Text(label,
+                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            ),
+            Expanded(
+              child: record == null
+                  ? Text(emptyText,
+                      style: TextStyle(
+                          color: Colors.grey.shade400, fontSize: 13))
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(icon, size: 13, color: iconColor),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${_formatDate(record.createdAt.toIso8601String())}  ·  ${record.userName}',
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        if (badgeLabel != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(badgeLabel,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: fg)),
+                          ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.chevron_right,
+                            size: 14, color: Colors.grey.shade400),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

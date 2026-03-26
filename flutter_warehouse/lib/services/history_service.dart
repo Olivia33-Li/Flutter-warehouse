@@ -12,6 +12,8 @@ class HistoryService {
     String? startDate,
     String? endDate,
     String? userName,
+    String? locationCode,
+    bool? inventoryChangingOnly,
     int page = 1,
     int limit = 50,
   }) async {
@@ -23,6 +25,8 @@ class HistoryService {
       if (startDate != null) 'startDate': startDate,
       if (endDate != null) 'endDate': endDate,
       if (userName != null && userName.isNotEmpty) 'userName': userName,
+      if (locationCode != null) 'locationCode': locationCode,
+      if (inventoryChangingOnly == true) 'inventoryChangingOnly': 'true',
       'page': page,
       'limit': limit,
     });

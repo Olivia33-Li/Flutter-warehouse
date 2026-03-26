@@ -43,26 +43,23 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     }
   }
 
-  Future<void> _showInventoryDialog({InventoryRecord? existing}) async {
+  Future<void> _showInventoryDialog() async {
     final locSearchCtrl = TextEditingController();
-    final boxesCtrl = TextEditingController(text: existing?.boxes.toString() ?? '');
+    final boxesCtrl = TextEditingController();
     final unitsCtrl = TextEditingController(
-      text: existing?.unitsPerBox.toString() ??
-          (_data?['cartonQty']?.toString() ?? '1'),
-    );
+        text: _data?['cartonQty']?.toString() ?? '1');
+    final qtyCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
     final newLocCodeCtrl = TextEditingController();
     final newLocDescCtrl = TextEditingController();
 
-    String? selectedLocationId = existing?.locationId is Map
-        ? existing!.locationId['_id']
-        : existing?.locationId?.toString();
-    String? selectedLocationCode = existing?.locationId is Map
-        ? existing!.locationId['code']
-        : null;
-
+    String? selectedLocationId;
+    String? selectedLocationCode;
     List<Location> locResults = [];
     bool isNewLoc = false;
     bool locSearching = false;
+    bool useConfigMode = true; // 默认按箱规
+    bool saving = false;
     String? dialogError;
 
     await showDialog(
@@ -70,7 +67,10 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
           Future<void> searchLocs(String q) async {
-            if (q.isEmpty) { setS(() => locResults = []); return; }
+            if (q.isEmpty) {
+              setS(() => locResults = []);
+              return;
+            }
             setS(() => locSearching = true);
             try {
               locResults = await LocationService().getAll(search: q);
@@ -79,8 +79,13 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
             }
           }
 
+          final previewQty = useConfigMode
+              ? (int.tryParse(boxesCtrl.text) ?? 0) *
+                  (int.tryParse(unitsCtrl.text) ?? 0)
+              : (int.tryParse(qtyCtrl.text) ?? 0);
+
           return AlertDialog(
-            title: Text(existing == null ? '添加库位库存' : '编辑库存'),
+            title: const Text('新增库位'),
             content: SizedBox(
               width: 320,
               child: SingleChildScrollView(
@@ -88,263 +93,390 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 库位选择
-                    Row(
-                      children: [
-                        const Text('库位', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const Spacer(),
-                        if (!isNewLoc)
-                          TextButton.icon(
-                            icon: const Icon(Icons.add, size: 14),
-                            label: const Text('新建库位'),
-                            style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                            onPressed: () => setS(() {
+                  // ── 库位选择 ──────────────────────────────────────────
+                  Row(
+                    children: [
+                      const Text('库位',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      if (!isNewLoc)
+                        TextButton.icon(
+                          icon: const Icon(Icons.add, size: 14),
+                          label: const Text('新建库位'),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap),
+                          onPressed: () => setS(() {
+                            isNewLoc = true;
+                            selectedLocationId = null;
+                            selectedLocationCode = null;
+                            locSearchCtrl.clear();
+                            locResults = [];
+                          }),
+                        ),
+                      if (isNewLoc)
+                        TextButton.icon(
+                          icon: const Icon(Icons.search, size: 14),
+                          label: const Text('搜索已有'),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap),
+                          onPressed: () => setS(() {
+                            isNewLoc = false;
+                            newLocCodeCtrl.clear();
+                            newLocDescCtrl.clear();
+                          }),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  if (!isNewLoc) ...[
+                    if (selectedLocationId != null)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.check_circle,
+                            color: Colors.green),
+                        title: Text(selectedLocationCode ?? ''),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => setS(() {
+                            selectedLocationId = null;
+                            selectedLocationCode = null;
+                          }),
+                        ),
+                      )
+                    else ...[
+                      TextField(
+                        controller: locSearchCtrl,
+                        decoration: InputDecoration(
+                          hintText: '输入库位编号搜索',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                          suffixIcon: locSearching
+                              ? const Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2)))
+                              : null,
+                        ),
+                        onChanged: (v) => searchLocs(v),
+                      ),
+                      if (locResults.isNotEmpty)
+                        Container(
+                          constraints:
+                              const BoxConstraints(maxHeight: 150),
+                          decoration: BoxDecoration(
+                            border:
+                                Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: ListView(
+                            shrinkWrap: true,
+                            children: [
+                              ...locResults.take(5).map((l) => ListTile(
+                                    dense: true,
+                                    title: Text(l.code),
+                                    subtitle: l.description != null
+                                        ? Text(l.description!)
+                                        : null,
+                                    onTap: () => setS(() {
+                                      selectedLocationId = l.id;
+                                      selectedLocationCode = l.code;
+                                      locSearchCtrl.clear();
+                                      locResults = [];
+                                    }),
+                                  )),
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(
+                                    Icons.add_circle_outline,
+                                    color: Colors.blue,
+                                    size: 18),
+                                title: Text(
+                                    '新建 "${locSearchCtrl.text}"',
+                                    style: const TextStyle(
+                                        color: Colors.blue,
+                                        fontSize: 13)),
+                                onTap: () => setS(() {
+                                  isNewLoc = true;
+                                  newLocCodeCtrl.text =
+                                      locSearchCtrl.text;
+                                  locResults = [];
+                                }),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (locResults.isEmpty &&
+                          locSearchCtrl.text.isNotEmpty &&
+                          !locSearching)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: GestureDetector(
+                            onTap: () => setS(() {
                               isNewLoc = true;
-                              selectedLocationId = null;
-                              selectedLocationCode = null;
-                              locSearchCtrl.clear();
-                              locResults = [];
+                              newLocCodeCtrl.text = locSearchCtrl.text;
                             }),
+                            child: Text(
+                                '未找到，点击新建 "${locSearchCtrl.text}"',
+                                style: const TextStyle(
+                                    color: Colors.blue,
+                                    decoration: TextDecoration.underline,
+                                    fontSize: 13)),
                           ),
-                        if (isNewLoc)
-                          TextButton.icon(
-                            icon: const Icon(Icons.search, size: 14),
-                            label: const Text('搜索已有'),
-                            style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                            onPressed: () => setS(() {
-                              isNewLoc = false;
-                              newLocCodeCtrl.clear();
-                              newLocDescCtrl.clear();
-                            }),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-
-                    if (!isNewLoc) ...[
-                      // 已选中显示
-                      if (selectedLocationId != null)
-                        ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.check_circle, color: Colors.green),
-                          title: Text(selectedLocationCode ?? ''),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () => setS(() {
-                              selectedLocationId = null;
-                              selectedLocationCode = null;
-                            }),
-                          ),
-                        )
-                      else ...[
-                        TextField(
-                          controller: locSearchCtrl,
-                          decoration: InputDecoration(
-                            hintText: '输入库位编号搜索',
-                            border: const OutlineInputBorder(),
-                            isDense: true,
-                            suffixIcon: locSearching
-                                ? const Padding(
-                                    padding: EdgeInsets.all(10),
-                                    child: SizedBox(width: 14, height: 14,
-                                        child: CircularProgressIndicator(strokeWidth: 2)))
-                                : null,
-                          ),
-                          onChanged: (v) => searchLocs(v),
                         ),
-                        if (locResults.isNotEmpty)
-                          Container(
-                            constraints: const BoxConstraints(maxHeight: 150),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: ListView(
-                              shrinkWrap: true,
-                              children: [
-                                ...locResults.take(5).map((l) => ListTile(
-                                      dense: true,
-                                      title: Text(l.code),
-                                      subtitle: l.description != null ? Text(l.description!) : null,
-                                      onTap: () => setS(() {
-                                        selectedLocationId = l.id;
-                                        selectedLocationCode = l.code;
-                                        locSearchCtrl.clear();
-                                        locResults = [];
-                                      }),
-                                    )),
-                                ListTile(
-                                  dense: true,
-                                  leading: const Icon(Icons.add_circle_outline,
-                                      color: Colors.blue, size: 18),
-                                  title: Text('新建 "${locSearchCtrl.text}"',
-                                      style: const TextStyle(color: Colors.blue, fontSize: 13)),
-                                  onTap: () => setS(() {
-                                    isNewLoc = true;
-                                    newLocCodeCtrl.text = locSearchCtrl.text;
-                                    locResults = [];
-                                  }),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (locResults.isEmpty &&
-                            locSearchCtrl.text.isNotEmpty &&
-                            !locSearching)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: GestureDetector(
-                              onTap: () => setS(() {
-                                isNewLoc = true;
-                                newLocCodeCtrl.text = locSearchCtrl.text;
-                              }),
-                              child: Text('未找到，点击新建 "${locSearchCtrl.text}"',
-                                  style: const TextStyle(
-                                      color: Colors.blue,
-                                      decoration: TextDecoration.underline,
-                                      fontSize: 13)),
-                            ),
-                          ),
-                      ],
-                    ],
-
-                    // 新建库位表单
-                    if (isNewLoc) ...[
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          border: Border.all(color: Colors.blue.shade200),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: newLocCodeCtrl,
-                              textCapitalization: TextCapitalization.characters,
-                              decoration: const InputDecoration(
-                                labelText: '库位编号 *',
-                                border: OutlineInputBorder(),
-                                filled: true,
-                                fillColor: Colors.white,
-                                isDense: true,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: newLocDescCtrl,
-                              decoration: const InputDecoration(
-                                labelText: '描述（可选）',
-                                border: OutlineInputBorder(),
-                                filled: true,
-                                fillColor: Colors.white,
-                                isDense: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 12),
-
-                    // 箱数
-                    TextField(
-                      controller: boxesCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '箱数',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        suffixText: '箱',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 每箱数量
-                    TextField(
-                      controller: unitsCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '每箱数量',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        suffixText: '件/箱',
-                      ),
-                    ),
-
-                    if (dialogError != null) ...[
-                      const SizedBox(height: 8),
-                      Text(dialogError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                     ],
                   ],
-                ),
+
+                  if (isNewLoc) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        border: Border.all(color: Colors.blue.shade200),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: newLocCodeCtrl,
+                            textCapitalization:
+                                TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              labelText: '库位编号 *',
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Colors.white,
+                              isDense: true,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: newLocDescCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '描述（可选）',
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Colors.white,
+                              isDense: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // ── 初始库存 ─────────────────────────────────────────
+                  const SizedBox(height: 14),
+                  const Text('初始库存',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                          value: true,
+                          label: Text('按箱规'),
+                          icon: Icon(Icons.view_list, size: 16)),
+                      ButtonSegment(
+                          value: false,
+                          label: Text('按总数量'),
+                          icon: Icon(Icons.numbers, size: 16)),
+                    ],
+                    selected: {useConfigMode},
+                    onSelectionChanged: (v) =>
+                        setS(() => useConfigMode = v.first),
+                  ),
+                  const SizedBox(height: 10),
+
+                  if (useConfigMode) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: boxesCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: '箱数 *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              suffixText: '箱',
+                            ),
+                            onChanged: (_) => setS(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: unitsCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: '每箱件数 *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              suffixText: '件/箱',
+                            ),
+                            onChanged: (_) => setS(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    TextField(
+                      controller: qtyCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '总件数 *',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        suffixText: '件',
+                      ),
+                      onChanged: (_) => setS(() {}),
+                    ),
+                  ],
+
+                  // Preview
+                  if (previewQty > 0) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        useConfigMode
+                            ? '初始库存：${int.tryParse(boxesCtrl.text) ?? 0}箱 × ${int.tryParse(unitsCtrl.text) ?? 0}件/箱 = $previewQty件'
+                            : '初始库存：$previewQty 件',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+
+                  // Note
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '备注（可选）',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+
+                  if (dialogError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(dialogError!,
+                        style: const TextStyle(
+                            color: Colors.red, fontSize: 13)),
+                  ],
+                ],
               ),
             ),
-            actions: [
-              TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+          ),
+          actions: [
+              TextButton(
+                  onPressed: saving ? null : () => ctx.pop(),
+                  child: const Text('取消')),
               FilledButton(
-                onPressed: () async {
-                  final boxes = int.tryParse(boxesCtrl.text) ?? 0;
-                  final unitsPerBox = int.tryParse(unitsCtrl.text) ?? 0;
-                  if (boxes <= 0) {
-                    setS(() => dialogError = '请输入有效箱数');
-                    return;
-                  }
-                  if (unitsPerBox <= 0) {
-                    setS(() => dialogError = '请输入每箱数量');
-                    return;
-                  }
-                  String? locId = selectedLocationId;
-                  try {
-                    if (isNewLoc) {
-                      final code = newLocCodeCtrl.text.trim();
-                      if (code.isEmpty) {
-                        setS(() => dialogError = '库位编号不能为空');
-                        return;
-                      }
-                      final newLoc = await LocationService().create(
-                        code: code,
-                        description: newLocDescCtrl.text.trim().isEmpty
-                            ? null
-                            : newLocDescCtrl.text.trim(),
-                      );
-                      locId = newLoc.id;
-                    }
-                    if (locId == null) {
-                      setS(() => dialogError = '请选择或新建库位');
-                      return;
-                    }
-                    if (existing != null) {
-                      await _inventoryService.update(
-                        existing.id,
-                        boxes: boxes,
-                        unitsPerBox: unitsPerBox,
-                      );
-                    } else {
-                      await _inventoryService.create(
-                        skuCode: _data!['sku'],
-                        locationId: locId,
-                        boxes: boxes,
-                        unitsPerBox: unitsPerBox,
-                      );
-                    }
-                    if (ctx.mounted) ctx.pop();
-                    _load();
-                  } catch (e) {
-                    final msg = e is DioException
-                        ? (e.response?.data?['message'] ?? '操作失败')
-                        : '操作失败: $e';
-                    setS(() => dialogError = msg is List ? msg.join(', ') : msg.toString());
-                  }
-                },
-                child: const Text('保存'),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        // Validate location
+                        String? locId = selectedLocationId;
+                        if (!isNewLoc && locId == null) {
+                          setS(() => dialogError = '请选择或新建库位');
+                          return;
+                        }
+                        // Validate stock input
+                        int boxes, units;
+                        if (useConfigMode) {
+                          boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                          units = int.tryParse(unitsCtrl.text) ?? 0;
+                          if (boxes <= 0) {
+                            setS(() => dialogError = '请输入有效箱数');
+                            return;
+                          }
+                          if (units <= 0) {
+                            setS(() => dialogError = '请输入有效每箱件数');
+                            return;
+                          }
+                        } else {
+                          final qty = int.tryParse(qtyCtrl.text) ?? 0;
+                          if (qty <= 0) {
+                            setS(() => dialogError = '请输入有效总件数');
+                            return;
+                          }
+                          boxes = 1;
+                          units = qty;
+                        }
+                        setS(() {
+                          saving = true;
+                          dialogError = null;
+                        });
+                        try {
+                          if (isNewLoc) {
+                            final code =
+                                newLocCodeCtrl.text.trim().toUpperCase();
+                            if (code.isEmpty) {
+                              setS(() {
+                                saving = false;
+                                dialogError = '库位编号不能为空';
+                              });
+                              return;
+                            }
+                            final newLoc = await LocationService().create(
+                              code: code,
+                              description:
+                                  newLocDescCtrl.text.trim().isEmpty
+                                      ? null
+                                      : newLocDescCtrl.text.trim(),
+                            );
+                            locId = newLoc.id;
+                          }
+                          await _inventoryService.create(
+                            skuCode: _data!['sku'],
+                            locationId: locId!,
+                            boxes: boxes,
+                            unitsPerBox: units,
+                            note: noteCtrl.text.trim().isEmpty
+                                ? null
+                                : noteCtrl.text.trim(),
+                          );
+                          if (ctx.mounted) ctx.pop();
+                          _load();
+                        } catch (e) {
+                          final msg = e is DioException
+                              ? (e.response?.data?['message'] ?? '操作失败')
+                              : '操作失败: $e';
+                          setS(() {
+                            saving = false;
+                            dialogError = msg is List
+                                ? msg.join(', ')
+                                : msg.toString();
+                          });
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('确认新增'),
               ),
             ],
           );
@@ -480,10 +612,6 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     if (user?.canEdit == true) ...[
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () => _showInventoryDialog(existing: record),
-                      ),
                       IconButton(
                         icon: const Icon(Icons.delete, size: 20, color: Colors.red),
                         onPressed: () => _deleteInventory(record),
