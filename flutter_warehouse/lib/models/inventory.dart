@@ -25,6 +25,7 @@ class InventoryRecord {
   final int boxes;
   final int unitsPerBox;
   final List<InventoryConfig> configurations;
+  final bool pendingCount;
 
   InventoryRecord({
     required this.id,
@@ -35,6 +36,7 @@ class InventoryRecord {
     required this.boxes,
     required this.unitsPerBox,
     this.configurations = const [],
+    this.pendingCount = false,
   });
 
   int get totalQty => configurations.isNotEmpty
@@ -57,6 +59,7 @@ class InventoryRecord {
       boxes: (json['boxes'] as num?)?.toInt() ?? 0,
       unitsPerBox: (json['unitsPerBox'] as num?)?.toInt() ?? 1,
       configurations: configs,
+      pendingCount: json['pendingCount'] == true,
     );
   }
 }

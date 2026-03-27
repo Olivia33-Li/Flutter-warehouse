@@ -33,5 +33,5 @@ class User {
       );
 
   bool get isAdmin => role == 'admin';
-  bool get canEdit => role == 'admin' || role == 'editor';
+  bool get canEdit => true; // All authenticated users can perform inventory operations
 }

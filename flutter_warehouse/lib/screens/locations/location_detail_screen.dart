@@ -7,6 +7,7 @@ import '../../services/inventory_service.dart';
 import '../../services/history_service.dart';
 import '../../services/sku_service.dart';
 import '../../models/inventory.dart';
+import '../../models/sku.dart';
 import '../../models/location.dart';
 import '../../models/change_record.dart';
 import '../../widgets/error_view.dart';
@@ -72,68 +73,413 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     if (!mounted) return;
 
     String? selectedSkuCode = existing?.skuCode;
+    String? selectedSkuName = existing != null
+        ? skus.where((s) => s.sku == existing.skuCode).map((s) => s.name).firstOrNull
+        : null;
     final boxesCtrl = TextEditingController(text: existing?.boxes.toString() ?? '');
     final unitsCtrl = TextEditingController(text: existing?.unitsPerBox.toString() ?? '1');
+    final totalQtyCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    bool byCarton = true;
     String? dialogError;
+
+    // SKU search state
+    final skuSearchCtrl = TextEditingController();
+    List<Sku> filteredSkus = [];
+    bool showSkuResults = false;
+
+    // Inline new-SKU creation state
+    bool isCreatingNew = false;
+    final newCodeCtrl = TextEditingController();
+    final newNameCtrl = TextEditingController();
+    String? createError;
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: Text(existing == null ? '新增库位' : '编辑库位'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (existing == null)
-                DropdownButtonFormField<String>(
-                  value: selectedSkuCode,
-                  decoration: const InputDecoration(
-                      labelText: 'SKU', border: OutlineInputBorder()),
-                  items: skus
-                      .map((s) => DropdownMenuItem(value: s.sku, child: Text(s.sku)))
-                      .toList(),
-                  onChanged: (v) => selectedSkuCode = v,
-                )
-              else
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('SKU', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                  subtitle: Text(existing.skuCode, style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: boxesCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: '箱数', border: OutlineInputBorder(), suffixText: '箱'),
+          title: Text(existing == null ? '新增 SKU' : '编辑库存'),
+          content: SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── SKU selector ─────────────────────────────────────
+                  if (existing == null) ...[
+                    // State A: SKU already selected → show chip
+                    if (selectedSkuCode != null && !showSkuResults && !isCreatingNew)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('SKU', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                                  const SizedBox(height: 2),
+                                  Text(selectedSkuCode!,
+                                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  if (selectedSkuName != null && selectedSkuName!.isNotEmpty)
+                                    Text(selectedSkuName!,
+                                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              tooltip: '重新选择',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => setS(() {
+                                selectedSkuCode = null;
+                                selectedSkuName = null;
+                                skuSearchCtrl.clear();
+                                filteredSkus = [];
+                                showSkuResults = false;
+                              }),
+                            ),
+                          ],
+                        ),
+                      )
+                    // State B: search field + results
+                    else if (!isCreatingNew) ...[
+                      TextField(
+                        controller: skuSearchCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'SKU',
+                          hintText: '搜索编码 / 名称 / 条码',
+                          prefixIcon: Icon(Icons.search, size: 18),
+                          border: OutlineInputBorder(),
+                          isDense: false,
+                        ),
+                        onChanged: (v) {
+                          final q = v.trim().toLowerCase();
+                          setS(() {
+                            if (q.isEmpty) {
+                              filteredSkus = [];
+                              showSkuResults = false;
+                            } else {
+                              filteredSkus = skus.where((s) =>
+                                s.sku.toLowerCase().contains(q) ||
+                                (s.name?.toLowerCase().contains(q) ?? false) ||
+                                (s.barcode?.toLowerCase().contains(q) ?? false),
+                              ).toList();
+                              showSkuResults = true;
+                            }
+                          });
+                        },
+                      ),
+                      if (showSkuResults) ...[
+                        const SizedBox(height: 2),
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListView(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            children: [
+                              ...filteredSkus.map((s) => ListTile(
+                                dense: true,
+                                title: Text(s.sku,
+                                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: (s.name != null && s.name!.isNotEmpty)
+                                    ? Text(s.name!)
+                                    : null,
+                                trailing: (s.barcode != null && s.barcode!.isNotEmpty)
+                                    ? Text(s.barcode!,
+                                        style: TextStyle(
+                                            color: Colors.grey.shade500, fontSize: 11))
+                                    : null,
+                                onTap: () => setS(() {
+                                  selectedSkuCode = s.sku;
+                                  selectedSkuName = s.name;
+                                  showSkuResults = false;
+                                  skuSearchCtrl.clear();
+                                }),
+                              )),
+                              if (filteredSkus.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                  child: Text('未找到匹配的 SKU',
+                                      style: TextStyle(color: Colors.grey)),
+                                ),
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.add,
+                                    color: Colors.blue, size: 18),
+                                title: const Text('+ 新建货号',
+                                    style: TextStyle(
+                                        color: Colors.blue, fontSize: 13)),
+                                onTap: () => setS(() {
+                                  newCodeCtrl.text =
+                                      skuSearchCtrl.text.trim();
+                                  newNameCtrl.clear();
+                                  isCreatingNew = true;
+                                  showSkuResults = false;
+                                  createError = null;
+                                }),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('新建货号',
+                                style: TextStyle(fontSize: 13)),
+                            style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2)),
+                            onPressed: () => setS(() {
+                              newCodeCtrl.clear();
+                              newNameCtrl.clear();
+                              isCreatingNew = true;
+                              createError = null;
+                            }),
+                          ),
+                        ),
+                    ]
+                    // State C: inline create-new form
+                    else ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          border: Border.all(color: Colors.blue.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.add_box_outlined,
+                                    size: 16, color: Colors.blue),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text('新建货号',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blue,
+                                          fontSize: 13)),
+                                ),
+                                GestureDetector(
+                                  onTap: () => setS(() {
+                                    isCreatingNew = false;
+                                    createError = null;
+                                  }),
+                                  child: const Icon(Icons.close, size: 16),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: newCodeCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'SKU 编码 *',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: newNameCtrl,
+                              decoration: const InputDecoration(
+                                labelText: '货号名称（可选）',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            if (createError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(createError!,
+                                  style: const TextStyle(
+                                      color: Colors.red, fontSize: 12)),
+                            ],
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 8),
+                                    textStyle:
+                                        const TextStyle(fontSize: 13)),
+                                onPressed: () async {
+                                  final code = newCodeCtrl.text.trim();
+                                  if (code.isEmpty) {
+                                    setS(() => createError = '请输入 SKU 编码');
+                                    return;
+                                  }
+                                  try {
+                                    final nameVal =
+                                        newNameCtrl.text.trim();
+                                    final created =
+                                        await SkuService().create(
+                                      sku: code,
+                                      name: nameVal.isEmpty
+                                          ? null
+                                          : nameVal,
+                                    );
+                                    skus.add(created);
+                                    setS(() {
+                                      selectedSkuCode = created.sku;
+                                      selectedSkuName = created.name;
+                                      isCreatingNew = false;
+                                      createError = null;
+                                    });
+                                  } catch (e) {
+                                    setS(() => createError = '创建失败: $e');
+                                  }
+                                },
+                                child: const Text('创建'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                  ] else
+                    // Editing existing inventory: show read-only SKU label
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('SKU',
+                            style: TextStyle(
+                                color: Colors.grey, fontSize: 13)),
+                        subtitle: Text(existing.skuCode,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+
+                  // ── Mode toggle (create only) ─────────────────────────
+                  if (existing == null) ...[
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                            value: true,
+                            label: Text('按箱规'),
+                            icon: Icon(Icons.inventory_2_outlined)),
+                        ButtonSegment(
+                            value: false,
+                            label: Text('按总数量'),
+                            icon: Icon(Icons.format_list_numbered)),
+                      ],
+                      selected: {byCarton},
+                      onSelectionChanged: (s) =>
+                          setS(() => byCarton = s.first),
+                      style: const ButtonStyle(
+                          visualDensity: VisualDensity.compact),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // ── Quantity fields ───────────────────────────────────
+                  if (existing != null || byCarton) ...[
+                    TextField(
+                      controller: boxesCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: '箱数',
+                          border: OutlineInputBorder(),
+                          suffixText: '箱'),
+                      onChanged: (_) => setS(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: unitsCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: '每箱件数',
+                          border: OutlineInputBorder(),
+                          suffixText: '件/箱'),
+                      onChanged: (_) => setS(() {}),
+                    ),
+                    Builder(builder: (_) {
+                      final b = int.tryParse(boxesCtrl.text) ?? 0;
+                      final u = int.tryParse(unitsCtrl.text) ?? 0;
+                      if (b > 0 && u > 0) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('共 ${b * u} 件',
+                              style: const TextStyle(
+                                  color: Colors.grey, fontSize: 12)),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }),
+                  ] else ...[
+                    TextField(
+                      controller: totalQtyCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: '初始总件数',
+                          border: OutlineInputBorder(),
+                          suffixText: '件'),
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: const InputDecoration(
+                        labelText: '备注（可选）',
+                        border: OutlineInputBorder()),
+                  ),
+
+                  if (dialogError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(dialogError!,
+                        style: const TextStyle(
+                            color: Colors.red, fontSize: 13)),
+                  ],
+                ],
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: unitsCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: '每箱数量', border: OutlineInputBorder(), suffixText: '件/箱'),
-              ),
-              if (dialogError != null) ...[
-                const SizedBox(height: 8),
-                Text(dialogError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-              ],
-            ],
+            ),
           ),
           actions: [
-            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+            TextButton(
+                onPressed: () => ctx.pop(), child: const Text('取消')),
             FilledButton(
               onPressed: () async {
-                final boxes = int.tryParse(boxesCtrl.text) ?? 0;
-                final unitsPerBox = int.tryParse(unitsCtrl.text) ?? 0;
-                if (boxes <= 0 || unitsPerBox <= 0) {
-                  setS(() => dialogError = '请输入有效的箱数和每箱数量');
-                  return;
-                }
-                if (selectedSkuCode == null) {
+                if (existing == null && selectedSkuCode == null) {
                   setS(() => dialogError = '请选择 SKU');
                   return;
                 }
+                int boxes, unitsPerBox;
+                if (existing != null || byCarton) {
+                  boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                  unitsPerBox = int.tryParse(unitsCtrl.text) ?? 0;
+                  if (boxes <= 0 || unitsPerBox <= 0) {
+                    setS(() => dialogError = '请输入有效的箱数和每箱件数');
+                    return;
+                  }
+                } else {
+                  final qty = int.tryParse(totalQtyCtrl.text) ?? 0;
+                  if (qty <= 0) {
+                    setS(() => dialogError = '请输入有效的数量');
+                    return;
+                  }
+                  boxes = 1;
+                  unitsPerBox = qty;
+                }
+                final note = noteCtrl.text.trim();
                 try {
                   if (existing != null) {
                     await _inventoryService.update(
@@ -147,6 +493,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       locationId: widget.id,
                       boxes: boxes,
                       unitsPerBox: unitsPerBox,
+                      note: note.isEmpty ? null : note,
                     );
                   }
                   if (ctx.mounted) ctx.pop();

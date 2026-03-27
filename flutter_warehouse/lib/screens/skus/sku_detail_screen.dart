@@ -526,11 +526,28 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
         ?.map((e) => InventoryRecord.fromJson(e))
         .toList() ?? [];
 
+    // Carton distribution: group by unitsPerBox, sum boxes across all locations
+    final Map<int, int> configDist = {};
+    for (final record in inventory) {
+      final cfgs = record.configurations.isNotEmpty
+          ? record.configurations
+          : [InventoryConfig(boxes: record.boxes, unitsPerBox: record.unitsPerBox)];
+      for (final c in cfgs) {
+        configDist[c.unitsPerBox] = (configDist[c.unitsPerBox] ?? 0) + c.boxes;
+      }
+    }
+    final distEntries = configDist.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final uniqueConfigCount = configDist.length;
+    final distText = distEntries.isEmpty
+        ? '-'
+        : distEntries.map((e) => '${e.key}件/箱（${e.value}箱）').join('，');
+
     return Scaffold(
       appBar: AppBar(
         title: Text(data['sku'] ?? ''),
         actions: [
-          if (user?.canEdit == true)
+          if (user != null)
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () => context.push('/skus/new',
@@ -556,8 +573,10 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   _info('SKU', data['sku']),
                   if (data['name'] != null) _info('名称', data['name']),
                   if (data['barcode'] != null) _info('条码', data['barcode']),
-                  if (data['cartonQty'] != null)
-                    _info('每箱个数', '${data['cartonQty']} 件'),
+                  const Divider(),
+                  _info('默认箱规', data['cartonQty'] != null ? '${data['cartonQty']} 件/箱' : '-'),
+                  _info('实际箱规', '$uniqueConfigCount 种'),
+                  _info('箱规分布', distText),
                   const Divider(),
                   _info('总库存', '${data['totalQty'] ?? 0} 件'),
                 ],

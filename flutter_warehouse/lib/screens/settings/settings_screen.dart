@@ -407,8 +407,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const Divider(),
 
-          // CSV 导入（editor+）
-          if (user?.canEdit == true)
+          // CSV 导入（仅 admin）
+          if (user?.isAdmin == true)
             ListTile(
               leading: const Icon(Icons.upload_file),
               title: const Text('导入 CSV'),

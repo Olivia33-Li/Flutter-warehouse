@@ -83,57 +83,258 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   Future<void> _showStockInDialog() async {
     final boxesCtrl = TextEditingController();
     final unitsCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
+    bool useConfigMode = true; // default: 按箱规
+    bool isPending = false;
     String? err;
     bool saving = false;
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('入库'),
-          content: _operationDialogContent(
-            ctx: ctx,
-            header: '${widget.skuCode}  →  ${widget.locationCode}',
-            children: [
-              _qtyRow(boxesCtrl, unitsCtrl),
-              const SizedBox(height: 10),
-              _noteField(noteCtrl),
-            ],
-            err: err,
-          ),
-          actions: [
-            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
-            FilledButton(
-              onPressed: saving ? null : () async {
-                final boxes = int.tryParse(boxesCtrl.text) ?? 0;
-                final units = int.tryParse(unitsCtrl.text) ?? 0;
-                if (boxes <= 0 || units <= 0) {
-                  setS(() => err = '请输入有效的箱数和每箱件数');
-                  return;
-                }
-                setS(() { saving = true; err = null; });
-                try {
-                  await _invService.stockIn(
-                    skuCode: widget.skuCode,
-                    locationId: widget.locationId,
-                    boxes: boxes,
-                    unitsPerBox: units,
-                    note: noteCtrl.text.trim(),
-                  );
-                  if (ctx.mounted) ctx.pop();
-                  widget.onChanged?.call();
-                  _load();
-                } catch (e) {
-                  setS(() { saving = false; err = '入库失败: $e'; });
-                }
-              },
-              child: saving ? _spinner() : const Text('确认入库'),
+        builder: (ctx, setS) {
+          final previewQty = isPending
+              ? 0
+              : useConfigMode
+                  ? (int.tryParse(boxesCtrl.text) ?? 0) *
+                      (int.tryParse(unitsCtrl.text) ?? 0)
+                  : (int.tryParse(qtyCtrl.text) ?? 0);
+
+          return AlertDialog(
+            title: const Text('入库'),
+            content: SizedBox(
+              width: 340,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isPending
+                            ? Colors.orange.shade50
+                            : Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${widget.skuCode}  @  ${widget.locationCode}',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text(
+                            _invRecord?.pendingCount == true
+                                ? '当前状态: 待清点'
+                                : '当前库存: $_qty 件',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: isPending
+                                    ? Colors.orange.shade700
+                                    : Colors.green.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 待清点 toggle
+                    CheckboxListTile(
+                      value: isPending,
+                      onChanged: (v) => setS(() => isPending = v ?? false),
+                      title: const Text('暂存 / 待清点',
+                          style: TextStyle(fontSize: 14)),
+                      subtitle: const Text('货已到位，数量暂未确认',
+                          style: TextStyle(fontSize: 12)),
+                      secondary: Icon(Icons.pending_actions_outlined,
+                          color: isPending ? Colors.orange : Colors.grey,
+                          size: 20),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                    ),
+                    const SizedBox(height: 8),
+
+                    if (!isPending) ...[
+                      // Mode toggle
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                              value: true,
+                              label: Text('按箱规'),
+                              icon: Icon(Icons.view_list, size: 16)),
+                          ButtonSegment(
+                              value: false,
+                              label: Text('按总数量'),
+                              icon: Icon(Icons.numbers, size: 16)),
+                        ],
+                        selected: {useConfigMode},
+                        onSelectionChanged: (v) =>
+                            setS(() => useConfigMode = v.first),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 按箱规
+                      if (useConfigMode)
+                        _qtyRow(boxesCtrl, unitsCtrl,
+                            onChanged: () => setS(() {}))
+                      else
+                        TextField(
+                          controller: qtyCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: '入库件数 *',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            suffixText: '件',
+                          ),
+                          onChanged: (_) => setS(() {}),
+                        ),
+
+                      // Preview
+                      if (previewQty > 0) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Text('入库总量: ',
+                                  style: TextStyle(fontSize: 13)),
+                              Text('+ $previewQty 件',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: Colors.green.shade700)),
+                              Text('  →  ${_qty + previewQty} 件',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500)),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          border: Border.all(color: Colors.orange.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 16, color: Colors.orange.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '将标记此库存为"待清点"，当前数量不变。'
+                                '后续确认后可通过"调整"更新数量。',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange.shade800),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                    _noteField(noteCtrl),
+
+                    if (err != null) ...[
+                      const SizedBox(height: 8),
+                      Text(err!,
+                          style: const TextStyle(
+                              color: Colors.red, fontSize: 13)),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: isPending
+                        ? Colors.orange.shade600
+                        : Colors.green.shade600),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        if (isPending) {
+                          // Mark pending — no quantity change
+                          setS(() { saving = true; err = null; });
+                          try {
+                            await _invService.markPending(
+                              widget.inventoryRecordId!,
+                              pending: true,
+                            );
+                            if (ctx.mounted) ctx.pop();
+                            widget.onChanged?.call();
+                            _load();
+                          } catch (e) {
+                            setS(() { saving = false; err = '操作失败: $e'; });
+                          }
+                          return;
+                        }
+                        int boxes, units;
+                        if (useConfigMode) {
+                          boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                          units = int.tryParse(unitsCtrl.text) ?? 0;
+                          if (boxes <= 0 || units <= 0) {
+                            setS(() => err = '请输入有效的箱数和每箱件数');
+                            return;
+                          }
+                        } else {
+                          final qty = int.tryParse(qtyCtrl.text) ?? 0;
+                          if (qty <= 0) {
+                            setS(() => err = '请输入有效件数');
+                            return;
+                          }
+                          boxes = 1;
+                          units = qty;
+                        }
+                        setS(() { saving = true; err = null; });
+                        try {
+                          await _invService.stockIn(
+                            skuCode: widget.skuCode,
+                            locationId: widget.locationId,
+                            boxes: boxes,
+                            unitsPerBox: units,
+                            note: noteCtrl.text.trim(),
+                          );
+                          if (ctx.mounted) ctx.pop();
+                          widget.onChanged?.call();
+                          _load();
+                        } catch (e) {
+                          setS(() { saving = false; err = '入库失败: $e'; });
+                        }
+                      },
+                child: saving
+                    ? _spinner()
+                    : Text(isPending ? '确认暂存' : '确认入库'),
+              ),
+            ],
+          );
+        },
       ),
     );
+
+    qtyCtrl.dispose();
+    noteCtrl.dispose();
   }
 
   // ── 出库 ──
@@ -384,7 +585,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         }
                         if (qty > _qty) {
                           setS(() => err =
-                              '出库数量不能超过当前库存 (${_qty} 件)');
+                              '出库数量不能超过当前库存 ($_qty 件)');
                           return;
                         }
                         setS(() {
@@ -826,48 +1027,6 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   }
 
   // ── 共用 helper widgets ──
-  Widget _operationDialogContent({
-    required BuildContext ctx,
-    required String header,
-    String? subInfo,
-    String? note,
-    required List<Widget> children,
-    String? err,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(header, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              if (subInfo != null)
-                Text(subInfo, style: TextStyle(fontSize: 12, color: Colors.blue.shade700)),
-            ],
-          ),
-        ),
-        if (note != null) ...[
-          const SizedBox(height: 8),
-          Text(note, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        ],
-        const SizedBox(height: 14),
-        ...children,
-        if (err != null) ...[
-          const SizedBox(height: 8),
-          Text(err, style: const TextStyle(color: Colors.red, fontSize: 13)),
-        ],
-      ],
-    );
-  }
-
   Widget _qtyRow(TextEditingController boxesCtrl, TextEditingController unitsCtrl,
       {VoidCallback? onChanged}) {
     return Row(
@@ -987,7 +1146,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     border: Border.all(
                       color: _qty > 0 ? Colors.green.shade200 : Colors.orange.shade200),
                   ),
-                  child: Text('${_qty} 件',
+                  child: Text('$_qty 件',
                       style: TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 16,
                         color: _qty > 0

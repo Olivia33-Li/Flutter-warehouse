@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/history_service.dart';
 import '../../models/change_record.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/audit_log_detail_sheet.dart';
 
-class HistoryScreen extends StatefulWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final _historyService = HistoryService();
   final _keywordCtrl = TextEditingController();
   List<ChangeRecord> _records = [];
@@ -22,6 +24,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String? _filterBusinessAction;
   String? _filterEntity;
   String? _filterDateRange;
+  DateTime? _customStart;
+  DateTime? _customEnd;
+  // null = all users (admin only); non-null = filter by username
+  String? _filterUserName;
+  bool _userFilterInitialized = false;
   int _page = 1;
   int _total = 0;
   static const _limit = 50;
@@ -29,7 +36,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // _load() will be called after first build via didChangeDependencies
+    // to ensure the user is available from the provider
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_userFilterInitialized) {
+      _userFilterInitialized = true;
+      final user = ref.read(currentUserProvider);
+      if (user != null && !user.isAdmin) {
+        _filterUserName = user.username;
+      }
+      _load();
+    }
   }
 
   @override
@@ -46,19 +67,81 @@ class _HistoryScreenState extends State<HistoryScreen> {
       case 'today':
         return (today.toIso8601String(), now.toIso8601String());
       case '7d':
-        return (today
-                .subtract(const Duration(days: 7))
-                .toIso8601String(),
+        return (today.subtract(const Duration(days: 7)).toIso8601String(),
             now.toIso8601String());
       case '30d':
-        return (today
-                .subtract(const Duration(days: 30))
-                .toIso8601String(),
+        return (today.subtract(const Duration(days: 30)).toIso8601String(),
             now.toIso8601String());
+      case 'custom':
+        return (
+          _customStart?.toIso8601String(),
+          _customEnd?.toIso8601String(),
+        );
       default:
         return (null, null);
     }
   }
+
+  Future<void> _pickCustomRange() async {
+    // Pick start date
+    final startDate = await showDatePicker(
+      context: context,
+      initialDate: _customStart ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      helpText: '选择开始日期',
+    );
+    if (!mounted || startDate == null) return;
+
+    final startTime = await showTimePicker(
+      context: context,
+      initialTime: _customStart != null
+          ? TimeOfDay.fromDateTime(_customStart!)
+          : const TimeOfDay(hour: 0, minute: 0),
+      helpText: '选择开始时间',
+    );
+    if (!mounted) return;
+
+    final start = DateTime(
+      startDate.year, startDate.month, startDate.day,
+      startTime?.hour ?? 0, startTime?.minute ?? 0,
+    );
+
+    // Pick end date
+    final endDate = await showDatePicker(
+      context: context,
+      initialDate: _customEnd ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      helpText: '选择结束日期',
+    );
+    if (!mounted || endDate == null) return;
+
+    final endTime = await showTimePicker(
+      context: context,
+      initialTime: _customEnd != null
+          ? TimeOfDay.fromDateTime(_customEnd!)
+          : const TimeOfDay(hour: 23, minute: 59),
+      helpText: '选择结束时间',
+    );
+    if (!mounted) return;
+
+    final end = DateTime(
+      endDate.year, endDate.month, endDate.day,
+      endTime?.hour ?? 23, endTime?.minute ?? 59,
+    );
+
+    setState(() {
+      _customStart = start;
+      _customEnd = end;
+      _filterDateRange = 'custom';
+    });
+    _load();
+  }
+
+  String _fmtDateTime(DateTime dt) =>
+      '${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
+      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
   Future<void> _load({bool reset = true}) async {
     if (reset) _page = 1;
@@ -68,12 +151,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
     try {
       final (startDate, endDate) = _dateRange();
+      // Check actions are public — don't restrict to the current user's records
+      final isCheckFilter = _filterBusinessAction == '标记已检查' ||
+          _filterBusinessAction == '取消已检查';
       final result = await _historyService.getAll(
         businessAction: _filterBusinessAction,
         entity: _filterEntity,
         keyword: _keywordCtrl.text.trim(),
         startDate: startDate,
         endDate: endDate,
+        userName: isCheckFilter ? null : _filterUserName,
         page: _page,
         limit: _limit,
       );
@@ -125,11 +212,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: Text('操作记录 ($_total)'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(112),
+          preferredSize: Size.fromHeight(
+            ref.watch(currentUserProvider)?.isAdmin == true ? 154 : 112,
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
             child: Column(
               children: [
+                if (ref.watch(currentUserProvider)?.isAdmin == true) ...[
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _chip('全部用户', null, _filterUserName, (v) {
+                          setState(() => _filterUserName = v);
+                          _load();
+                        }),
+                        _chip(
+                          '我的记录',
+                          ref.read(currentUserProvider)?.username,
+                          _filterUserName,
+                          (v) {
+                            setState(() => _filterUserName = v);
+                            _load();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
                 SearchBar(
                   controller: _keywordCtrl,
                   hintText: '搜索描述 / SKU / 库位 / 用户名...',
@@ -202,7 +314,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       }),
                       const SizedBox(width: 8),
                       _chip('全部时间', null, _filterDateRange, (v) {
-                        setState(() => _filterDateRange = v);
+                        setState(() {
+                          _filterDateRange = v;
+                          _customStart = null;
+                          _customEnd = null;
+                        });
                         _load();
                       }),
                       _chip('今天', 'today', _filterDateRange, (v) {
@@ -217,6 +333,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         setState(() => _filterDateRange = v);
                         _load();
                       }),
+                      // Custom date-time range chip
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: FilterChip(
+                          label: Text(
+                            _filterDateRange == 'custom' &&
+                                    _customStart != null &&
+                                    _customEnd != null
+                                ? '${_fmtDateTime(_customStart!)} ~ ${_fmtDateTime(_customEnd!)}'
+                                : '自定义时间',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          selected: _filterDateRange == 'custom',
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) {
+                            if (_filterDateRange == 'custom') {
+                              setState(() {
+                                _filterDateRange = null;
+                                _customStart = null;
+                                _customEnd = null;
+                              });
+                              _load();
+                            } else {
+                              _pickCustomRange();
+                            }
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),

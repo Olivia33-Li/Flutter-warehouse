@@ -15,9 +15,10 @@ class InventoryService {
   Future<InventoryRecord> create({
     required String skuCode,
     required String locationId,
-    required int boxes,
-    required int unitsPerBox,
+    int boxes = 0,
+    int unitsPerBox = 1,
     String? note,
+    bool pendingCount = false,
   }) async {
     final response = await _api.post('/inventory', data: {
       'skuCode': skuCode,
@@ -25,7 +26,13 @@ class InventoryService {
       'boxes': boxes,
       'unitsPerBox': unitsPerBox,
       if (note != null && note.isNotEmpty) 'note': note,
+      if (pendingCount) 'pendingCount': true,
     });
+    return InventoryRecord.fromJson(response.data);
+  }
+
+  Future<InventoryRecord> markPending(String id, {required bool pending}) async {
+    final response = await _api.patch('/inventory/$id', data: {'pendingCount': pending});
     return InventoryRecord.fromJson(response.data);
   }
 
