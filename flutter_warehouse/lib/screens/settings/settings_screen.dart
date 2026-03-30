@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/inventory_service.dart';
-import '../../services/import_service.dart';
 import '../../services/api_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -173,116 +171,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  // CSV 格式说明
-  void _showCsvFormatDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('CSV 文件格式说明'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('必填列（列名包含以下关键词即可）：',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              _formatRow('SKU 编号', 'sku / item / code / product'),
-              _formatRow('库位编号', 'location / loc / bin / warehouse'),
-              _formatRow('数量（箱）', 'qty / quantity / carton / box'),
-              const SizedBox(height: 12),
-              const Text('可选列：', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              _formatRow('SKU 名称', 'name / description / desc'),
-              _formatRow('条形码', 'barcode / upc / ean'),
-              _formatRow('每箱件数', 'carton_qty / pcs / pieces / unit'),
-              const SizedBox(height: 16),
-              const Text('示例文件内容：',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'sku,name,location,qty\n'
-                  'ABC001,苹果手机壳,A01-01,50\n'
-                  'ABC002,充电线,A01-02,120\n'
-                  'XYZ999,蓝牙耳机,B02-03,30',
-                  style: TextStyle(fontFamily: 'monospace', fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text('• 文件编码请使用 UTF-8\n• 相同 SKU+位置 的数量会累加',
-                  style: TextStyle(fontSize: 12, color: Colors.grey)),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => ctx.pop(), child: const Text('知道了')),
-          FilledButton(
-            onPressed: () { ctx.pop(); _importCsv(); },
-            child: const Text('去选择文件'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _formatRow(String label, String keys) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(label, style: const TextStyle(fontSize: 13)),
-          ),
-          Expanded(
-            child: Text(keys,
-                style: const TextStyle(fontSize: 13, color: Colors.blue)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // CSV 导入
-  Future<void> _importCsv() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['csv'],
-      withData: true,
-    );
-    if (result == null || result.files.single.bytes == null) return;
-
-    try {
-      final bytes = result.files.single.bytes!;
-      final filename = result.files.single.name;
-      final res = await ImportService().importCsvBytes(bytes, filename);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              '导入完成: 新增 ${res['created']}, 更新 ${res['updated']}, 跳过 ${res['skipped']}'),
-        ));
-      }
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'];
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg ?? '导入失败'), backgroundColor: Colors.red));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导入失败: $e'), backgroundColor: Colors.red));
-      }
-    }
-  }
-
   // 用户管理（admin）
   Future<void> _showUsersDialog() async {
     try {
@@ -407,14 +295,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const Divider(),
 
-          // CSV 导入（仅 admin）
+          // 数据导入（仅 admin）
           if (user?.isAdmin == true)
             ListTile(
               leading: const Icon(Icons.upload_file),
-              title: const Text('导入 CSV'),
-              subtitle: const Text('点击查看格式说明并上传'),
+              title: const Text('数据导入'),
+              subtitle: const Text('SKU 主档 / 库位主档 / 库存明细'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: _showCsvFormatDialog,
+              onTap: () => context.push('/import'),
             ),
 
           // 导出 Excel

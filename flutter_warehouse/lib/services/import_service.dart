@@ -1,14 +1,198 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import 'package:dio/dio.dart';
 import 'api_service.dart';
+
+class ImportError {
+  final int row;
+  final String message;
+  ImportError({required this.row, required this.message});
+  factory ImportError.fromJson(Map<String, dynamic> json) =>
+      ImportError(row: json['row'] ?? 0, message: json['message'] ?? '');
+}
+
+class ImportResult {
+  final int total;
+  final int created;
+  final int updated;
+  final int skipped;
+  final List<ImportError> errors;
+
+  ImportResult({
+    required this.total,
+    required this.created,
+    required this.updated,
+    required this.skipped,
+    required this.errors,
+  });
+
+  factory ImportResult.fromJson(Map<String, dynamic> json) => ImportResult(
+        total: json['total'] ?? 0,
+        created: json['created'] ?? 0,
+        updated: json['updated'] ?? 0,
+        skipped: json['skipped'] ?? 0,
+        errors: (json['errors'] as List?)
+                ?.map((e) => ImportError.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+      );
+
+  bool get hasErrors => errors.isNotEmpty;
+  bool get isClean => errors.isEmpty && skipped == 0;
+}
+
+class PreviewRow {
+  final int row;
+  final String action; // 'create' | 'update' | 'skip'
+  final String summary;
+  final String? error;
+
+  PreviewRow({
+    required this.row,
+    required this.action,
+    required this.summary,
+    this.error,
+  });
+
+  factory PreviewRow.fromJson(Map<String, dynamic> json) => PreviewRow(
+        row: json['row'] ?? 0,
+        action: json['action'] ?? 'skip',
+        summary: json['summary'] ?? '',
+        error: json['error'] as String?,
+      );
+
+  bool get isSkipped => action == 'skip';
+  bool get isCreate => action == 'create';
+  bool get isUpdate => action == 'update';
+}
+
+class ImportPreview {
+  final int total;
+  final int willCreate;
+  final int willUpdate;
+  final int willSkip;
+  final int errorCount;
+  final List<PreviewRow> rows;
+
+  ImportPreview({
+    required this.total,
+    required this.willCreate,
+    required this.willUpdate,
+    required this.willSkip,
+    required this.errorCount,
+    required this.rows,
+  });
+
+  factory ImportPreview.fromJson(Map<String, dynamic> json) => ImportPreview(
+        total: json['total'] ?? 0,
+        willCreate: json['willCreate'] ?? 0,
+        willUpdate: json['willUpdate'] ?? 0,
+        willSkip: json['willSkip'] ?? 0,
+        errorCount: json['errorCount'] ?? 0,
+        rows: (json['rows'] as List?)
+                ?.map((e) => PreviewRow.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+      );
+
+  bool get hasErrors => errorCount > 0;
+  bool get hasValidRows => willCreate > 0 || willUpdate > 0;
+}
 
 class ImportService {
   final _api = ApiService.instance.dio;
 
-  Future<Map<String, dynamic>> importCsvBytes(List<int> bytes, String filename) async {
-    final formData = FormData.fromMap({
-      'file': MultipartFile.fromBytes(bytes, filename: filename),
-    });
-    final response = await _api.post('/import/csv', data: formData);
-    return response.data;
+  // ─── Validate (no write) ─────────────────────────────────────────────────
+
+  Future<ImportPreview> validateSkus(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/skus/validate',
+        data: FormData.fromMap(
+            {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportPreview.fromJson(response.data);
+  }
+
+  Future<ImportPreview> validateLocations(
+      List<int> bytes, String filename) async {
+    final response = await _api.post('/import/locations/validate',
+        data: FormData.fromMap(
+            {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportPreview.fromJson(response.data);
+  }
+
+  Future<ImportPreview> validateInventory(
+      List<int> bytes, String filename) async {
+    final response = await _api.post('/import/inventory/validate',
+        data: FormData.fromMap(
+            {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportPreview.fromJson(response.data);
+  }
+
+  // ─── Import (write) ──────────────────────────────────────────────────────
+
+  Future<ImportResult> importSkus(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/skus',
+        data: FormData.fromMap(
+            {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportResult.fromJson(response.data);
+  }
+
+  Future<ImportResult> importLocations(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/locations',
+        data: FormData.fromMap(
+            {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportResult.fromJson(response.data);
+  }
+
+  Future<ImportResult> importInventory(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/inventory',
+        data: FormData.fromMap(
+            {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportResult.fromJson(response.data);
+  }
+
+  // ─── Templates ───────────────────────────────────────────────────────────
+
+  /// Downloads a CSV template. barcode column is prefixed with tab to encourage
+  /// Excel to treat it as text (reduces scientific-notation mangling).
+  void downloadTemplate(String type) {
+    late String content;
+    late String filename;
+
+    switch (type) {
+      case 'skus':
+        // Note: barcode column uses text format hint in the example row
+        content = 'sku_code,name,barcode,default_carton_qty,status\r\n'
+            'ABC-001,产品名称示例,1234567890123,12,active\r\n'
+            'DEF-002,另一个产品,,6,active\r\n';
+        filename = 'sku_master_template.csv';
+
+      case 'locations':
+        content = 'location_code,description,status\r\n'
+            'A1A,货架A区1排,active\r\n'
+            'B2B,货架B区2排,active\r\n'
+            'C3C-OLD,已停用库位,inactive\r\n';
+        filename = 'location_master_template.csv';
+
+      case 'inventory':
+        // 7 columns: sku_code, location_code, boxes, carton_qty, total_qty, stock_status, note
+        content =
+            'sku_code,location_code,boxes,carton_qty,total_qty,stock_status,note\r\n'
+            'ABC-001,A1A,10,12,,confirmed,按箱规导入示例\r\n'
+            'ABC-001,A1A,3,100,,confirmed,多箱规合并示例\r\n'
+            'DEF-002,B2B,,,120,confirmed,按总件数导入示例\r\n'
+            'XYZ-003,C1A,,,0,pending_count,待清点\r\n';
+        filename = 'inventory_detail_template.csv';
+
+      default:
+        return;
+    }
+
+    const bom = '\uFEFF';
+    final blob = html.Blob(['$bom$content'], 'text/csv;charset=utf-8');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..setAttribute('download', filename)
+      ..click();
+    html.Url.revokeObjectUrl(url);
   }
 }

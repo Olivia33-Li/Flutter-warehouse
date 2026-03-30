@@ -13,6 +13,7 @@ import '../screens/history/history_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/inventory/inventory_add_screen.dart';
 import '../widgets/main_shell.dart';
+import '../screens/import/import_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final user = ref.watch(currentUserProvider);
@@ -55,6 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      GoRoute(path: '/import', builder: (_, __) => const ImportScreen()),
 
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
