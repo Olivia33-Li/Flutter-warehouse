@@ -83,65 +83,177 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Future<void> _pickCustomRange() async {
-    // Pick start date
-    final startDate = await showDatePicker(
+    final now = DateTime.now();
+    DateTime? start = _customStart;
+    DateTime? end = _customEnd;
+    // which field the calendar is editing: true=start, false=end
+    bool editingStart = true;
+
+    await showDialog(
       context: context,
-      initialDate: _customStart ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: '选择开始日期',
-    );
-    if (!mounted || startDate == null) return;
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final calendarInitial = editingStart
+              ? (start ?? now)
+              : (end ?? now);
+          final calendarFirst =
+              editingStart ? DateTime(2020) : (start ?? DateTime(2020));
 
-    final startTime = await showTimePicker(
-      context: context,
-      initialTime: _customStart != null
-          ? TimeOfDay.fromDateTime(_customStart!)
-          : const TimeOfDay(hour: 0, minute: 0),
-      helpText: '选择开始时间',
-    );
-    if (!mounted) return;
+          Widget fieldBtn(String label, DateTime? val, bool isStart) {
+            final active = editingStart == isStart;
+            final primary = Theme.of(ctx).colorScheme.primary;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => setS(() => editingStart = isStart),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: active ? primary.withValues(alpha: 0.08) : Colors.transparent,
+                    border: Border.all(
+                        color: active ? primary : Colors.grey.shade300,
+                        width: active ? 1.5 : 1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: active ? primary : Colors.grey.shade500)),
+                      const SizedBox(height: 2),
+                      Text(
+                        val != null ? _fmtDate(val) : '请选择',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: active
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: val != null
+                                ? (active ? primary : null)
+                                : Colors.grey.shade400),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
 
-    final start = DateTime(
-      startDate.year, startDate.month, startDate.day,
-      startTime?.hour ?? 0, startTime?.minute ?? 0,
-    );
+          return Dialog(
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 标题栏
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+                  child: Row(
+                    children: [
+                      const Text('自定义时间范围',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
+                      const Spacer(),
+                      IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.of(ctx).pop()),
+                    ],
+                  ),
+                ),
 
-    // Pick end date
-    final endDate = await showDatePicker(
-      context: context,
-      initialDate: _customEnd ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: '选择结束日期',
-    );
-    if (!mounted || endDate == null) return;
+                // 开始 / 结束 字段按钮
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Row(
+                    children: [
+                      fieldBtn('开始日期', start, true),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('→',
+                            style: TextStyle(color: Colors.grey)),
+                      ),
+                      fieldBtn('结束日期', end, false),
+                    ],
+                  ),
+                ),
 
-    final endTime = await showTimePicker(
-      context: context,
-      initialTime: _customEnd != null
-          ? TimeOfDay.fromDateTime(_customEnd!)
-          : const TimeOfDay(hour: 23, minute: 59),
-      helpText: '选择结束时间',
-    );
-    if (!mounted) return;
+                // 内嵌日历 — 点选即确认，无需 OK 键
+                CalendarDatePicker(
+                  key: ValueKey(editingStart),
+                  initialDate: calendarInitial.isAfter(now) ? now : calendarInitial,
+                  firstDate: calendarFirst,
+                  lastDate: now,
+                  onDateChanged: (d) {
+                    setS(() {
+                      if (editingStart) {
+                        start = DateTime(d.year, d.month, d.day, 0, 0, 0);
+                        if (end != null && end!.isBefore(start!)) end = null;
+                        editingStart = false; // 自动切到结束
+                      } else {
+                        end = DateTime(d.year, d.month, d.day, 23, 59, 59);
+                      }
+                    });
+                  },
+                ),
 
-    final end = DateTime(
-      endDate.year, endDate.month, endDate.day,
-      endTime?.hour ?? 23, endTime?.minute ?? 59,
+                // 操作按钮
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _customStart = null;
+                            _customEnd = null;
+                            _filterDateRange = null;
+                          });
+                          Navigator.of(ctx).pop();
+                          _load();
+                        },
+                        child: Text('清空',
+                            style:
+                                TextStyle(color: Colors.grey.shade500)),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('取消')),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: start != null && end != null
+                            ? () {
+                                setState(() {
+                                  _customStart = start;
+                                  _customEnd = end;
+                                  _filterDateRange = 'custom';
+                                });
+                                Navigator.of(ctx).pop();
+                                _load();
+                              }
+                            : null,
+                        child: const Text('应用'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
-
-    setState(() {
-      _customStart = start;
-      _customEnd = end;
-      _filterDateRange = 'custom';
-    });
-    _load();
   }
 
-  String _fmtDateTime(DateTime dt) =>
-      '${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  String _fmtDate(DateTime dt) =>
+      '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+
 
   Future<void> _load({bool reset = true}) async {
     if (reset) _page = 1;
@@ -220,25 +332,24 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             child: Column(
               children: [
                 if (ref.watch(currentUserProvider)?.isAdmin == true) ...[
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _chip('全部用户', null, _filterUserName, (v) {
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      _chip('全部用户', null, _filterUserName, (v) {
+                        setState(() => _filterUserName = v);
+                        _load();
+                      }),
+                      _chip(
+                        '我的记录',
+                        ref.read(currentUserProvider)?.username,
+                        _filterUserName,
+                        (v) {
                           setState(() => _filterUserName = v);
                           _load();
-                        }),
-                        _chip(
-                          '我的记录',
-                          ref.read(currentUserProvider)?.username,
-                          _filterUserName,
-                          (v) {
-                            setState(() => _filterUserName = v);
-                            _load();
-                          },
-                        ),
-                      ],
-                    ),
+                        },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                 ],
@@ -259,110 +370,106 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   onChanged: (_) => _load(),
                 ),
                 const SizedBox(height: 6),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _chip('全部', null, _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      _chip('入库', '入库', _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      _chip('出库', '出库', _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      _chip('调整', '调整', _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      _chip('录入', '录入', _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      _chip('转移', '批量转移', _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      _chip('复制', '批量复制', _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      _chip('检查', '标记已检查', _filterBusinessAction, (v) {
-                        setState(() => _filterBusinessAction = v);
-                        _load();
-                      }),
-                      const SizedBox(width: 8),
-                      _chip('全部对象', null, _filterEntity, (v) {
-                        setState(() => _filterEntity = v);
-                        _load();
-                      }),
-                      _chip('SKU', 'SKU', _filterEntity, (v) {
-                        setState(() => _filterEntity = v);
-                        _load();
-                      }),
-                      _chip('库位', '库位', _filterEntity, (v) {
-                        setState(() => _filterEntity = v);
-                        _load();
-                      }),
-                      _chip('库存', '库存', _filterEntity, (v) {
-                        setState(() => _filterEntity = v);
-                        _load();
-                      }),
-                      const SizedBox(width: 8),
-                      _chip('全部时间', null, _filterDateRange, (v) {
-                        setState(() {
-                          _filterDateRange = v;
-                          _customStart = null;
-                          _customEnd = null;
-                        });
-                        _load();
-                      }),
-                      _chip('今天', 'today', _filterDateRange, (v) {
-                        setState(() => _filterDateRange = v);
-                        _load();
-                      }),
-                      _chip('近7天', '7d', _filterDateRange, (v) {
-                        setState(() => _filterDateRange = v);
-                        _load();
-                      }),
-                      _chip('近30天', '30d', _filterDateRange, (v) {
-                        setState(() => _filterDateRange = v);
-                        _load();
-                      }),
-                      // Custom date-time range chip
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: FilterChip(
-                          label: Text(
-                            _filterDateRange == 'custom' &&
-                                    _customStart != null &&
-                                    _customEnd != null
-                                ? '${_fmtDateTime(_customStart!)} ~ ${_fmtDateTime(_customEnd!)}'
-                                : '自定义时间',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          selected: _filterDateRange == 'custom',
-                          visualDensity: VisualDensity.compact,
-                          onSelected: (_) {
-                            if (_filterDateRange == 'custom') {
-                              setState(() {
-                                _filterDateRange = null;
-                                _customStart = null;
-                                _customEnd = null;
-                              });
-                              _load();
-                            } else {
-                              _pickCustomRange();
-                            }
-                          },
-                        ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    // ── 操作类型 ──
+                    _chip('全部', null, _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    _chip('入库', '入库', _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    _chip('出库', '出库', _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    _chip('调整', '调整', _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    _chip('录入', '录入', _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    _chip('转移', '批量转移', _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    _chip('复制', '批量复制', _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    _chip('检查', '标记已检查', _filterBusinessAction, (v) {
+                      setState(() => _filterBusinessAction = v);
+                      _load();
+                    }),
+                    // ── 对象类型 ──
+                    _chip('全部对象', null, _filterEntity, (v) {
+                      setState(() => _filterEntity = v);
+                      _load();
+                    }),
+                    _chip('SKU', 'SKU', _filterEntity, (v) {
+                      setState(() => _filterEntity = v);
+                      _load();
+                    }),
+                    _chip('库位', '库位', _filterEntity, (v) {
+                      setState(() => _filterEntity = v);
+                      _load();
+                    }),
+                    _chip('库存', '库存', _filterEntity, (v) {
+                      setState(() => _filterEntity = v);
+                      _load();
+                    }),
+                    // ── 时间 ──
+                    _chip('全部时间', null, _filterDateRange, (v) {
+                      setState(() {
+                        _filterDateRange = v;
+                        _customStart = null;
+                        _customEnd = null;
+                      });
+                      _load();
+                    }),
+                    _chip('今天', 'today', _filterDateRange, (v) {
+                      setState(() => _filterDateRange = v);
+                      _load();
+                    }),
+                    _chip('近7天', '7d', _filterDateRange, (v) {
+                      setState(() => _filterDateRange = v);
+                      _load();
+                    }),
+                    _chip('近30天', '30d', _filterDateRange, (v) {
+                      setState(() => _filterDateRange = v);
+                      _load();
+                    }),
+                    FilterChip(
+                      label: Text(
+                        _filterDateRange == 'custom' &&
+                                _customStart != null &&
+                                _customEnd != null
+                            ? '${_fmtDate(_customStart!)} ~ ${_fmtDate(_customEnd!)}'
+                            : '自定义时间',
+                        style: const TextStyle(fontSize: 12),
                       ),
-                    ],
-                  ),
+                      selected: _filterDateRange == 'custom',
+                      visualDensity: VisualDensity.compact,
+                      onSelected: (_) {
+                        if (_filterDateRange == 'custom') {
+                          setState(() {
+                            _filterDateRange = null;
+                            _customStart = null;
+                            _customEnd = null;
+                          });
+                          _load();
+                        } else {
+                          _pickCustomRange();
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),

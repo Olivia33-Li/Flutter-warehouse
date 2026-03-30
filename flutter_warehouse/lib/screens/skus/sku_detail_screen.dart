@@ -59,6 +59,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     bool isNewLoc = false;
     bool locSearching = false;
     bool useConfigMode = true; // 默认按箱规
+    bool isPending = false;
     bool saving = false;
     String? dialogError;
 
@@ -281,89 +282,134 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
 
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                          value: true,
-                          label: Text('按箱规'),
-                          icon: Icon(Icons.view_list, size: 16)),
-                      ButtonSegment(
-                          value: false,
-                          label: Text('按总数量'),
-                          icon: Icon(Icons.numbers, size: 16)),
-                    ],
-                    selected: {useConfigMode},
-                    onSelectionChanged: (v) =>
-                        setS(() => useConfigMode = v.first),
+                  // 待清点 toggle
+                  CheckboxListTile(
+                    value: isPending,
+                    onChanged: (v) => setS(() => isPending = v ?? false),
+                    title: const Text('暂存 / 待清点',
+                        style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('货已到位，数量暂未确认',
+                        style: TextStyle(fontSize: 12)),
+                    secondary: Icon(Icons.pending_actions_outlined,
+                        color: isPending ? Colors.orange : Colors.grey,
+                        size: 20),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    tileColor: isPending ? Colors.orange.shade50 : null,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
-                  const SizedBox(height: 10),
 
-                  if (useConfigMode) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: boxesCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: '箱数 *',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                              suffixText: '箱',
-                            ),
-                            onChanged: (_) => setS(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: unitsCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: '每箱件数 *',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                              suffixText: '件/箱',
-                            ),
-                            onChanged: (_) => setS(() {}),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    TextField(
-                      controller: qtyCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '总件数 *',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        suffixText: '件',
-                      ),
-                      onChanged: (_) => setS(() {}),
-                    ),
-                  ],
-
-                  // Preview
-                  if (previewQty > 0) ...[
+                  if (isPending) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                          horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(6),
+                        color: Colors.orange.shade50,
+                        border: Border.all(color: Colors.orange.shade200),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        useConfigMode
-                            ? '初始库存：${int.tryParse(boxesCtrl.text) ?? 0}箱 × ${int.tryParse(unitsCtrl.text) ?? 0}件/箱 = $previewQty件'
-                            : '初始库存：$previewQty 件',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green.shade700,
-                            fontWeight: FontWeight.w500),
-                      ),
+                      child: Row(children: [
+                        Icon(Icons.info_outline,
+                            size: 14, color: Colors.orange.shade700),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '将创建"待清点"记录，数量不计入合计，后续可通过调整确认。',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange.shade800),
+                          ),
+                        ),
+                      ]),
                     ),
+                  ] else ...[
+                    const SizedBox(height: 8),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                            value: true,
+                            label: Text('按箱规'),
+                            icon: Icon(Icons.view_list, size: 16)),
+                        ButtonSegment(
+                            value: false,
+                            label: Text('按总数量'),
+                            icon: Icon(Icons.numbers, size: 16)),
+                      ],
+                      selected: {useConfigMode},
+                      onSelectionChanged: (v) =>
+                          setS(() => useConfigMode = v.first),
+                    ),
+                    const SizedBox(height: 10),
+
+                    if (useConfigMode) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: boxesCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: '箱数 *',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                                suffixText: '箱',
+                              ),
+                              onChanged: (_) => setS(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: unitsCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: '每箱件数 *',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                                suffixText: '件/箱',
+                              ),
+                              onChanged: (_) => setS(() {}),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      TextField(
+                        controller: qtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '总件数 *',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          suffixText: '件',
+                        ),
+                        onChanged: (_) => setS(() {}),
+                      ),
+                    ],
+
+                    if (previewQty > 0) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          useConfigMode
+                              ? '初始库存：${int.tryParse(boxesCtrl.text) ?? 0}箱 × ${int.tryParse(unitsCtrl.text) ?? 0}件/箱 = $previewQty件'
+                              : '初始库存：$previewQty 件',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
                   ],
 
                   // Note
@@ -392,18 +438,23 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   onPressed: saving ? null : () => ctx.pop(),
                   child: const Text('取消')),
               FilledButton(
+                style: isPending
+                    ? FilledButton.styleFrom(
+                        backgroundColor: Colors.orange.shade600)
+                    : null,
                 onPressed: saving
                     ? null
                     : () async {
-                        // Validate location
                         String? locId = selectedLocationId;
                         if (!isNewLoc && locId == null) {
                           setS(() => dialogError = '请选择或新建库位');
                           return;
                         }
-                        // Validate stock input
                         int boxes, units;
-                        if (useConfigMode) {
+                        if (isPending) {
+                          boxes = 0;
+                          units = 1;
+                        } else if (useConfigMode) {
                           boxes = int.tryParse(boxesCtrl.text) ?? 0;
                           units = int.tryParse(unitsCtrl.text) ?? 0;
                           if (boxes <= 0) {
@@ -423,10 +474,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           boxes = 1;
                           units = qty;
                         }
-                        setS(() {
-                          saving = true;
-                          dialogError = null;
-                        });
+                        setS(() { saving = true; dialogError = null; });
                         try {
                           if (isNewLoc) {
                             final code =
@@ -455,6 +503,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                             note: noteCtrl.text.trim().isEmpty
                                 ? null
                                 : noteCtrl.text.trim(),
+                            pendingCount: isPending,
                           );
                           if (ctx.mounted) ctx.pop();
                           _load();
@@ -476,7 +525,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                         height: 16,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
-                    : const Text('确认新增'),
+                    : Text(isPending ? '确认暂存' : '确认新增'),
               ),
             ],
           );

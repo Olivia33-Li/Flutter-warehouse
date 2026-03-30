@@ -81,6 +81,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     final totalQtyCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     bool byCarton = true;
+    bool isPending = false;
     String? dialogError;
 
     // SKU search state
@@ -368,71 +369,119 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       ),
                     ),
 
-                  // ── Mode toggle (create only) ─────────────────────────
+                  // ── Mode toggle + 待清点 (create only) ────────────────
                   if (existing == null) ...[
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(
-                            value: true,
-                            label: Text('按箱规'),
-                            icon: Icon(Icons.inventory_2_outlined)),
-                        ButtonSegment(
-                            value: false,
-                            label: Text('按总数量'),
-                            icon: Icon(Icons.format_list_numbered)),
-                      ],
-                      selected: {byCarton},
-                      onSelectionChanged: (s) =>
-                          setS(() => byCarton = s.first),
-                      style: const ButtonStyle(
-                          visualDensity: VisualDensity.compact),
+                    CheckboxListTile(
+                      value: isPending,
+                      onChanged: (v) => setS(() => isPending = v ?? false),
+                      title: const Text('暂存 / 待清点',
+                          style: TextStyle(fontSize: 14)),
+                      subtitle: const Text('货已到位，数量暂未确认',
+                          style: TextStyle(fontSize: 12)),
+                      secondary: Icon(Icons.pending_actions_outlined,
+                          color: isPending ? Colors.orange : Colors.grey,
+                          size: 20),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                      tileColor: isPending ? Colors.orange.shade50 : null,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
-                    const SizedBox(height: 12),
+                    if (!isPending) ...[
+                      const SizedBox(height: 8),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                              value: true,
+                              label: Text('按箱规'),
+                              icon: Icon(Icons.inventory_2_outlined)),
+                          ButtonSegment(
+                              value: false,
+                              label: Text('按总数量'),
+                              icon: Icon(Icons.format_list_numbered)),
+                        ],
+                        selected: {byCarton},
+                        onSelectionChanged: (s) =>
+                            setS(() => byCarton = s.first),
+                        style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact),
+                      ),
+                      const SizedBox(height: 12),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          border:
+                              Border.all(color: Colors.orange.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(children: [
+                          Icon(Icons.info_outline,
+                              size: 14, color: Colors.orange.shade700),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '将创建"待清点"记录，数量不计入合计，后续可通过调整确认。',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange.shade800),
+                            ),
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                   ],
 
-                  // ── Quantity fields ───────────────────────────────────
-                  if (existing != null || byCarton) ...[
-                    TextField(
-                      controller: boxesCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                          labelText: '箱数',
-                          border: OutlineInputBorder(),
-                          suffixText: '箱'),
-                      onChanged: (_) => setS(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: unitsCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                          labelText: '每箱件数',
-                          border: OutlineInputBorder(),
-                          suffixText: '件/箱'),
-                      onChanged: (_) => setS(() {}),
-                    ),
-                    Builder(builder: (_) {
-                      final b = int.tryParse(boxesCtrl.text) ?? 0;
-                      final u = int.tryParse(unitsCtrl.text) ?? 0;
-                      if (b > 0 && u > 0) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text('共 ${b * u} 件',
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 12)),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    }),
-                  ] else ...[
-                    TextField(
-                      controller: totalQtyCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                          labelText: '初始总件数',
-                          border: OutlineInputBorder(),
-                          suffixText: '件'),
-                    ),
+                  // ── Quantity fields (hidden when pending or editing) ──
+                  if (!isPending) ...[
+                    if (existing != null || byCarton) ...[
+                      TextField(
+                        controller: boxesCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: '箱数',
+                            border: OutlineInputBorder(),
+                            suffixText: '箱'),
+                        onChanged: (_) => setS(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: unitsCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: '每箱件数',
+                            border: OutlineInputBorder(),
+                            suffixText: '件/箱'),
+                        onChanged: (_) => setS(() {}),
+                      ),
+                      Builder(builder: (_) {
+                        final b = int.tryParse(boxesCtrl.text) ?? 0;
+                        final u = int.tryParse(unitsCtrl.text) ?? 0;
+                        if (b > 0 && u > 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text('共 ${b * u} 件',
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 12)),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      }),
+                    ] else ...[
+                      TextField(
+                        controller: totalQtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: '初始总件数',
+                            border: OutlineInputBorder(),
+                            suffixText: '件'),
+                      ),
+                    ],
                   ],
 
                   const SizedBox(height: 8),
@@ -457,13 +506,20 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
             TextButton(
                 onPressed: () => ctx.pop(), child: const Text('取消')),
             FilledButton(
+              style: existing == null && isPending
+                  ? FilledButton.styleFrom(
+                      backgroundColor: Colors.orange.shade600)
+                  : null,
               onPressed: () async {
                 if (existing == null && selectedSkuCode == null) {
                   setS(() => dialogError = '请选择 SKU');
                   return;
                 }
                 int boxes, unitsPerBox;
-                if (existing != null || byCarton) {
+                if (isPending) {
+                  boxes = 0;
+                  unitsPerBox = 1;
+                } else if (existing != null || byCarton) {
                   boxes = int.tryParse(boxesCtrl.text) ?? 0;
                   unitsPerBox = int.tryParse(unitsCtrl.text) ?? 0;
                   if (boxes <= 0 || unitsPerBox <= 0) {
@@ -494,6 +550,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       boxes: boxes,
                       unitsPerBox: unitsPerBox,
                       note: note.isEmpty ? null : note,
+                      pendingCount: isPending,
                     );
                   }
                   if (ctx.mounted) ctx.pop();
@@ -504,7 +561,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                   }
                 }
               },
-              child: const Text('保存'),
+              child: Text(existing == null && isPending ? '确认暂存' : '保存'),
             ),
           ],
         ),
