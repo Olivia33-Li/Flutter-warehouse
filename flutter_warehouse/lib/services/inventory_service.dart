@@ -4,10 +4,17 @@ import '../models/inventory.dart';
 class InventoryService {
   final _api = ApiService.instance.dio;
 
-  Future<List<InventoryRecord>> getAll({String? skuCode, String? locationId}) async {
+  Future<List<InventoryRecord>> getAll({
+    String? skuCode,
+    String? locationId,
+    bool pendingOnly = false,
+    String? stockStatus,
+  }) async {
     final response = await _api.get('/inventory', queryParameters: {
       if (skuCode != null) 'skuCode': skuCode,
       if (locationId != null) 'locationId': locationId,
+      if (pendingOnly) 'pendingOnly': 'true',
+      if (stockStatus != null) 'stockStatus': stockStatus,
     });
     return (response.data as List).map((e) => InventoryRecord.fromJson(e)).toList();
   }

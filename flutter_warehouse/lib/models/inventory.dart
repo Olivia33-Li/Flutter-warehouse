@@ -26,6 +26,8 @@ class InventoryRecord {
   final int unitsPerBox;
   final List<InventoryConfig> configurations;
   final bool pendingCount;
+  /// confirmed | pending_count | temporary
+  final String stockStatus;
 
   InventoryRecord({
     required this.id,
@@ -37,6 +39,7 @@ class InventoryRecord {
     required this.unitsPerBox,
     this.configurations = const [],
     this.pendingCount = false,
+    this.stockStatus = 'confirmed',
   });
 
   int get totalQty => configurations.isNotEmpty
@@ -45,11 +48,14 @@ class InventoryRecord {
 
   Location? get location => locationId is Map ? Location.fromJson(locationId) : null;
 
+  bool get isTemporary => stockStatus == 'temporary';
+
   factory InventoryRecord.fromJson(Map<String, dynamic> json) {
     final configs = (json['configurations'] as List?)
             ?.map((e) => InventoryConfig.fromJson(e as Map<String, dynamic>))
             .toList() ??
         [];
+    final pendingCount = json['pendingCount'] == true;
     return InventoryRecord(
       id: json['_id'] ?? '',
       skuCode: json['skuCode'] ?? '',
@@ -59,7 +65,9 @@ class InventoryRecord {
       boxes: (json['boxes'] as num?)?.toInt() ?? 0,
       unitsPerBox: (json['unitsPerBox'] as num?)?.toInt() ?? 1,
       configurations: configs,
-      pendingCount: json['pendingCount'] == true,
+      pendingCount: pendingCount,
+      stockStatus: json['stockStatus'] as String? ??
+          (pendingCount ? 'pending_count' : 'confirmed'),
     );
   }
 }
