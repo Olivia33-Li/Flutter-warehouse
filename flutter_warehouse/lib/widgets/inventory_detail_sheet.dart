@@ -18,6 +18,7 @@ class InventoryDetailSheet extends StatefulWidget {
   final bool showSkuNav;
   final bool showLocNav;
   final bool canEdit;
+  final bool quantityUnknown;
   final VoidCallback? onChanged; // called after any mutation
 
   const InventoryDetailSheet({
@@ -34,6 +35,7 @@ class InventoryDetailSheet extends StatefulWidget {
     this.showSkuNav = false,
     this.showLocNav = false,
     this.canEdit = false,
+    this.quantityUnknown = false,
     this.onChanged,
   });
 
@@ -53,6 +55,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   int get _qty => _invRecord?.totalQty ?? widget.totalQty;
   int get _boxes => _invRecord?.boxes ?? widget.boxes;
   int get _units => _invRecord?.unitsPerBox ?? widget.unitsPerBox;
+  bool get _quantityUnknown => _invRecord?.quantityUnknown ?? widget.quantityUnknown;
   List<InventoryConfig> get _configs =>
       _invRecord != null ? _invRecord!.configurations : widget.configurations;
 
@@ -129,7 +132,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           Text(
                             _invRecord?.pendingCount == true
                                 ? '当前状态: 待清点'
-                                : '当前库存: $_qty 件',
+                                : (_quantityUnknown ? '当前库存: 未填写' : '当前库存: $_qty 件'),
                             style: TextStyle(
                                 fontSize: 12,
                                 color: isPending
@@ -387,7 +390,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         Text('${widget.skuCode}  @  ${widget.locationCode}',
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text('当前库存: $_qty 件',
+                        Text(_quantityUnknown ? '当前库存: 未填写' : '当前库存: $_qty 件',
                             style: TextStyle(
                                 fontSize: 12, color: Colors.red.shade700)),
                       ],
@@ -689,7 +692,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         Text('${widget.skuCode}  @  ${widget.locationCode}',
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text('当前库存: $_qty 件',
+                        Text(_quantityUnknown ? '当前库存: 未填写' : '当前库存: $_qty 件',
                             style: TextStyle(
                                 fontSize: 12, color: Colors.blue.shade700)),
                       ],
@@ -1141,17 +1144,24 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _qty > 0 ? Colors.green.shade50 : Colors.orange.shade50,
+                    color: _quantityUnknown
+                        ? Colors.grey.shade100
+                        : (_qty > 0 ? Colors.green.shade50 : Colors.orange.shade50),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: _qty > 0 ? Colors.green.shade200 : Colors.orange.shade200),
+                      color: _quantityUnknown
+                          ? Colors.grey.shade400
+                          : (_qty > 0 ? Colors.green.shade200 : Colors.orange.shade200)),
                   ),
-                  child: Text('$_qty 件',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16,
-                        color: _qty > 0
-                            ? Colors.green.shade700 : Colors.orange.shade700,
-                      )),
+                  child: Text(
+                    _quantityUnknown ? '未填写数量' : '$_qty 件',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16,
+                      color: _quantityUnknown
+                          ? Colors.grey.shade600
+                          : (_qty > 0 ? Colors.green.shade700 : Colors.orange.shade700),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1160,17 +1170,20 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
           // 当前库存结构（支持多箱规）
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-            child: _configs.isEmpty
-                ? Text('$_boxes箱 × $_units件/箱',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12))
-                : Wrap(
-                    spacing: 10,
-                    runSpacing: 2,
-                    children: _configs.map((c) => Text(
-                          '${c.boxes}箱×${c.unitsPerBox}件/箱 = ${c.qty}件',
-                          style: const TextStyle(color: Colors.grey, fontSize: 12),
-                        )).toList(),
-                  ),
+            child: _quantityUnknown
+                ? Text('待补充库存信息',
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12))
+                : (_configs.isEmpty
+                    ? Text('$_boxes箱 × $_units件/箱',
+                        style: const TextStyle(color: Colors.grey, fontSize: 12))
+                    : Wrap(
+                        spacing: 10,
+                        runSpacing: 2,
+                        children: _configs.map((c) => Text(
+                              '${c.boxes}箱×${c.unitsPerBox}件/箱 = ${c.qty}件',
+                              style: const TextStyle(color: Colors.grey, fontSize: 12),
+                            )).toList(),
+                      )),
           ),
 
           // 主操作按钮行

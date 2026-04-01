@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import '../../services/import_service.dart';
 
 class ImportScreen extends StatelessWidget {
@@ -9,7 +10,7 @@ class ImportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('批量导入'),
@@ -18,6 +19,7 @@ class ImportScreen extends StatelessWidget {
               Tab(text: 'SKU 主档'),
               Tab(text: '库位主档'),
               Tab(text: '库存明细'),
+              Tab(text: '导入记录'),
             ],
           ),
         ),
@@ -60,19 +62,21 @@ class ImportScreen extends StatelessWidget {
               columns: [
                 _ColDef('sku_code', _ColReq.required, 'SKU 编码'),
                 _ColDef('location_code', _ColReq.required, '库位编码'),
-                _ColDef('boxes', _ColReq.eitherA, '箱数，必须与 carton_qty 同时填写'),
-                _ColDef('carton_qty', _ColReq.eitherA, '每箱件数，必须与 boxes 同时填写'),
-                _ColDef('total_qty', _ColReq.eitherB, '总件数，仅在不填 boxes/carton_qty 时使用'),
+                _ColDef('boxes', _ColReq.optional, '箱数，需与 carton_qty 同时填写'),
+                _ColDef('carton_qty', _ColReq.optional, '每箱件数，需与 boxes 同时填写'),
+                _ColDef('total_qty', _ColReq.optional, '总件数，仅填此项时按总件数导入'),
                 _ColDef('stock_status', _ColReq.optional, 'confirmed / pending_count / temporary，默认 confirmed'),
                 _ColDef('note', _ColReq.optional, '备注'),
               ],
               notes: [
-                '数量规则：填写 boxes+carton_qty（按箱规）或 total_qty（按总件数）二选一。\n'
+                '数量规则：填写 boxes+carton_qty（按箱规）或 total_qty（按总件数）。\n'
+                    '若数量字段均为空或只填写了部分，系统将创建"待补充数量"记录，不报错。\n'
                     '若同时填写了 total_qty，系统会校验 total_qty == boxes × carton_qty，不一致则报错。',
                 '多箱规：同一 SKU+库位 可在文件中出现多行（不同箱规），系统自动合并为多箱规记录。\n'
                     '如果同一 SKU+库位+箱规 出现两次，系统会报重复错误（不静默合并）。',
               ],
             ),
+            const _ImportLogsTab(),
           ],
         ),
       ),
@@ -132,7 +136,7 @@ class _ImportTabState extends State<_ImportTab>
   Future<void> _pickAndValidate() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['csv'],
+      allowedExtensions: ['csv', 'xlsx'],
       withData: true,
     );
     if (picked == null || picked.files.isEmpty) return;
@@ -780,6 +784,330 @@ class _ResultPanel extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _stat(String label, int value, Color color) => RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: 13, color: color),
+          children: [
+            TextSpan(
+                text: '$value ',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            TextSpan(text: label),
+          ],
+        ),
+      );
+}
+
+// ─── Import Logs Tab ──────────────────────────────────────────────────────────
+
+class _ImportLogsTab extends StatefulWidget {
+  const _ImportLogsTab();
+
+  @override
+  State<_ImportLogsTab> createState() => _ImportLogsTabState();
+}
+
+class _ImportLogsTabState extends State<_ImportLogsTab>
+    with AutomaticKeepAliveClientMixin {
+  final _service = ImportService();
+
+  List<ImportLogRecord> _records = [];
+  int _total = 0;
+  int _page = 1;
+  bool _loading = false;
+  String? _error;
+  String? _filterType;
+
+  static const _typeOptions = [
+    (null, '全部'),
+    ('skus', 'SKU 主档'),
+    ('locations', '库位主档'),
+    ('inventory', '库存明细'),
+  ];
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load(reset: true);
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _records = [];
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final result = await _service.getLogs(
+        importType: _filterType,
+        page: _page,
+        limit: 30,
+      );
+      setState(() {
+        _records = reset ? result.records : [..._records, ...result.records];
+        _total = result.total;
+      });
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    spacing: 6,
+                    children: _typeOptions.map((opt) {
+                      final selected = _filterType == opt.$1;
+                      return FilterChip(
+                        label: Text(opt.$2),
+                        selected: selected,
+                        onSelected: (_) {
+                          setState(() => _filterType = opt.$1);
+                          _load(reset: true);
+                        },
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                tooltip: '刷新',
+                onPressed: () => _load(reset: true),
+              ),
+            ],
+          ),
+        ),
+
+        if (!_loading && _records.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('共 $_total 条记录',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            ),
+          ),
+
+        Expanded(
+          child: _loading && _records.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_error!, style: const TextStyle(color: Colors.red)),
+                          const SizedBox(height: 8),
+                          TextButton(
+                              onPressed: () => _load(reset: true),
+                              child: const Text('重试')),
+                        ],
+                      ),
+                    )
+                  : _records.isEmpty
+                      ? Center(
+                          child: Text('暂无导入记录',
+                              style: TextStyle(color: Colors.grey.shade500)))
+                      : RefreshIndicator(
+                          onRefresh: () => _load(reset: true),
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                            itemCount:
+                                _records.length + (_records.length < _total ? 1 : 0),
+                            itemBuilder: (ctx, i) {
+                              if (i == _records.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Center(
+                                    child: TextButton(
+                                      onPressed: () { _page++; _load(); },
+                                      child: const Text('加载更多'),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return _LogCard(record: _records[i]);
+                            },
+                          ),
+                        ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Log Card ─────────────────────────────────────────────────────────────────
+
+class _LogCard extends StatelessWidget {
+  final ImportLogRecord record;
+  const _LogCard({required this.record});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('MM-dd HH:mm');
+    final hasErrors = record.hasErrors;
+    final isClean = record.isClean;
+
+    final Color borderColor;
+    final Color bgColor;
+    final Color statusColor;
+    final String statusLabel;
+    final IconData statusIcon;
+
+    if (isClean) {
+      borderColor = Colors.green.shade200;
+      bgColor = Colors.green.shade50;
+      statusColor = Colors.green.shade700;
+      statusLabel = '成功';
+      statusIcon = Icons.check_circle_outline;
+    } else if (hasErrors && record.created + record.updated > 0) {
+      borderColor = Colors.orange.shade200;
+      bgColor = Colors.orange.shade50;
+      statusColor = Colors.orange.shade700;
+      statusLabel = '部分成功';
+      statusIcon = Icons.warning_amber_outlined;
+    } else if (hasErrors && record.created + record.updated == 0) {
+      borderColor = Colors.red.shade200;
+      bgColor = Colors.red.shade50;
+      statusColor = Colors.red.shade600;
+      statusLabel = '全部失败';
+      statusIcon = Icons.error_outline;
+    } else {
+      borderColor = Colors.blue.shade200;
+      bgColor = Colors.blue.shade50;
+      statusColor = Colors.blue.shade700;
+      statusLabel = '完成（有跳过）';
+      statusIcon = Icons.info_outline;
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: borderColor),
+      ),
+      color: bgColor,
+      elevation: 0,
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+        childrenPadding: EdgeInsets.zero,
+        leading: Icon(statusIcon, color: statusColor, size: 22),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(record.importTypeLabel,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(statusLabel,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor)),
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 3),
+            Text(record.filename,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
+            Row(children: [
+              Text(fmt.format(record.createdAt),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+              const SizedBox(width: 8),
+              Text(record.userName,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+            ]),
+          ],
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Divider(height: 1, color: borderColor),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 4,
+                  children: [
+                    _stat('共', record.total, Colors.grey.shade700),
+                    _stat('新建', record.created, Colors.green.shade700),
+                    _stat('更新', record.updated, Colors.blue.shade700),
+                    if (record.skipped > 0)
+                      _stat('跳过', record.skipped, Colors.orange.shade700),
+                    if (hasErrors)
+                      _stat('错误', record.errors.length, Colors.red.shade600),
+                  ],
+                ),
+                if (hasErrors) ...[
+                  const SizedBox(height: 10),
+                  Text('行级错误详情：',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red.shade700)),
+                  const SizedBox(height: 6),
+                  ...record.errors.take(20).map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('第 ${e.row} 行  ',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red.shade600,
+                                    fontFamily: 'monospace')),
+                            Expanded(
+                              child: Text(e.message,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade800)),
+                            ),
+                          ],
+                        ),
+                      )),
+                  if (record.errors.length > 20)
+                    Text('… 还有 ${record.errors.length - 20} 条错误',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade500)),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

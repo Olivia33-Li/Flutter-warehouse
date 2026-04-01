@@ -666,6 +666,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           inventoryRecordId: record.id,
                           showLocNav: true,
                           canEdit: user?.canEdit == true,
+                          quantityUnknown: record.quantityUnknown,
                           onChanged: _load,
                         ),
                       )
@@ -674,9 +675,11 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      record.configurations.length > 1
-                          ? '共${record.totalQty}件 (${record.configurations.length}种箱规)'
-                          : '${record.boxes}箱×${record.unitsPerBox} = ${record.totalQty}件',
+                      record.quantityUnknown
+                          ? '未填写数量'
+                          : (record.configurations.length > 1
+                              ? '共${record.totalQty}件 (${record.configurations.length}种箱规)'
+                              : '${record.boxes}箱×${record.unitsPerBox} = ${record.totalQty}件'),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     if (user?.canEdit == true) ...[

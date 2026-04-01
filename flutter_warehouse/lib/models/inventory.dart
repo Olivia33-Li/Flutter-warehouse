@@ -28,6 +28,9 @@ class InventoryRecord {
   final bool pendingCount;
   /// confirmed | pending_count | temporary
   final String stockStatus;
+  /// When true: SKU is registered at this location but no quantity was provided.
+  /// Display as "未填写数量" instead of a number.
+  final bool quantityUnknown;
 
   InventoryRecord({
     required this.id,
@@ -40,11 +43,15 @@ class InventoryRecord {
     this.configurations = const [],
     this.pendingCount = false,
     this.stockStatus = 'confirmed',
+    this.quantityUnknown = false,
   });
 
   int get totalQty => configurations.isNotEmpty
       ? configurations.fold(0, (s, c) => s + c.qty)
       : boxes * unitsPerBox;
+
+  /// Human-readable quantity string. Use this for display instead of totalQty directly.
+  String get qtyDisplay => quantityUnknown ? '未填写数量' : '$totalQty 件';
 
   Location? get location => locationId is Map ? Location.fromJson(locationId) : null;
 
@@ -68,6 +75,7 @@ class InventoryRecord {
       pendingCount: pendingCount,
       stockStatus: json['stockStatus'] as String? ??
           (pendingCount ? 'pending_count' : 'confirmed'),
+      quantityUnknown: json['quantityUnknown'] == true,
     );
   }
 }

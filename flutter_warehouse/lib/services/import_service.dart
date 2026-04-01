@@ -99,6 +99,76 @@ class ImportPreview {
   bool get hasValidRows => willCreate > 0 || willUpdate > 0;
 }
 
+// ─── Import Log ──────────────────────────────────────────────────────────────
+
+class ImportLogError {
+  final int row;
+  final String message;
+  ImportLogError({required this.row, required this.message});
+  factory ImportLogError.fromJson(Map<String, dynamic> json) =>
+      ImportLogError(row: json['row'] ?? 0, message: json['message'] ?? '');
+}
+
+class ImportLogRecord {
+  final String id;
+  final String userId;
+  final String userName;
+  final String importType; // skus | locations | inventory
+  final String filename;
+  final int total;
+  final int created;
+  final int updated;
+  final int skipped;
+  final List<ImportLogError> errors;
+  final DateTime createdAt;
+
+  ImportLogRecord({
+    required this.id,
+    required this.userId,
+    required this.userName,
+    required this.importType,
+    required this.filename,
+    required this.total,
+    required this.created,
+    required this.updated,
+    required this.skipped,
+    required this.errors,
+    required this.createdAt,
+  });
+
+  bool get hasErrors => errors.isNotEmpty;
+  bool get isClean => errors.isEmpty && skipped == 0;
+
+  String get importTypeLabel => switch (importType) {
+        'skus' => 'SKU 主档',
+        'locations' => '库位主档',
+        'inventory' => '库存明细',
+        _ => importType,
+      };
+
+  factory ImportLogRecord.fromJson(Map<String, dynamic> json) =>
+      ImportLogRecord(
+        id: json['_id'] ?? '',
+        userId: json['userId'] ?? '',
+        userName: json['userName'] ?? '',
+        importType: json['importType'] ?? '',
+        filename: json['filename'] ?? '',
+        total: json['total'] ?? 0,
+        created: json['created'] ?? 0,
+        updated: json['updated'] ?? 0,
+        skipped: json['skipped'] ?? 0,
+        errors: (json['importErrors'] as List?)
+                ?.map((e) => ImportLogError.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+        createdAt: json['createdAt'] != null
+            ? DateTime.parse(json['createdAt']).toLocal()
+            : DateTime.now(),
+      );
+}
+
+// ─── Service ─────────────────────────────────────────────────────────────────
+
 class ImportService {
   final _api = ApiService.instance.dio;
 
@@ -148,6 +218,23 @@ class ImportService {
         data: FormData.fromMap(
             {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
     return ImportResult.fromJson(response.data);
+  }
+
+  // ─── Import Logs ─────────────────────────────────────────────────────────
+
+  Future<({List<ImportLogRecord> records, int total, int page})> getLogs({
+    String? importType,
+    int page = 1,
+    int limit = 30,
+  }) async {
+    final params = <String, dynamic>{'page': page, 'limit': limit};
+    if (importType != null) params['importType'] = importType;
+    final response = await _api.get('/import/logs', queryParameters: params);
+    final data = response.data as Map<String, dynamic>;
+    final records = (data['records'] as List)
+        .map((e) => ImportLogRecord.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return (records: records, total: data['total'] as int, page: data['page'] as int);
   }
 
   // ─── Templates ───────────────────────────────────────────────────────────

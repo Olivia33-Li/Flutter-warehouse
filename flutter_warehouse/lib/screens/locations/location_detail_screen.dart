@@ -735,13 +735,14 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     inventoryRecordId: record.id,
                     showSkuNav: true,
                     canEdit: user?.canEdit == true,
+                    quantityUnknown: record.quantityUnknown,
                     onChanged: _load,
                   ),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${record.totalQty}件',
+                    Text(record.qtyDisplay,
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                     if (user?.canEdit == true)
                       IconButton(
@@ -910,7 +911,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                                 ),
                               ),
                               Text(
-                                '${r.totalQty}件',
+                                r.qtyDisplay,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -1263,7 +1264,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     spacing: 4,
                     children: noConflict
                         .map((r) => Chip(
-                              label: Text('${r.skuCode} · ${r.totalQty}件',
+                              label: Text('${r.skuCode} · ${r.qtyDisplay}',
                                   style:
                                       const TextStyle(fontSize: 11)),
                               visualDensity: VisualDensity.compact,
