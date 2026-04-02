@@ -104,4 +104,11 @@ class InventoryService {
   Future<void> clearAll() async {
     await _api.delete('/inventory');
   }
+
+  /// Wipes all business data (inventory, SKUs, locations, transactions,
+  /// audit logs, import logs) while preserving user accounts.
+  Future<Map<String, dynamic>> clearAllData() async {
+    final response = await _api.delete('/inventory/all-data');
+    return response.data as Map<String, dynamic>;
+  }
 }

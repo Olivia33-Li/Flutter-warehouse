@@ -959,12 +959,35 @@ class _ImportLogsTabState extends State<_ImportLogsTab>
 
 // ─── Log Card ─────────────────────────────────────────────────────────────────
 
-class _LogCard extends StatelessWidget {
+class _LogCard extends StatefulWidget {
   final ImportLogRecord record;
   const _LogCard({required this.record});
 
   @override
+  State<_LogCard> createState() => _LogCardState();
+}
+
+class _LogCardState extends State<_LogCard> {
+  final _service = ImportService();
+  bool _exporting = false;
+
+  Future<void> _exportLog() async {
+    setState(() => _exporting = true);
+    try {
+      await _service.exportLog(widget.record);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final record = widget.record;
     final fmt = DateFormat('MM-dd HH:mm');
     final hasErrors = record.hasErrors;
     final isClean = record.isClean;
@@ -1023,7 +1046,7 @@ class _LogCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.12),
+                color: statusColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(statusLabel,
@@ -1105,6 +1128,20 @@ class _LogCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade500)),
                 ],
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: _exporting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.download_outlined, size: 16),
+                    label: Text(_exporting ? '导出中…' : '导出详情 Excel'),
+                    onPressed: _exporting ? null : _exportLog,
+                  ),
+                ),
               ],
             ),
           ),

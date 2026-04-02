@@ -1,6 +1,7 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import 'api_service.dart';
 
 class ImportError {
@@ -237,6 +238,26 @@ class ImportService {
     return (records: records, total: data['total'] as int, page: data['page'] as int);
   }
 
+  // ─── Export Log ──────────────────────────────────────────────────────────
+
+  /// Downloads a detailed Excel report for the given import log record.
+  Future<void> exportLog(ImportLogRecord record) async {
+    final response = await _api.get(
+      '/import/logs/${record.id}/export',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final bytes = response.data as List<int>;
+    final fmt = DateFormat('yyyyMMdd_HHmm');
+    final filename = 'import_${record.importType}_${fmt.format(record.createdAt)}.xlsx';
+    final blob = html.Blob([bytes],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..setAttribute('download', filename)
+      ..click();
+    html.Url.revokeObjectUrl(url);
+  }
+
   // ─── Templates ───────────────────────────────────────────────────────────
 
   /// Downloads a CSV template. barcode column is prefixed with tab to encourage
@@ -248,9 +269,10 @@ class ImportService {
     switch (type) {
       case 'skus':
         // Note: barcode column uses text format hint in the example row
-        content = 'sku_code,name,barcode,default_carton_qty,status\r\n'
-            'ABC-001,产品名称示例,1234567890123,12,active\r\n'
-            'DEF-002,另一个产品,,6,active\r\n';
+        content = 'sku_code,name,barcode,default_carton_qty,status,sku_level\r\n'
+            'ABC-001,产品名称示例,1234567890123,12,active,variant\r\n'
+            'DEF-002,另一个产品,,6,active,variant\r\n'
+            'MAIN-001,主码大类产品,,,,main\r\n';
         filename = 'sku_master_template.csv';
 
       case 'locations':
@@ -261,13 +283,14 @@ class ImportService {
         filename = 'location_master_template.csv';
 
       case 'inventory':
-        // 7 columns: sku_code, location_code, boxes, carton_qty, total_qty, stock_status, note
+        // 8 columns: sku_code, location_code, boxes, carton_qty, total_qty, stock_status, note, inventory_type
         content =
-            'sku_code,location_code,boxes,carton_qty,total_qty,stock_status,note\r\n'
-            'ABC-001,A1A,10,12,,confirmed,按箱规导入示例\r\n'
-            'ABC-001,A1A,3,100,,confirmed,多箱规合并示例\r\n'
-            'DEF-002,B2B,,,120,confirmed,按总件数导入示例\r\n'
-            'XYZ-003,C1A,,,0,pending_count,待清点\r\n';
+            'sku_code,location_code,boxes,carton_qty,total_qty,stock_status,note,inventory_type\r\n'
+            'ABC-001,A1A,10,12,,confirmed,按箱规导入示例,specific\r\n'
+            'ABC-001,A1A,3,100,,confirmed,多箱规合并示例,specific\r\n'
+            'DEF-002,B2B,,,120,confirmed,按总件数导入示例,specific\r\n'
+            'XYZ-003,C1A,,,0,pending_count,待清点,specific\r\n'
+            'MAIN-001,D1A,,,,,,generic\r\n';
         filename = 'inventory_detail_template.csv';
 
       default:

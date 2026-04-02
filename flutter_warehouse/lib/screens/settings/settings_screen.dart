@@ -222,35 +222,101 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  // 清空库存
-  Future<void> _confirmClearInventory() async {
-    final confirm = await showDialog<bool>(
+  // 清空所有业务数据
+  Future<void> _confirmClearAllData() async {
+    // First confirmation
+    final confirm1 = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('危险操作'),
-        content: const Text('确定要清空所有库存记录吗？此操作不可恢复！'),
+        title: const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
+          SizedBox(width: 8),
+          Text('危险操作'),
+        ]),
+        content: const Text(
+          '此操作将清空以下所有数据：\n\n'
+          '• 全部库存记录\n'
+          '• 全部 SKU 主档\n'
+          '• 全部库位主档\n'
+          '• 全部出入库流水\n'
+          '• 全部操作日志\n'
+          '• 全部导入记录\n\n'
+          '仅保留用户账号。\n\n'
+          '此操作不可恢复！',
+        ),
         actions: [
           TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => ctx.pop(true),
-            child: const Text('确认清空'),
+            child: const Text('继续'),
           ),
         ],
       ),
     );
-    if (confirm != true) return;
+    if (confirm1 != true || !mounted) return;
+
+    // Second confirmation: type to confirm
+    final confirmCtrl = TextEditingController();
+    String? confirmErr;
+    final confirm2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('二次确认'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('请输入"清空数据"以确认操作：'),
+              const SizedBox(height: 10),
+              TextField(
+                controller: confirmCtrl,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: '清空数据',
+                  errorText: confirmErr,
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () {
+                if (confirmCtrl.text.trim() != '清空数据') {
+                  setS(() => confirmErr = '输入不正确');
+                  return;
+                }
+                ctx.pop(true);
+              },
+              child: const Text('确认清空'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirm2 != true || !mounted) return;
 
     try {
-      await InventoryService().clearAll();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('库存已清空')));
-      }
+      final result = await InventoryService().clearAllData();
+      if (!mounted) return;
+      final deleted = result['deleted'] as Map<String, dynamic>? ?? {};
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          '清空完成：库存 ${deleted['inventories']} 条，'
+          'SKU ${deleted['skus']} 条，库位 ${deleted['locations']} 条，'
+          '流水 ${deleted['transactions']} 条，日志 ${deleted['auditLogs']} 条，'
+          '导入记录 ${deleted['importLogs']} 条',
+        ),
+        duration: const Duration(seconds: 6),
+      ));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')));
+          SnackBar(content: Text('操作失败: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -325,10 +391,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: const Text('清空所有库存',
+              title: const Text('清空所有业务数据',
                   style: TextStyle(color: Colors.red)),
-              subtitle: const Text('保留用户和操作记录'),
-              onTap: _confirmClearInventory,
+              subtitle: const Text('清空库存、SKU、库位、流水、日志及导入记录，仅保留用户账号'),
+              onTap: _confirmClearAllData,
             ),
           ],
 
