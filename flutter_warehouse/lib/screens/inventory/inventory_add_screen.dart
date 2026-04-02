@@ -134,7 +134,9 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
       return;
     }
 
-    int boxes, unitsPerBox;
+    int boxes;
+    int? unitsPerBox;
+    bool boxesOnlyMode = false;
     if (_isPending) {
       boxes = 0;
       unitsPerBox = 1;
@@ -142,8 +144,13 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
       final qty = int.tryParse(_qtyCtrl.text);
       if (qty == null || qty <= 0) { setState(() => _error = '请输入有效箱数'); return; }
       boxes = qty;
-      unitsPerBox = int.tryParse(_cartonQtyCtrl.text) ?? 1;
-      if (unitsPerBox <= 0) unitsPerBox = 1;
+      final parsedUnits = int.tryParse(_cartonQtyCtrl.text);
+      if (parsedUnits != null && parsedUnits > 0) {
+        unitsPerBox = parsedUnits;
+      } else {
+        // No carton qty provided — boxes-only mode
+        boxesOnlyMode = true;
+      }
     } else {
       final total = int.tryParse(_totalQtyCtrl.text);
       if (total == null || total <= 0) { setState(() => _error = '请输入有效件数'); return; }
@@ -195,6 +202,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
           unitsPerBox: unitsPerBox,
           note: note.isEmpty ? null : note,
           pendingCount: _isPending,
+          boxesOnlyMode: boxesOnlyMode,
         );
       } on DioException catch (e) {
         // 已有库存记录 → 自动转为入库操作
@@ -206,6 +214,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
             boxes: boxes,
             unitsPerBox: unitsPerBox,
             note: note.isEmpty ? null : note,
+            boxesOnlyMode: boxesOnlyMode,
           );
         } else {
           rethrow;
@@ -631,8 +640,9 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                   }
                   // 按箱规
                   final boxes = int.tryParse(_qtyCtrl.text) ?? 0;
-                  final units = int.tryParse(_cartonQtyCtrl.text) ?? 1;
-                  final total = boxes * units;
+                  final units = int.tryParse(_cartonQtyCtrl.text);
+                  final isBoxesOnly = units == null || units <= 0;
+                  final total = isBoxesOnly ? 0 : boxes * units;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -669,7 +679,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('每箱件数',
+                                const Text('每箱件数（可选）',
                                     style: TextStyle(
                                         fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 6),
@@ -677,7 +687,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                                   controller: _cartonQtyCtrl,
                                   keyboardType: TextInputType.number,
                                   decoration: const InputDecoration(
-                                    hintText: '1',
+                                    hintText: '留空=仅记箱数',
                                     border: OutlineInputBorder(),
                                     suffixText: '件/箱',
                                   ),
@@ -690,7 +700,9 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                       ),
                       if (boxes > 0) ...[
                         const SizedBox(height: 8),
-                        _summaryChip('合计 $total 件'),
+                        isBoxesOnly
+                            ? _summaryChip('$boxes 箱（箱规待录）')
+                            : _summaryChip('合计 $total 件'),
                       ],
                     ],
                   );

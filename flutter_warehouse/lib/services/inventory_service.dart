@@ -23,17 +23,19 @@ class InventoryService {
     required String skuCode,
     required String locationId,
     int boxes = 0,
-    int unitsPerBox = 1,
+    int? unitsPerBox,
     String? note,
     bool pendingCount = false,
+    bool boxesOnlyMode = false,
   }) async {
     final response = await _api.post('/inventory', data: {
       'skuCode': skuCode,
       'locationId': locationId,
       'boxes': boxes,
-      'unitsPerBox': unitsPerBox,
+      if (unitsPerBox != null) 'unitsPerBox': unitsPerBox,
       if (note != null && note.isNotEmpty) 'note': note,
       if (pendingCount) 'pendingCount': true,
+      if (boxesOnlyMode) 'boxesOnlyMode': true,
     });
     return InventoryRecord.fromJson(response.data);
   }
@@ -47,15 +49,17 @@ class InventoryService {
     required String skuCode,
     required String locationId,
     required int boxes,
-    required int unitsPerBox,
+    int? unitsPerBox,
     String? note,
+    bool boxesOnlyMode = false,
   }) async {
     await _api.post('/transactions/in', data: {
       'skuCode': skuCode,
       'locationId': locationId,
       'boxes': boxes,
-      'unitsPerBox': unitsPerBox,
+      if (unitsPerBox != null) 'unitsPerBox': unitsPerBox,
       if (note != null && note.isNotEmpty) 'note': note,
+      if (boxesOnlyMode) 'boxesOnlyMode': true,
     });
   }
 

@@ -29,8 +29,12 @@ class InventoryRecord {
   /// confirmed | pending_count | temporary
   final String stockStatus;
   /// When true: SKU is registered at this location but no quantity was provided.
-  /// Display as "未填写数量" instead of a number.
+  /// Display as "待清点" instead of a number.
   final bool quantityUnknown;
+
+  /// When true: only box count is known, per-box qty is unknown.
+  /// Display as "X 箱" without piece count.
+  final bool boxesOnlyMode;
 
   InventoryRecord({
     required this.id,
@@ -44,14 +48,28 @@ class InventoryRecord {
     this.pendingCount = false,
     this.stockStatus = 'confirmed',
     this.quantityUnknown = false,
+    this.boxesOnlyMode = false,
   });
 
   int get totalQty => configurations.isNotEmpty
       ? configurations.fold(0, (s, c) => s + c.qty)
       : boxes * unitsPerBox;
 
+  int get totalBoxes => configurations.isNotEmpty
+      ? configurations.fold(0, (s, c) => s + c.boxes)
+      : boxes;
+
   /// Human-readable quantity string. Use this for display instead of totalQty directly.
-  String get qtyDisplay => quantityUnknown ? '未填写数量' : '$totalQty 件';
+  String get qtyDisplay {
+    if (quantityUnknown) return '待清点';
+    if (boxesOnlyMode) return '$totalBoxes 箱';
+    if (configurations.length > 1) {
+      final parts = configurations.map((c) => '${c.boxes}箱·${c.unitsPerBox}件/箱').join(' + ');
+      return '$parts = $totalQty 件';
+    }
+    if (unitsPerBox > 1) return '$totalBoxes箱 · $totalQty件';
+    return '$totalQty 件';
+  }
 
   Location? get location => locationId is Map ? Location.fromJson(locationId) : null;
 
@@ -76,6 +94,7 @@ class InventoryRecord {
       stockStatus: json['stockStatus'] as String? ??
           (pendingCount ? 'pending_count' : 'confirmed'),
       quantityUnknown: json['quantityUnknown'] == true,
+      boxesOnlyMode: json['boxesOnlyMode'] == true,
     );
   }
 }
