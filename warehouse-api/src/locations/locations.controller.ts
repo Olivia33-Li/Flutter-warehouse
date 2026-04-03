@@ -33,6 +33,24 @@ export class LocationsController {
     return this.locationsService.update(id, dto, user);
   }
 
+  @Patch(':id/check')
+  @Roles('editor')
+  check(@Param('id') id: string, @Body() dto: { checked: boolean }, @CurrentUser() user: any) {
+    return this.locationsService.check(id, dto.checked, user);
+  }
+
+  @Post(':id/transfer')
+  @Roles('editor')
+  transfer(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: any) {
+    return this.locationsService.transfer(id, dto, user);
+  }
+
+  @Post(':id/copy')
+  @Roles('editor')
+  copy(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: any) {
+    return this.locationsService.copy(id, dto, user);
+  }
+
   @Delete(':id')
   @Roles('editor')
   remove(@Param('id') id: string, @CurrentUser() user: any) {

@@ -8,6 +8,7 @@ import { LocationsModule } from './locations/locations.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { HistoryModule } from './history/history.module';
 import { ImportModule } from './import/import.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ImportModule } from './import/import.module';
     InventoryModule,
     HistoryModule,
     ImportModule,
+    TransactionsModule,
   ],
 })
 export class AppModule {}

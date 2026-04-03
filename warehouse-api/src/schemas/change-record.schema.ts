@@ -2,7 +2,6 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 export type ChangeRecordDocument = ChangeRecord & Document;
-
 export type ActionType = 'add' | 'edit' | 'delete' | 'import';
 export type EntityType = 'sku' | 'location' | 'inventory' | 'user';
 
@@ -14,14 +13,29 @@ export class ChangeRecord {
   @Prop({ required: true })
   userName: string;
 
-  @Prop({ type: String, enum: ['add', 'edit', 'delete', 'import'], required: true })
-  action: ActionType;
+  @Prop({ required: true })
+  action: string;
 
-  @Prop({ type: String, enum: ['sku', 'location', 'inventory', 'user'], required: true })
-  entity: EntityType;
+  @Prop({ required: true })
+  entity: string;
+
+  @Prop()
+  entityId: string;
 
   @Prop({ required: true })
   description: string;
+
+  @Prop()
+  businessAction: string;
+
+  @Prop({ type: Object })
+  details: Record<string, any>;
+
+  @Prop({ type: Object })
+  changes: Record<string, any>;
 }
 
 export const ChangeRecordSchema = SchemaFactory.createForClass(ChangeRecord);
+ChangeRecordSchema.index({ createdAt: -1 });
+ChangeRecordSchema.index({ entity: 1 });
+ChangeRecordSchema.index({ businessAction: 1 });

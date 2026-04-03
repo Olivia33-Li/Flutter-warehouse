@@ -44,11 +44,11 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
     }
   }
 
-  Widget _stockBadge(sku) {
-    final qty = sku.totalQty as int;
-    final min = sku.minStock as int?;
+  Widget _stockBadge(Sku sku) {
+    final qty = sku.totalQty;
+    final min = sku.minStock;
     final Color color;
-    final String label = '共 $qty 件';
+    final String label = sku.allBoxesOnly ? '共 $qty 箱' : '共 $qty 件';
 
     if (qty == 0) {
       color = Colors.grey;
@@ -154,7 +154,9 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
                                       spacing: 6,
                                       runSpacing: 4,
                                       children: sku.locations.map((loc) => Chip(
-                                        label: Text('${loc.locationCode} · ${loc.totalQty}件',
+                                        label: Text(loc.boxesOnly
+                                            ? '${loc.locationCode} · ${loc.boxes}箱'
+                                            : '${loc.locationCode} · ${loc.totalQty}件',
                                             style: const TextStyle(fontSize: 12)),
                                         visualDensity: VisualDensity.compact,
                                         padding: EdgeInsets.zero,

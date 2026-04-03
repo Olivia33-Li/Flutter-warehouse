@@ -80,7 +80,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     final unitsCtrl = TextEditingController(text: existing?.unitsPerBox.toString() ?? '1');
     final totalQtyCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    bool byCarton = true;
+    String inputMode = 'carton'; // 'carton' | 'boxesOnly' | 'qty'
     bool isPending = false;
     String? dialogError;
 
@@ -390,20 +390,24 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     ),
                     if (!isPending) ...[
                       const SizedBox(height: 8),
-                      SegmentedButton<bool>(
+                      SegmentedButton<String>(
                         segments: const [
                           ButtonSegment(
-                              value: true,
+                              value: 'carton',
                               label: Text('按箱规'),
                               icon: Icon(Icons.inventory_2_outlined)),
                           ButtonSegment(
-                              value: false,
+                              value: 'boxesOnly',
+                              label: Text('仅箱数'),
+                              icon: Icon(Icons.view_list)),
+                          ButtonSegment(
+                              value: 'qty',
                               label: Text('按总数量'),
                               icon: Icon(Icons.format_list_numbered)),
                         ],
-                        selected: {byCarton},
+                        selected: {inputMode},
                         onSelectionChanged: (s) =>
-                            setS(() => byCarton = s.first),
+                            setS(() => inputMode = s.first),
                         style: const ButtonStyle(
                             visualDensity: VisualDensity.compact),
                       ),
@@ -439,7 +443,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
 
                   // ── Quantity fields (hidden when pending or editing) ──
                   if (!isPending) ...[
-                    if (existing != null || byCarton) ...[
+                    if (existing != null || inputMode == 'carton') ...[
                       TextField(
                         controller: boxesCtrl,
                         keyboardType: TextInputType.number,
@@ -472,6 +476,17 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                         }
                         return const SizedBox.shrink();
                       }),
+                    ] else if (inputMode == 'boxesOnly') ...[
+                      TextField(
+                        controller: boxesCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: '箱数',
+                            border: OutlineInputBorder(),
+                            suffixText: '箱',
+                            helperText: '仅记录箱数，暂不填写每箱件数'),
+                        onChanged: (_) => setS(() {}),
+                      ),
                     ] else ...[
                       TextField(
                         controller: totalQtyCtrl,
@@ -519,11 +534,18 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                 if (isPending) {
                   boxes = 0;
                   unitsPerBox = 1;
-                } else if (existing != null || byCarton) {
+                } else if (existing != null || inputMode == 'carton') {
                   boxes = int.tryParse(boxesCtrl.text) ?? 0;
                   unitsPerBox = int.tryParse(unitsCtrl.text) ?? 0;
                   if (boxes <= 0 || unitsPerBox <= 0) {
                     setS(() => dialogError = '请输入有效的箱数和每箱件数');
+                    return;
+                  }
+                } else if (inputMode == 'boxesOnly') {
+                  boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                  unitsPerBox = 1;
+                  if (boxes <= 0) {
+                    setS(() => dialogError = '请输入有效箱数');
                     return;
                   }
                 } else {
@@ -551,6 +573,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       unitsPerBox: unitsPerBox,
                       note: note.isEmpty ? null : note,
                       pendingCount: isPending,
+                      boxesOnlyMode: inputMode == 'boxesOnly',
                     );
                   }
                   if (ctx.mounted) ctx.pop();
@@ -603,7 +626,11 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     _info('描述', data['description']),
                   const Divider(),
                   _info('SKU 种类', '${data['skuCount'] ?? 0}'),
-                  _info('总库存', '${data['totalQty'] ?? 0} 件'),
+                  _info('总库存', () {
+                    final allBoxesOnly = inventory.isNotEmpty && inventory.every((r) => r.boxesOnlyMode);
+                    if (allBoxesOnly) return '${data['totalBoxes'] ?? 0} 箱';
+                    return '${data['totalQty'] ?? 0} 件';
+                  }()),
                   const Divider(),
                   // 已检查开关
                   Row(

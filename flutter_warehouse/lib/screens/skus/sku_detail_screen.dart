@@ -58,7 +58,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     List<Location> locResults = [];
     bool isNewLoc = false;
     bool locSearching = false;
-    bool useConfigMode = true; // 默认按箱规
+    String inputMode = 'carton'; // 'carton' | 'boxesOnly' | 'qty'
     bool isPending = false;
     bool saving = false;
     String? dialogError;
@@ -80,10 +80,13 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
             }
           }
 
-          final previewQty = useConfigMode
-              ? (int.tryParse(boxesCtrl.text) ?? 0) *
-                  (int.tryParse(unitsCtrl.text) ?? 0)
-              : (int.tryParse(qtyCtrl.text) ?? 0);
+          final previewBoxes = int.tryParse(boxesCtrl.text) ?? 0;
+          final previewUnits = int.tryParse(unitsCtrl.text) ?? 0;
+          final previewQty = inputMode == 'carton'
+              ? previewBoxes * previewUnits
+              : inputMode == 'boxesOnly'
+                  ? previewBoxes
+                  : (int.tryParse(qtyCtrl.text) ?? 0);
 
           return AlertDialog(
             title: const Text('新增库位'),
@@ -327,24 +330,28 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                     ),
                   ] else ...[
                     const SizedBox(height: 8),
-                    SegmentedButton<bool>(
+                    SegmentedButton<String>(
                       segments: const [
                         ButtonSegment(
-                            value: true,
+                            value: 'carton',
                             label: Text('按箱规'),
                             icon: Icon(Icons.view_list, size: 16)),
                         ButtonSegment(
-                            value: false,
+                            value: 'boxesOnly',
+                            label: Text('仅箱数'),
+                            icon: Icon(Icons.inventory_2_outlined, size: 16)),
+                        ButtonSegment(
+                            value: 'qty',
                             label: Text('按总数量'),
                             icon: Icon(Icons.numbers, size: 16)),
                       ],
-                      selected: {useConfigMode},
+                      selected: {inputMode},
                       onSelectionChanged: (v) =>
-                          setS(() => useConfigMode = v.first),
+                          setS(() => inputMode = v.first),
                     ),
                     const SizedBox(height: 10),
 
-                    if (useConfigMode) ...[
+                    if (inputMode == 'carton') ...[
                       Row(
                         children: [
                           Expanded(
@@ -376,6 +383,19 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           ),
                         ],
                       ),
+                    ] else if (inputMode == 'boxesOnly') ...[
+                      TextField(
+                        controller: boxesCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '箱数 *',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          suffixText: '箱',
+                          helperText: '仅记录箱数，暂不填写每箱件数',
+                        ),
+                        onChanged: (_) => setS(() {}),
+                      ),
                     ] else ...[
                       TextField(
                         controller: qtyCtrl,
@@ -400,9 +420,11 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          useConfigMode
-                              ? '初始库存：${int.tryParse(boxesCtrl.text) ?? 0}箱 × ${int.tryParse(unitsCtrl.text) ?? 0}件/箱 = $previewQty件'
-                              : '初始库存：$previewQty 件',
+                          inputMode == 'carton'
+                              ? '初始库存：$previewBoxes箱 × $previewUnits件/箱 = $previewQty件'
+                              : inputMode == 'boxesOnly'
+                                  ? '初始库存：$previewQty 箱（每箱件数待定）'
+                                  : '初始库存：$previewQty 件',
                           style: TextStyle(
                               fontSize: 12,
                               color: Colors.green.shade700,
@@ -454,7 +476,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                         if (isPending) {
                           boxes = 0;
                           units = 1;
-                        } else if (useConfigMode) {
+                        } else if (inputMode == 'carton') {
                           boxes = int.tryParse(boxesCtrl.text) ?? 0;
                           units = int.tryParse(unitsCtrl.text) ?? 0;
                           if (boxes <= 0) {
@@ -463,6 +485,13 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           }
                           if (units <= 0) {
                             setS(() => dialogError = '请输入有效每箱件数');
+                            return;
+                          }
+                        } else if (inputMode == 'boxesOnly') {
+                          boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                          units = 1;
+                          if (boxes <= 0) {
+                            setS(() => dialogError = '请输入有效箱数');
                             return;
                           }
                         } else {
@@ -504,6 +533,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                 ? null
                                 : noteCtrl.text.trim(),
                             pendingCount: isPending,
+                            boxesOnlyMode: inputMode == 'boxesOnly',
                           );
                           if (ctx.mounted) ctx.pop();
                           _load();
@@ -627,7 +657,11 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   _info('实际箱规', '$uniqueConfigCount 种'),
                   _info('箱规分布', distText),
                   const Divider(),
-                  _info('总库存', '${data['totalQty'] ?? 0} 件'),
+                  _info('总库存', () {
+                    final allBoxesOnly = inventory.isNotEmpty && inventory.every((r) => r.boxesOnlyMode);
+                    if (allBoxesOnly) return '${data['totalBoxes'] ?? 0} 箱';
+                    return '${data['totalQty'] ?? 0} 件';
+                  }()),
                 ],
               ),
             ),
@@ -675,11 +709,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      record.quantityUnknown
-                          ? '未填写数量'
-                          : (record.configurations.length > 1
-                              ? '共${record.totalQty}件 (${record.configurations.length}种箱规)'
-                              : '${record.boxes}箱×${record.unitsPerBox} = ${record.totalQty}件'),
+                      record.qtyDisplay,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     if (user?.canEdit == true) ...[

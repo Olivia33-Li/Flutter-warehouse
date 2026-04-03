@@ -30,12 +30,24 @@ export class SkusService {
       .populate('locationId', 'code')
       .lean();
 
-    const invMap = new Map<string, { locationId: string; locationCode: string; qty: number }[]>();
+    const invMap = new Map<string, { locationId: string; locationCode: string; totalQty: number; boxes: number; unitsPerBox: number; boxesOnly: boolean }[]>();
     for (const inv of inventories) {
       const key = inv.skuId.toString();
       if (!invMap.has(key)) invMap.set(key, []);
       const loc = inv.locationId as any;
-      invMap.get(key)!.push({ locationId: loc?._id?.toString() ?? '', locationCode: loc?.code ?? '?', qty: inv.quantity });
+      const boxes = inv.boxes ?? 0;
+      const unitsPerBox = inv.unitsPerBox ?? 1;
+      const totalQty = (inv.quantity ?? 0) > 0
+        ? inv.quantity
+        : boxes * unitsPerBox;
+      invMap.get(key)!.push({
+        locationId: loc?._id?.toString() ?? '',
+        locationCode: loc?.code ?? '?',
+        totalQty,
+        boxes,
+        unitsPerBox,
+        boxesOnly: !!(inv as any).boxesOnlyMode,
+      });
     }
 
     return skus.map((s) => {
@@ -43,7 +55,7 @@ export class SkusService {
       return {
         ...s,
         locations: locs,
-        totalQty: locs.reduce((sum, l) => sum + l.qty, 0),
+        totalQty: locs.reduce((sum, l) => sum + l.totalQty, 0),
       };
     });
   }
@@ -57,10 +69,26 @@ export class SkusService {
       .populate('locationId', 'code description')
       .lean();
 
-    const totalQty = inventory.reduce((sum, r) => sum + r.quantity, 0);
+    const formatted = inventory.map((r) => {
+      const loc = r.locationId as any;
+      const isBoxesOnly = !!(r as any).boxesOnlyMode;
+      const boxes = (r.boxes ?? 0) > 0 ? r.boxes : (r.quantity ?? 0);
+      const unitsPerBox = r.unitsPerBox ?? 1;
+      return {
+        ...r,
+        skuCode: r.skuCode || sku.sku,
+        locationId: loc,
+        boxes,
+        unitsPerBox,
+        quantity: isBoxesOnly ? 0 : (r.quantity ?? boxes * unitsPerBox),
+      };
+    });
+
+    const totalQty = formatted.reduce((sum, r) => (r as any).boxesOnlyMode ? sum : sum + (r.quantity ?? 0), 0);
+    const totalBoxes = formatted.reduce((sum, r) => sum + (r.boxes ?? 0), 0);
     const totalPcs = sku.cartonQty ? totalQty * sku.cartonQty : null;
 
-    return { ...sku, inventory, totalQty, totalPcs };
+    return { ...sku, inventory: formatted, totalQty, totalBoxes, totalPcs };
   }
 
   async create(dto: CreateSkuDto, user: any) {

@@ -10,6 +10,9 @@ export class Location {
 
   @Prop({ trim: true })
   description: string;
+
+  @Prop({ type: Date })
+  checkedAt: Date;
 }
 
 export const LocationSchema = SchemaFactory.createForClass(Location);

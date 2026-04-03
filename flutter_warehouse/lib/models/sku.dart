@@ -4,6 +4,7 @@ class SkuLocation {
   final int boxes;
   final int unitsPerBox;
   final int totalQty;
+  final bool boxesOnly;
 
   SkuLocation({
     required this.locationId,
@@ -11,6 +12,7 @@ class SkuLocation {
     required this.boxes,
     required this.unitsPerBox,
     required this.totalQty,
+    this.boxesOnly = false,
   });
 
   factory SkuLocation.fromJson(Map<String, dynamic> json) => SkuLocation(
@@ -19,6 +21,7 @@ class SkuLocation {
         boxes: (json['boxes'] as num?)?.toInt() ?? 0,
         unitsPerBox: (json['unitsPerBox'] as num?)?.toInt() ?? 1,
         totalQty: (json['totalQty'] as num?)?.toInt() ?? 0,
+        boxesOnly: json['boxesOnly'] == true,
       );
 }
 
@@ -66,4 +69,7 @@ class Sku {
       };
 
   String get displayName => name != null && name!.isNotEmpty ? name! : sku;
+
+  /// True when every location for this SKU is in boxes-only mode (no per-box qty known).
+  bool get allBoxesOnly => locations.isNotEmpty && locations.every((l) => l.boxesOnly);
 }

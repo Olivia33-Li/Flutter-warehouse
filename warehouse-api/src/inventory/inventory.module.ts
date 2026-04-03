@@ -5,6 +5,7 @@ import { InventoryService } from './inventory.service';
 import { Inventory, InventorySchema } from '../schemas/inventory.schema';
 import { Sku, SkuSchema } from '../schemas/sku.schema';
 import { Location, LocationSchema } from '../schemas/location.schema';
+import { ImportLog, ImportLogSchema } from '../schemas/import-log.schema';
 import { HistoryModule } from '../history/history.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { HistoryModule } from '../history/history.module';
       { name: Inventory.name, schema: InventorySchema },
       { name: Sku.name, schema: SkuSchema },
       { name: Location.name, schema: LocationSchema },
+      { name: ImportLog.name, schema: ImportLogSchema },
     ]),
     HistoryModule,
   ],

@@ -56,6 +56,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   int get _boxes => _invRecord?.boxes ?? widget.boxes;
   int get _units => _invRecord?.unitsPerBox ?? widget.unitsPerBox;
   bool get _quantityUnknown => _invRecord?.quantityUnknown ?? widget.quantityUnknown;
+  bool get _boxesOnlyMode => _invRecord?.boxesOnlyMode ?? false;
+  String get _qtyLabel => _quantityUnknown ? '未填写' : (_boxesOnlyMode ? '$_boxes 箱' : '$_qty 件');
   List<InventoryConfig> get _configs =>
       _invRecord != null ? _invRecord!.configurations : widget.configurations;
 
@@ -132,7 +134,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           Text(
                             _invRecord?.pendingCount == true
                                 ? '当前状态: 待清点'
-                                : (_quantityUnknown ? '当前库存: 未填写' : '当前库存: $_qty 件'),
+                                : '当前库存: $_qtyLabel',
                             style: TextStyle(
                                 fontSize: 12,
                                 color: isPending
@@ -390,7 +392,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         Text('${widget.skuCode}  @  ${widget.locationCode}',
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text(_quantityUnknown ? '当前库存: 未填写' : '当前库存: $_qty 件',
+                        Text('当前库存: $_qtyLabel',
                             style: TextStyle(
                                 fontSize: 12, color: Colors.red.shade700)),
                       ],
@@ -692,7 +694,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         Text('${widget.skuCode}  @  ${widget.locationCode}',
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text(_quantityUnknown ? '当前库存: 未填写' : '当前库存: $_qty 件',
+                        Text('当前库存: $_qtyLabel',
                             style: TextStyle(
                                 fontSize: 12, color: Colors.blue.shade700)),
                       ],

@@ -4,81 +4,108 @@ import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../../services/import_service.dart';
 
-class ImportScreen extends StatelessWidget {
+class ImportScreen extends StatefulWidget {
   const ImportScreen({super.key});
 
   @override
+  State<ImportScreen> createState() => _ImportScreenState();
+}
+
+class _ImportScreenState extends State<ImportScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  final _logsKey = GlobalKey<_ImportLogsTabState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onImportDone() {
+    _tabController.animateTo(3);
+    _logsKey.currentState?.reload();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('批量导入'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'SKU 主档'),
-              Tab(text: '库位主档'),
-              Tab(text: '库存明细'),
-              Tab(text: '导入记录'),
-            ],
-          ),
-        ),
-        body: const TabBarView(
-          children: [
-            _ImportTab(
-              type: 'skus',
-              title: 'SKU 主档导入',
-              description: '用于批量新增或更新 SKU 基础资料。\n'
-                  '已存在的 SKU 将被更新（upsert），不会重复创建。',
-              columns: [
-                _ColDef('sku_code', _ColReq.required, 'SKU 编码，全大写'),
-                _ColDef('name', _ColReq.optional, '商品名称'),
-                _ColDef('barcode', _ColReq.optional, '条形码（必须以文本格式保存，防止科学计数法）'),
-                _ColDef('default_carton_qty', _ColReq.optional, '默认箱规（正整数），供库存导入时参考'),
-                _ColDef('status', _ColReq.optional, 'active（在用）或 inactive（停用），默认 active'),
-              ],
-              notes: [
-                '条形码注意：在 Excel 中请将条形码列格式设为【文本】后再填入数据，'
-                    '否则 Excel 会将长数字转为科学计数法（如 1.23E+12）导致数据损坏。',
-              ],
-            ),
-            _ImportTab(
-              type: 'locations',
-              title: '库位主档导入',
-              description: '用于批量新增或更新库位基础资料。\n'
-                  '已存在的库位将被更新（upsert），不会重复创建。',
-              columns: [
-                _ColDef('location_code', _ColReq.required, '库位编码，全大写'),
-                _ColDef('description', _ColReq.optional, '库位描述'),
-                _ColDef('status', _ColReq.optional, 'active（在用）或 inactive（停用），默认 active'),
-              ],
-            ),
-            _ImportTab(
-              type: 'inventory',
-              title: '库存明细导入',
-              description: '用于批量录入库存数据。\n'
-                  'SKU 和库位必须已存在（请先完成主档导入）。\n'
-                  '已有记录将被替换（upsert），不会累加。',
-              columns: [
-                _ColDef('sku_code', _ColReq.required, 'SKU 编码'),
-                _ColDef('location_code', _ColReq.required, '库位编码'),
-                _ColDef('boxes', _ColReq.optional, '箱数，需与 carton_qty 同时填写'),
-                _ColDef('carton_qty', _ColReq.optional, '每箱件数，需与 boxes 同时填写'),
-                _ColDef('total_qty', _ColReq.optional, '总件数，仅填此项时按总件数导入'),
-                _ColDef('stock_status', _ColReq.optional, 'confirmed / pending_count / temporary，默认 confirmed'),
-                _ColDef('note', _ColReq.optional, '备注'),
-              ],
-              notes: [
-                '数量规则：填写 boxes+carton_qty（按箱规）或 total_qty（按总件数）。\n'
-                    '若数量字段均为空或只填写了部分，系统将创建"待补充数量"记录，不报错。\n'
-                    '若同时填写了 total_qty，系统会校验 total_qty == boxes × carton_qty，不一致则报错。',
-                '多箱规：同一 SKU+库位 可在文件中出现多行（不同箱规），系统自动合并为多箱规记录。\n'
-                    '如果同一 SKU+库位+箱规 出现两次，系统会报重复错误（不静默合并）。',
-              ],
-            ),
-            const _ImportLogsTab(),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('批量导入'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'SKU 主档'),
+            Tab(text: '库位主档'),
+            Tab(text: '库存明细'),
+            Tab(text: '导入记录'),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _ImportTab(
+            type: 'skus',
+            title: 'SKU 主档导入',
+            description: '用于批量新增或更新 SKU 基础资料。\n'
+                '已存在的 SKU 将被更新（upsert），不会重复创建。',
+            columns: const [
+              _ColDef('sku_code', _ColReq.required, 'SKU 编码，全大写'),
+              _ColDef('name', _ColReq.optional, '商品名称'),
+              _ColDef('barcode', _ColReq.optional, '条形码（必须以文本格式保存，防止科学计数法）'),
+              _ColDef('default_carton_qty', _ColReq.optional, '默认箱规（正整数），供库存导入时参考'),
+              _ColDef('status', _ColReq.optional, 'active（在用）或 inactive（停用），默认 active'),
+            ],
+            notes: const [
+              '条形码注意：在 Excel 中请将条形码列格式设为【文本】后再填入数据，'
+                  '否则 Excel 会将长数字转为科学计数法（如 1.23E+12）导致数据损坏。',
+            ],
+            onImportDone: _onImportDone,
+          ),
+          _ImportTab(
+            type: 'locations',
+            title: '库位主档导入',
+            description: '用于批量新增或更新库位基础资料。\n'
+                '已存在的库位将被更新（upsert），不会重复创建。',
+            columns: const [
+              _ColDef('location_code', _ColReq.required, '库位编码，全大写'),
+              _ColDef('description', _ColReq.optional, '库位描述'),
+              _ColDef('status', _ColReq.optional, 'active（在用）或 inactive（停用），默认 active'),
+            ],
+            onImportDone: _onImportDone,
+          ),
+          _ImportTab(
+            type: 'inventory',
+            title: '库存明细导入',
+            description: '用于批量录入库存数据。\n'
+                'SKU 和库位必须已存在（请先完成主档导入）。\n'
+                '已有记录将被替换（upsert），不会累加。',
+            columns: const [
+              _ColDef('sku_code', _ColReq.required, 'SKU 编码'),
+              _ColDef('location_code', _ColReq.required, '库位编码'),
+              _ColDef('boxes', _ColReq.optional, '箱数，需与 carton_qty 同时填写'),
+              _ColDef('carton_qty', _ColReq.optional, '每箱件数，需与 boxes 同时填写'),
+              _ColDef('total_qty', _ColReq.optional, '总件数，仅填此项时按总件数导入'),
+              _ColDef('stock_status', _ColReq.optional, 'confirmed / pending_count / temporary，默认 confirmed'),
+              _ColDef('note', _ColReq.optional, '备注'),
+            ],
+            notes: const [
+              '数量规则：填写 boxes+carton_qty（按箱规）或 total_qty（按总件数）。\n'
+                  '若数量字段均为空或只填写了部分，系统将创建"待补充数量"记录，不报错。\n'
+                  '若同时填写了 total_qty，系统会校验 total_qty == boxes × carton_qty，不一致则报错。',
+              '多箱规：同一 SKU+库位 可在文件中出现多行（不同箱规），系统自动合并为多箱规记录。\n'
+                  '如果同一 SKU+库位+箱规 出现两次，系统会报重复错误（不静默合并）。',
+            ],
+            onImportDone: _onImportDone,
+          ),
+          _ImportLogsTab(key: _logsKey),
+        ],
       ),
     );
   }
@@ -102,6 +129,7 @@ class _ImportTab extends StatefulWidget {
   final String description;
   final List<_ColDef> columns;
   final List<String> notes;
+  final VoidCallback? onImportDone;
 
   const _ImportTab({
     required this.type,
@@ -109,6 +137,7 @@ class _ImportTab extends StatefulWidget {
     required this.description,
     required this.columns,
     this.notes = const [],
+    this.onImportDone,
   });
 
   @override
@@ -210,6 +239,7 @@ class _ImportTabState extends State<_ImportTab>
         _result = result;
         _phase = _Phase.done;
       });
+      widget.onImportDone?.call();
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
       setState(() {
@@ -805,14 +835,13 @@ class _ResultPanel extends StatelessWidget {
 // ─── Import Logs Tab ──────────────────────────────────────────────────────────
 
 class _ImportLogsTab extends StatefulWidget {
-  const _ImportLogsTab();
+  const _ImportLogsTab({super.key});
 
   @override
   State<_ImportLogsTab> createState() => _ImportLogsTabState();
 }
 
-class _ImportLogsTabState extends State<_ImportLogsTab>
-    with AutomaticKeepAliveClientMixin {
+class _ImportLogsTabState extends State<_ImportLogsTab> {
   final _service = ImportService();
 
   List<ImportLogRecord> _records = [];
@@ -830,13 +859,12 @@ class _ImportLogsTabState extends State<_ImportLogsTab>
   ];
 
   @override
-  bool get wantKeepAlive => true;
-
-  @override
   void initState() {
     super.initState();
     _load(reset: true);
   }
+
+  void reload() => _load(reset: true);
 
   Future<void> _load({bool reset = false}) async {
     if (reset) {
@@ -863,7 +891,6 @@ class _ImportLogsTabState extends State<_ImportLogsTab>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     return Column(
       children: [
         Padding(

@@ -23,11 +23,12 @@ services:
     image: mongo:7
     container_name: warehouse-mongo
     restart: unless-stopped
+    ports:
+      - "27017:27017"
     volumes:
       - mongo_data:/data/db
     networks:
       - warehouse-net
-    # 不暴露端口到公网，仅内部访问
 
 volumes:
   mongo_data:
