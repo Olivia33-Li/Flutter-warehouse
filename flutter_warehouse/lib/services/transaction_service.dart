@@ -29,7 +29,9 @@ class TransactionRecord {
 
   factory TransactionRecord.fromJson(Map<String, dynamic> json) {
     final loc = json['locationId'];
-    final locationCode = loc is Map ? (loc['code'] ?? '') : '';
+    final locationCode = loc is Map
+        ? (loc['code'] ?? '') as String
+        : (json['locationCode'] ?? '') as String;
     return TransactionRecord(
       id: json['_id'] ?? '',
       skuCode: json['skuCode'] ?? '',

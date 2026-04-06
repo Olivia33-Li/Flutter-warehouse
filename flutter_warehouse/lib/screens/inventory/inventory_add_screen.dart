@@ -35,8 +35,8 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
   Location? _selectedLoc;
   bool _isNewSku = false;     // 是否新建 SKU 模式
   bool _isNewLoc = false;     // 是否新建库位模式
-  bool _useConfigMode = true; // true=按箱规，false=按总数量
-  bool _isPending = false;    // 待清点模式
+  String _inputMode = 'carton'; // 'carton' | 'boxesOnly' | 'qty'
+  bool _isPending = false;      // 待清点模式
 
   bool _skuSearching = false;
   bool _locSearching = false;
@@ -134,24 +134,22 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
       return;
     }
 
-    int boxes;
+    int boxes = 0;
     int? unitsPerBox;
     bool boxesOnlyMode = false;
-    if (_isPending) {
-      boxes = 0;
-      unitsPerBox = 1;
-    } else if (_useConfigMode) {
+    if (_inputMode == 'carton') {
+      final qty = int.tryParse(_qtyCtrl.text);
+      if (qty == null || qty <= 0) { setState(() => _error = '请输入有效箱数'); return; }
+      final u = int.tryParse(_cartonQtyCtrl.text);
+      if (u == null || u <= 0) { setState(() => _error = '请输入每箱件数'); return; }
+      boxes = qty;
+      unitsPerBox = u;
+    } else if (_inputMode == 'boxesOnly') {
       final qty = int.tryParse(_qtyCtrl.text);
       if (qty == null || qty <= 0) { setState(() => _error = '请输入有效箱数'); return; }
       boxes = qty;
-      final parsedUnits = int.tryParse(_cartonQtyCtrl.text);
-      if (parsedUnits != null && parsedUnits > 0) {
-        unitsPerBox = parsedUnits;
-      } else {
-        // No carton qty provided — boxes-only mode
-        boxesOnlyMode = true;
-      }
-    } else {
+      boxesOnlyMode = true;
+    } else { // qty
       final total = int.tryParse(_totalQtyCtrl.text);
       if (total == null || total <= 0) { setState(() => _error = '请输入有效件数'); return; }
       boxes = 1;
@@ -160,7 +158,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
 
     setState(() { _saving = true; _error = null; });
     try {
-      final cartonQty = (!_isPending && _useConfigMode) ? int.tryParse(_cartonQtyCtrl.text) : null;
+      final cartonQty = _inputMode == 'carton' ? int.tryParse(_cartonQtyCtrl.text) : null;
       final note = _noteCtrl.text.trim();
       String skuCode;
 
@@ -595,124 +593,145 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
               tileColor: _isPending ? Colors.orange.shade50 : null,
             ),
 
-            if (!_isPending) ...[
-              const SizedBox(height: 8),
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(
-                      value: true,
-                      label: Text('按箱规'),
-                      icon: Icon(Icons.view_list, size: 16)),
-                  ButtonSegment(
-                      value: false,
-                      label: Text('按总数量'),
-                      icon: Icon(Icons.numbers, size: 16)),
-                ],
-                selected: {_useConfigMode},
-                onSelectionChanged: (v) =>
-                    setState(() => _useConfigMode = v.first),
-              ),
-              const SizedBox(height: 12),
-              StatefulBuilder(
-                builder: (ctx, setS) {
-                  if (!_useConfigMode) {
-                    final total = int.tryParse(_totalQtyCtrl.text) ?? 0;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextField(
-                          controller: _totalQtyCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: '总件数 *',
-                            hintText: '0',
-                            border: OutlineInputBorder(),
-                            suffixText: '件',
-                          ),
-                          onChanged: (_) => setS(() {}),
-                        ),
-                        if (total > 0) ...[
-                          const SizedBox(height: 8),
-                          _summaryChip('合计 $total 件'),
-                        ],
-                      ],
-                    );
-                  }
-                  // 按箱规
+            const SizedBox(height: 8),
+            // Mode selector — always visible (3 explicit modes)
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                    value: 'carton',
+                    label: Text('按箱规'),
+                    icon: Icon(Icons.view_list, size: 16)),
+                ButtonSegment(
+                    value: 'boxesOnly',
+                    label: Text('仅箱数'),
+                    icon: Icon(Icons.inventory_2_outlined, size: 16)),
+                ButtonSegment(
+                    value: 'qty',
+                    label: Text('按总数量'),
+                    icon: Icon(Icons.numbers, size: 16)),
+              ],
+              selected: {_inputMode},
+              onSelectionChanged: (v) =>
+                  setState(() => _inputMode = v.first),
+            ),
+            const SizedBox(height: 12),
+            StatefulBuilder(
+              builder: (ctx, setS) {
+                if (_inputMode == 'boxesOnly') {
                   final boxes = int.tryParse(_qtyCtrl.text) ?? 0;
-                  final units = int.tryParse(_cartonQtyCtrl.text);
-                  final isBoxesOnly = units == null || units <= 0;
-                  final total = isBoxesOnly ? 0 : boxes * units;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('箱数 *',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: _qtyCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                    hintText: '0',
-                                    border: OutlineInputBorder(),
-                                    suffixText: '箱',
-                                  ),
-                                  onChanged: (_) => setS(() {}),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.fromLTRB(8, 22, 8, 0),
-                            child: Text('×',
-                                style: TextStyle(
-                                    fontSize: 18, color: Colors.grey)),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('每箱件数（可选）',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: _cartonQtyCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                    hintText: '留空=仅记箱数',
-                                    border: OutlineInputBorder(),
-                                    suffixText: '件/箱',
-                                  ),
-                                  onChanged: (_) => setS(() {}),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      TextField(
+                        controller: _qtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '箱数 *',
+                          hintText: '0',
+                          border: OutlineInputBorder(),
+                          suffixText: '箱',
+                        ),
+                        onChanged: (_) => setS(() {}),
                       ),
                       if (boxes > 0) ...[
                         const SizedBox(height: 8),
-                        isBoxesOnly
-                            ? _summaryChip('$boxes 箱（箱规待录）')
-                            : _summaryChip('合计 $total 件'),
+                        _summaryChip('$boxes 箱 · 箱规待确认'),
                       ],
                     ],
                   );
-                },
-              ),
-            ] else ...[
+                }
+                if (_inputMode == 'qty') {
+                  final total = int.tryParse(_totalQtyCtrl.text) ?? 0;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: _totalQtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '总件数 *',
+                          hintText: '0',
+                          border: OutlineInputBorder(),
+                          suffixText: '件',
+                        ),
+                        onChanged: (_) => setS(() {}),
+                      ),
+                      if (total > 0) ...[
+                        const SizedBox(height: 8),
+                        _summaryChip('合计 $total 件'),
+                      ],
+                    ],
+                  );
+                }
+                // 按箱规
+                final boxes = int.tryParse(_qtyCtrl.text) ?? 0;
+                final units = int.tryParse(_cartonQtyCtrl.text) ?? 0;
+                final total = boxes * units;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('箱数 *',
+                                  style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _qtyCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  hintText: '0',
+                                  border: OutlineInputBorder(),
+                                  suffixText: '箱',
+                                ),
+                                onChanged: (_) => setS(() {}),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(8, 22, 8, 0),
+                          child: Text('×',
+                              style: TextStyle(fontSize: 18, color: Colors.grey)),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('每箱件数 *',
+                                  style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _cartonQtyCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  hintText: '0',
+                                  border: OutlineInputBorder(),
+                                  suffixText: '件/箱',
+                                ),
+                                onChanged: (_) => setS(() {}),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (boxes > 0 && units > 0) ...[
+                      const SizedBox(height: 8),
+                      _summaryChip('合计 $total 件'),
+                    ],
+                  ],
+                );
+              },
+            ),
+            if (_isPending) ...[
               const SizedBox(height: 8),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   border: Border.all(color: Colors.orange.shade200),
@@ -725,8 +744,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '将创建一条"待清点"记录，库存数量不计入合计。'
-                        '后续确认数量后可通过"调整"更新。',
+                        '将标记为"暂存"状态，数量不计入正式合计。',
                         style: TextStyle(
                             fontSize: 12, color: Colors.orange.shade800),
                       ),

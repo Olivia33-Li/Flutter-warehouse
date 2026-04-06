@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Sku, SkuDocument } from '../schemas/sku.schema';
@@ -14,16 +14,26 @@ export class SkusService {
     private historyService: HistoryService,
   ) {}
 
-  async findAll(search?: string) {
+  // statusFilter: 'active' (default) | 'archived' | 'all'
+  async findAll(search?: string, statusFilter: 'active' | 'archived' | 'all' = 'active') {
     const filter: any = {};
-    if (search) {
-      filter.$or = [
-        { sku: { $regex: search, $options: 'i' } },
-        { name: { $regex: search, $options: 'i' } },
-        { barcode: { $regex: search, $options: 'i' } },
-      ];
+    if (statusFilter === 'active') {
+      // backwards-compat: treat null/missing status as active
+      filter.$or = [{ status: 'active' }, { status: { $exists: false } }, { status: null }];
+    } else if (statusFilter === 'archived') {
+      filter.status = 'archived';
     }
-    const skus = await this.skuModel.find(filter).lean();
+    // 'all' → no status filter
+
+    let skus = await this.skuModel.find(filter).lean();
+
+    if (search && search.trim()) {
+      const norm = (s: string) => s.toLowerCase().replace(/[-_/\s"'.]/g, '');
+      const q = norm(search.trim());
+      skus = skus.filter((s) => {
+        return [s.sku, s.name ?? '', s.barcode ?? ''].some((f) => norm(f).includes(q));
+      });
+    }
 
     const inventories = await this.inventoryModel
       .find({ skuId: { $in: skus.map((s) => s._id) } })
@@ -54,6 +64,8 @@ export class SkusService {
       const locs = invMap.get((s._id as any).toString()) ?? [];
       return {
         ...s,
+        // normalise missing status to 'active' in response
+        status: s.status ?? 'active',
         locations: locs,
         totalQty: locs.reduce((sum, l) => sum + l.totalQty, 0),
       };
@@ -88,14 +100,19 @@ export class SkusService {
     const totalBoxes = formatted.reduce((sum, r) => sum + (r.boxes ?? 0), 0);
     const totalPcs = sku.cartonQty ? totalQty * sku.cartonQty : null;
 
-    return { ...sku, inventory: formatted, totalQty, totalBoxes, totalPcs };
+    return { ...sku, status: sku.status ?? 'active', inventory: formatted, totalQty, totalBoxes, totalPcs };
   }
 
   async create(dto: CreateSkuDto, user: any) {
     const exists = await this.skuModel.findOne({ sku: dto.sku.toUpperCase() });
     if (exists) throw new ConflictException('SKU 编号已存在');
 
-    const sku = await this.skuModel.create({ ...dto, sku: dto.sku.toUpperCase() });
+    // New SKUs always start as active — status never comes from the DTO
+    const sku = await this.skuModel.create({
+      ...dto,
+      sku: dto.sku.toUpperCase(),
+      status: 'active',
+    });
 
     await this.historyService.log({
       userId: user._id.toString(),
@@ -121,6 +138,52 @@ export class SkusService {
     });
 
     return sku;
+  }
+
+  async archive(id: string, user: any) {
+    const sku = await this.skuModel.findById(id);
+    if (!sku) throw new NotFoundException('SKU 不存在');
+    if ((sku.status ?? 'active') === 'archived') {
+      throw new BadRequestException('SKU 已是归档状态');
+    }
+
+    // Check if there is remaining inventory
+    const invCount = await this.inventoryModel.countDocuments({ skuId: new Types.ObjectId(id) });
+    const hasStock = invCount > 0;
+
+    sku.status = 'archived';
+    await sku.save();
+
+    await this.historyService.log({
+      userId: user._id.toString(),
+      userName: user.name,
+      action: 'edit',
+      entity: 'sku',
+      description: `归档 SKU: ${sku.sku}${hasStock ? '（仍有库存记录）' : ''}`,
+    });
+
+    return { message: `SKU ${sku.sku} 已归档`, hasStock };
+  }
+
+  async restore(id: string, user: any) {
+    const sku = await this.skuModel.findById(id);
+    if (!sku) throw new NotFoundException('SKU 不存在');
+    if ((sku.status ?? 'active') !== 'archived') {
+      throw new BadRequestException('SKU 不是归档状态');
+    }
+
+    sku.status = 'active';
+    await sku.save();
+
+    await this.historyService.log({
+      userId: user._id.toString(),
+      userName: user.name,
+      action: 'edit',
+      entity: 'sku',
+      description: `恢复 SKU: ${sku.sku}`,
+    });
+
+    return { message: `SKU ${sku.sku} 已恢复为在用` };
   }
 
   async remove(id: string, user: any) {

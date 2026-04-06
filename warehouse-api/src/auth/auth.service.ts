@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../schemas/user.schema';
 import { RegisterDto, LoginDto, ChangePasswordDto, UpdateProfileDto } from './dto/auth.dto';
+import { normalizeRole, ROLE_LABEL } from '../common/permissions';
 
 @Injectable()
 export class AuthService {
@@ -24,8 +25,9 @@ export class AuthService {
     const exists = await this.userModel.findOne({ username: dto.username.toLowerCase() });
     if (exists) throw new ConflictException('用户名已存在');
 
+    // First user becomes admin; subsequent self-registrations become staff
     const count = await this.userModel.countDocuments();
-    const role = count === 0 ? 'admin' : 'viewer';
+    const role = count === 0 ? 'admin' : 'staff';
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.userModel.create({
@@ -33,6 +35,8 @@ export class AuthService {
       name: dto.name,
       passwordHash,
       role,
+      isActive: true,
+      lastLoginAt: new Date(),
     });
 
     return this.generateTokens(user);
@@ -41,9 +45,13 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.userModel.findOne({ username: dto.username.toLowerCase() });
     if (!user) throw new UnauthorizedException('用户名或密码错误');
+    if (user.isActive === false) throw new UnauthorizedException('账号已被停用，请联系管理员');
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('用户名或密码错误');
+
+    user.lastLoginAt = new Date();
+    await user.save();
 
     return this.generateTokens(user);
   }
@@ -55,6 +63,7 @@ export class AuthService {
       });
       const user = await this.userModel.findById(payload.sub);
       if (!user) throw new UnauthorizedException();
+      if (user.isActive === false) throw new UnauthorizedException('账号已被停用');
       return this.generateTokens(user);
     } catch {
       throw new UnauthorizedException('Refresh token 无效或已过期');
@@ -80,11 +89,20 @@ export class AuthService {
       { new: true },
     );
     if (!user) throw new UnauthorizedException();
-    return { id: user._id, username: user.username, name: user.name, role: user.role };
+    const role = normalizeRole(user.role);
+    return {
+      id: user._id,
+      username: user.username,
+      name: user.name,
+      role,
+      roleLabel: ROLE_LABEL[role],
+      isActive: user.isActive,
+    };
   }
 
   private generateTokens(user: UserDocument) {
-    const payload = { sub: user._id.toString(), username: user.username, role: user.role };
+    const role = normalizeRole(user.role);
+    const payload = { sub: user._id.toString(), username: user.username, role };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
@@ -103,7 +121,10 @@ export class AuthService {
         id: user._id,
         username: user.username,
         name: user.name,
-        role: user.role,
+        role,
+        roleLabel: ROLE_LABEL[role],
+        isActive: user.isActive !== false,
+        lastLoginAt: user.lastLoginAt,
       },
     };
   }

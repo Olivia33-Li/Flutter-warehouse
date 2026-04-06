@@ -28,13 +28,19 @@ export class HistoryService {
     });
   }
 
+  private escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   async findAll(query: {
     userId?: string;
     action?: string;
     entity?: string;
     keyword?: string;
     businessAction?: string;
+    businessActions?: string[];
     locationCode?: string;
+    skuCode?: string;
     startDate?: string;
     endDate?: string;
     userName?: string;
@@ -43,8 +49,8 @@ export class HistoryService {
     limit?: number;
   }) {
     const {
-      userId, action, entity, keyword, businessAction,
-      locationCode, startDate, endDate, userName,
+      userId, action, entity, keyword, businessAction, businessActions,
+      locationCode, skuCode, startDate, endDate, userName,
       inventoryChangingOnly, page = 1, limit = 50,
     } = query;
 
@@ -53,13 +59,34 @@ export class HistoryService {
     if (userId) filter.userId = new Types.ObjectId(userId);
     if (action) filter.action = action;
     if (entity) filter.entity = entity;
-    if (businessAction) filter.businessAction = businessAction;
-    if (userName) filter.userName = { $regex: userName, $options: 'i' };
     if (inventoryChangingOnly) filter.entity = 'inventory';
 
+    // businessAction: prefer array OR-match, fall back to single value
+    if (businessActions && businessActions.length > 0) {
+      filter.businessAction = { $in: businessActions };
+    } else if (businessAction) {
+      filter.businessAction = businessAction;
+    }
+
+    if (userName) filter.userName = { $regex: userName, $options: 'i' };
+
     const andConditions: any[] = [];
-    if (keyword) andConditions.push({ description: { $regex: keyword, $options: 'i' } });
-    if (locationCode) andConditions.push({ description: { $regex: locationCode, $options: 'i' } });
+    if (keyword) andConditions.push({ description: { $regex: this.escapeRegex(keyword), $options: 'i' } });
+
+    // SKU + location combined description match (e.g. "ASH008-SY2 @ B2C")
+    if (skuCode && locationCode) {
+      andConditions.push({
+        description: {
+          $regex: `${this.escapeRegex(skuCode)} @ ${this.escapeRegex(locationCode)}`,
+          $options: 'i',
+        },
+      });
+    } else if (skuCode) {
+      andConditions.push({ description: { $regex: this.escapeRegex(skuCode), $options: 'i' } });
+    } else if (locationCode) {
+      andConditions.push({ description: { $regex: this.escapeRegex(locationCode), $options: 'i' } });
+    }
+
     if (andConditions.length > 0) filter.$and = andConditions;
 
     if (startDate || endDate) {

@@ -14,6 +14,7 @@ import '../screens/settings/settings_screen.dart';
 import '../screens/inventory/inventory_add_screen.dart';
 import '../widgets/main_shell.dart';
 import '../screens/import/import_screen.dart';
+import '../screens/inventory/inventory_history_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final user = ref.watch(currentUserProvider);
@@ -57,6 +58,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/import', builder: (_, __) => const ImportScreen()),
+      GoRoute(
+        path: '/inventory/history',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return InventoryHistoryScreen(
+            skuCode: extra?['skuCode'] ?? '',
+            skuId: extra?['skuId'],
+            locationId: extra?['locationId'] ?? '',
+            locationCode: extra?['locationCode'] ?? '',
+          );
+        },
+      ),
 
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),

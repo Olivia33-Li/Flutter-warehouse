@@ -14,21 +14,22 @@ import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ImportService } from './import.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { PERM } from '../common/permissions';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 const FILE_OPTIONS = { limits: { fileSize: 10 * 1024 * 1024 } };
 
 @Controller('import')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ImportController {
   constructor(private importService: ImportService) {}
 
   // ─── Validate (dry run) ───────────────────────────────────────────────────────
 
   @Post('skus/validate')
-  @Roles('editor')
+  @RequirePermission(PERM.DATA_IMPORT)
   @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
   validateSkus(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('请上传 CSV 文件');
@@ -36,7 +37,7 @@ export class ImportController {
   }
 
   @Post('locations/validate')
-  @Roles('editor')
+  @RequirePermission(PERM.DATA_IMPORT)
   @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
   validateLocations(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('请上传 CSV 文件');
@@ -44,7 +45,7 @@ export class ImportController {
   }
 
   @Post('inventory/validate')
-  @Roles('editor')
+  @RequirePermission(PERM.DATA_IMPORT)
   @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
   validateInventory(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('请上传 CSV 文件');
@@ -54,7 +55,7 @@ export class ImportController {
   // ─── Import ───────────────────────────────────────────────────────────────────
 
   @Post('skus')
-  @Roles('editor')
+  @RequirePermission(PERM.DATA_IMPORT)
   @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
   importSkus(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
     if (!file) throw new BadRequestException('请上传 CSV 文件');
@@ -62,7 +63,7 @@ export class ImportController {
   }
 
   @Post('locations')
-  @Roles('editor')
+  @RequirePermission(PERM.DATA_IMPORT)
   @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
   importLocations(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
     if (!file) throw new BadRequestException('请上传 CSV 文件');
@@ -70,7 +71,7 @@ export class ImportController {
   }
 
   @Post('inventory')
-  @Roles('editor')
+  @RequirePermission(PERM.DATA_IMPORT)
   @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
   importInventory(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
     if (!file) throw new BadRequestException('请上传 CSV 文件');
@@ -79,7 +80,28 @@ export class ImportController {
 
   // ─── Logs ─────────────────────────────────────────────────────────────────────
 
+  // Export must be declared BEFORE the list route to avoid NestJS routing conflicts
+  @Get('logs/:id/export')
+  @RequirePermission(PERM.DATA_IMPORT)
+  async exportLog(@Param('id') id: string, @Res() res: Response) {
+    console.log(`[Controller] GET /api/import/logs/${id}/export`);
+    try {
+      const buffer = await this.importService.exportLog(id);
+      res.set({
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="import_log_${id}.xlsx"`,
+        'Content-Length': buffer.length,
+      });
+      console.log(`[Controller] exportLog success, bytes=${buffer.length}`);
+      res.send(buffer);
+    } catch (e) {
+      console.error(`[Controller] exportLog failed: ${e}`);
+      throw e;
+    }
+  }
+
   @Get('logs')
+  @RequirePermission(PERM.DATA_IMPORT)
   getLogs(
     @Query('importType') importType?: string,
     @Query('page') page?: string,
@@ -90,15 +112,5 @@ export class ImportController {
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 30,
     });
-  }
-
-  @Get('logs/:id/export')
-  async exportLog(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.importService.exportLog(id);
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="import_log_${id}.xlsx"`,
-    });
-    res.send(buffer);
   }
 }

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dart analyze:*)",
+      "Bash(python3 -c \"import sys,json; lines=sys.stdin.readlines\\(\\); [print\\(json.loads\\(l\\).get\\('message',{}\\).get\\('content',''\\)[:500] if isinstance\\(json.loads\\(l\\).get\\('message',{}\\).get\\('content',''\\),str\\) else ''\\) for l in lines[-20:]]\")",
+      "Bash(python3 -c ':*)",
+      "Read(//c/Users/izong/.claude/projects/**)",
+      "Bash(python3)"
+    ]
+  }
+}

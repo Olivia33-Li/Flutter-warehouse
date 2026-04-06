@@ -4,9 +4,11 @@ import '../models/sku.dart';
 class SkuService {
   final _api = ApiService.instance.dio;
 
-  Future<List<Sku>> getAll({String? search}) async {
+  // statusFilter: 'active' (default) | 'archived' | 'all'
+  Future<List<Sku>> getAll({String? search, String statusFilter = 'active'}) async {
     final response = await _api.get('/skus', queryParameters: {
       if (search != null && search.isNotEmpty) 'search': search,
+      'statusFilter': statusFilter,
     });
     return (response.data as List).map((e) => Sku.fromJson(e)).toList();
   }
@@ -42,6 +44,17 @@ class SkuService {
       if (cartonQty != null) 'cartonQty': cartonQty,
     });
     return Sku.fromJson(response.data);
+  }
+
+  // Returns { message, hasStock }
+  Future<Map<String, dynamic>> archive(String id) async {
+    final response = await _api.patch('/skus/$id/archive');
+    return response.data as Map<String, dynamic>;
+  }
+
+  // Returns { message }
+  Future<void> restore(String id) async {
+    await _api.patch('/skus/$id/restore');
   }
 
   Future<void> delete(String id) async {

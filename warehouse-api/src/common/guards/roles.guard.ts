@@ -5,8 +5,8 @@ import { UserRole } from '../../schemas/user.schema';
 
 const ROLE_HIERARCHY: Record<UserRole, number> = {
   admin: 3,
-  editor: 2,
-  viewer: 1,
+  supervisor: 2,
+  staff: 1,
 };
 
 @Injectable()

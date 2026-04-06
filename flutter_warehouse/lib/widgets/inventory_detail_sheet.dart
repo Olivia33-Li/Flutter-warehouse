@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../services/transaction_service.dart';
+import '../services/history_service.dart';
 import '../services/inventory_service.dart';
+import '../services/sku_service.dart';
 import '../models/inventory.dart';
+import '../models/change_record.dart';
+import '../models/sku.dart';
 
 class InventoryDetailSheet extends StatefulWidget {
   final String skuCode;
@@ -17,7 +22,11 @@ class InventoryDetailSheet extends StatefulWidget {
   final String? inventoryRecordId; // for edit/delete
   final bool showSkuNav;
   final bool showLocNav;
-  final bool canEdit;
+  // Granular permission flags — pass from parent based on user.can*
+  final bool canEdit;    // legacy alias: shows all three buttons (supervisor+)
+  final bool canStockIn;
+  final bool canStockOut;
+  final bool canAdjust;
   final bool quantityUnknown;
   final VoidCallback? onChanged; // called after any mutation
 
@@ -35,6 +44,9 @@ class InventoryDetailSheet extends StatefulWidget {
     this.showSkuNav = false,
     this.showLocNav = false,
     this.canEdit = false,
+    this.canStockIn = false,
+    this.canStockOut = false,
+    this.canAdjust = false,
     this.quantityUnknown = false,
     this.onChanged,
   });
@@ -44,12 +56,49 @@ class InventoryDetailSheet extends StatefulWidget {
 }
 
 class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
-  final _txService = TransactionService();
+  final _historyService = HistoryService();
   final _invService = InventoryService();
-  List<TransactionRecord>? _records;
+  List<ChangeRecord>? _recentRecords; // recent 5 audit log entries for this SKU+loc
   InventoryRecord? _invRecord;
   bool _loading = true;
   String? _error;
+
+  // Permission helpers — honour both legacy canEdit and granular flags
+  bool get _canStockIn  => widget.canStockIn  || widget.canEdit;
+  bool get _canStockOut => widget.canStockOut || widget.canEdit;
+  bool get _canAdjust   => widget.canAdjust   || widget.canEdit;
+
+  bool get _isPending {
+    final r = _invRecord;
+    if (r == null) return false;
+    return r.pendingCount ||
+        r.stockStatus == 'pending_count' ||
+        r.stockStatus == 'temporary';
+  }
+
+  /// Converts a raw exception into a short user-friendly Chinese message.
+  String _friendly(Object e) {
+    // Dio 5.x: response body is in e.response.data, NOT in toString().
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final msg = data['message'];
+        if (msg is String && msg.isNotEmpty) return msg;
+        if (msg is List && msg.isNotEmpty) return msg.first.toString();
+      }
+      final code = e.response?.statusCode;
+      if (code == 403) return '权限不足，无法执行此操作';
+      if (code == 401) return '登录已过期，请重新登录';
+      if (code == 404) return '目标资源不存在，请刷新后重试';
+      if (code != null && code >= 400) return '请求失败（$code），请重试';
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout) {
+        return '无法连接服务器，请检查网络';
+      }
+      return '网络请求失败，请重试';
+    }
+    return '操作失败，请重试';
+  }
 
   // Live getters — prefer freshly-loaded data over stale widget props
   int get _qty => _invRecord?.totalQty ?? widget.totalQty;
@@ -70,18 +119,40 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([
-        _txService.getForInventory(widget.skuCode, widget.locationId),
-        _invService.getAll(skuCode: widget.skuCode, locationId: widget.locationId),
-      ]);
-      _records = results[0] as List<TransactionRecord>;
-      final invList = results[1] as List<InventoryRecord>;
-      if (invList.isNotEmpty) _invRecord = invList.first;
+      // Critical: load current inventory state
+      final invList = await _invService.getAll(
+          skuCode: widget.skuCode, locationId: widget.locationId);
+      if (invList.isNotEmpty && mounted) _invRecord = invList.first;
+
+      // Non-critical: load recent 5 audit log entries for this SKU+location
+      try {
+        final data = await _historyService.getAll(
+          entity: 'inventory',
+          skuCode: widget.skuCode,
+          locationCode: widget.locationCode,
+          page: 1,
+          limit: 5,
+        );
+        if (mounted) {
+          setState(() => _recentRecords = data['records'] as List<ChangeRecord>);
+        }
+      } catch (_) {
+        if (mounted) setState(() => _recentRecords = []);
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _viewAllHistory() {
+    context.push('/inventory/history', extra: {
+      'skuCode': widget.skuCode,
+      'locationId': widget.locationId,
+      'locationCode': widget.locationCode,
+      'skuId': widget.skuId,
+    });
   }
 
   // ── 入库 ──
@@ -90,7 +161,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     final unitsCtrl = TextEditingController();
     final qtyCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    bool useConfigMode = true; // default: 按箱规
+    String stockInMode = 'carton'; // 'carton' | 'boxesOnly' | 'qty'
     bool isPending = false;
     String? err;
     bool saving = false;
@@ -99,12 +170,14 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final previewQty = isPending
-              ? 0
-              : useConfigMode
-                  ? (int.tryParse(boxesCtrl.text) ?? 0) *
-                      (int.tryParse(unitsCtrl.text) ?? 0)
-                  : (int.tryParse(qtyCtrl.text) ?? 0);
+          final previewQty = (stockInMode == 'carton' && !isPending)
+              ? (int.tryParse(boxesCtrl.text) ?? 0) * (int.tryParse(unitsCtrl.text) ?? 0)
+              : (stockInMode == 'qty' && !isPending)
+                  ? (int.tryParse(qtyCtrl.text) ?? 0)
+                  : 0;
+          final previewBoxes = stockInMode == 'boxesOnly'
+              ? (int.tryParse(boxesCtrl.text) ?? 0)
+              : 0;
 
           return AlertDialog(
             title: const Text('入库'),
@@ -163,43 +236,78 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     ),
                     const SizedBox(height: 8),
 
-                    if (!isPending) ...[
-                      // Mode toggle
-                      SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment(
-                              value: true,
-                              label: Text('按箱规'),
-                              icon: Icon(Icons.view_list, size: 16)),
-                          ButtonSegment(
-                              value: false,
-                              label: Text('按总数量'),
-                              icon: Icon(Icons.numbers, size: 16)),
-                        ],
-                        selected: {useConfigMode},
-                        onSelectionChanged: (v) =>
-                            setS(() => useConfigMode = v.first),
-                      ),
-                      const SizedBox(height: 14),
+                    // Mode selector — always visible
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                            value: 'carton',
+                            label: Text('按箱规'),
+                            icon: Icon(Icons.view_list, size: 16)),
+                        ButtonSegment(
+                            value: 'boxesOnly',
+                            label: Text('仅箱数'),
+                            icon: Icon(Icons.inventory_2_outlined, size: 16)),
+                        ButtonSegment(
+                            value: 'qty',
+                            label: Text('按总数量'),
+                            icon: Icon(Icons.numbers, size: 16)),
+                      ],
+                      selected: {stockInMode},
+                      onSelectionChanged: (v) =>
+                          setS(() { stockInMode = v.first; err = null; }),
+                    ),
+                    const SizedBox(height: 14),
 
-                      // 按箱规
-                      if (useConfigMode)
-                        _qtyRow(boxesCtrl, unitsCtrl,
-                            onChanged: () => setS(() {}))
-                      else
-                        TextField(
-                          controller: qtyCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: '入库件数 *',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            suffixText: '件',
-                          ),
-                          onChanged: (_) => setS(() {}),
+                    // Input area
+                    if (stockInMode == 'boxesOnly') ...[
+                      TextField(
+                        controller: boxesCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '箱数 *',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          suffixText: '箱',
                         ),
-
-                      // Preview
+                        onChanged: (_) => setS(() {}),
+                      ),
+                      if (previewBoxes > 0) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isPending
+                                ? Colors.orange.shade50
+                                : Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: isPending
+                                    ? Colors.orange.shade200
+                                    : Colors.green.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(isPending ? '暂存箱数: ' : '入库箱数: ',
+                                  style: const TextStyle(fontSize: 13)),
+                              Text('$previewBoxes 箱',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: isPending
+                                          ? Colors.orange.shade700
+                                          : Colors.green.shade700)),
+                              Text('  · 箱规待确认',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ] else if (stockInMode == 'carton' && !isPending) ...[
+                      _qtyRow(boxesCtrl, unitsCtrl,
+                          onChanged: () => setS(() {})),
                       if (previewQty > 0) ...[
                         const SizedBox(height: 8),
                         Container(
@@ -227,8 +335,47 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 10),
+                    ] else if (stockInMode == 'qty' && !isPending) ...[
+                      TextField(
+                        controller: qtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '入库件数 *',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          suffixText: '件',
+                        ),
+                        onChanged: (_) => setS(() {}),
+                      ),
+                      if (previewQty > 0) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Text('入库总量: ',
+                                  style: TextStyle(fontSize: 13)),
+                              Text('+ $previewQty 件',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: Colors.green.shade700)),
+                              Text('  →  ${_qty + previewQty} 件',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ] else ...[
+                      // isPending + carton or qty: just mark record as pending
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
@@ -254,8 +401,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 10),
                     ],
+                    const SizedBox(height: 10),
 
                     _noteField(noteCtrl),
 
@@ -279,8 +426,33 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 onPressed: saving
                     ? null
                     : () async {
+                        if (stockInMode == 'boxesOnly') {
+                          // boxesOnly mode: add boxes, with or without pending
+                          final boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                          if (boxes <= 0) {
+                            setS(() => err = '请输入有效箱数');
+                            return;
+                          }
+                          setS(() { saving = true; err = null; });
+                          try {
+                            await _invService.stockIn(
+                              skuCode: widget.skuCode,
+                              locationId: widget.locationId,
+                              boxes: boxes,
+                              boxesOnlyMode: true,
+                              pendingCount: isPending,
+                              note: noteCtrl.text.trim(),
+                            );
+                            if (ctx.mounted) ctx.pop();
+                            widget.onChanged?.call();
+                            _load();
+                          } catch (e) {
+                            setS(() { saving = false; err = _friendly(e); });
+                          }
+                          return;
+                        }
                         if (isPending) {
-                          // Mark pending — no quantity change
+                          // carton or qty mode + pending: just mark existing record
                           setS(() { saving = true; err = null; });
                           try {
                             await _invService.markPending(
@@ -291,12 +463,12 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
-                            setS(() { saving = false; err = '操作失败: $e'; });
+                            setS(() { saving = false; err = _friendly(e); });
                           }
                           return;
                         }
                         int boxes, units;
-                        if (useConfigMode) {
+                        if (stockInMode == 'carton') {
                           boxes = int.tryParse(boxesCtrl.text) ?? 0;
                           units = int.tryParse(unitsCtrl.text) ?? 0;
                           if (boxes <= 0 || units <= 0) {
@@ -325,7 +497,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           widget.onChanged?.call();
                           _load();
                         } catch (e) {
-                          setS(() { saving = false; err = '入库失败: $e'; });
+                          setS(() { saving = false; err = _friendly(e); });
                         }
                       },
                 child: saving
@@ -338,6 +510,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       ),
     );
 
+    boxesCtrl.dispose();
+    unitsCtrl.dispose();
     qtyCtrl.dispose();
     noteCtrl.dispose();
   }
@@ -593,6 +767,18 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               '出库数量不能超过当前库存 ($_qty 件)');
                           return;
                         }
+                        // Build per-spec removal list for 按箱规 mode so backend
+                        // can accurately subtract from each configuration entry.
+                        final removalConfigs = useConfigMode
+                            ? List.generate(effectiveConfigs.length, (i) {
+                                final outBoxes =
+                                    int.tryParse(configCtrls[i].text) ?? 0;
+                                return {
+                                  'boxes': outBoxes,
+                                  'unitsPerBox': effectiveConfigs[i].unitsPerBox,
+                                };
+                              }).where((c) => c['boxes']! > 0).toList()
+                            : null;
                         setS(() {
                           saving = true;
                           err = null;
@@ -602,6 +788,9 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             skuCode: widget.skuCode,
                             locationId: widget.locationId,
                             quantity: qty,
+                            configurations: removalConfigs?.isNotEmpty == true
+                                ? removalConfigs
+                                : null,
                             note: noteCtrl.text.trim(),
                           );
                           if (ctx.mounted) ctx.pop();
@@ -610,7 +799,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         } catch (e) {
                           setS(() {
                             saving = false;
-                            err = '出库失败: $e';
+                            err = _friendly(e);
                           });
                         }
                       },
@@ -629,11 +818,18 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     noteCtrl.dispose();
   }
 
-  // ── 库存调整 ──
+  // ── 库存调整（4种模式：按总数量 / 按箱规 / 仅箱数 / SKU更正） ──
   Future<void> _showAdjustDialog() async {
-    // Initialize editable config rows: use configurations if present, else fall back to current boxes/unitsPerBox
+    // 'qty' | 'boxes_only' | 'configs' | 'sku_correct'
+    String adjustMode = _configs.isNotEmpty ? 'configs' : 'qty';
+
+    // ── 按总数量 state ──
+    final qtyCtrl = TextEditingController(text: _qty.toString());
+
+    // ── 按箱规 state — max 3 rows ──
     final configRows = _configs.isNotEmpty
         ? _configs
+            .take(3)
             .map((c) => <String, TextEditingController>{
                   'boxes': TextEditingController(text: c.boxes.toString()),
                   'units': TextEditingController(text: c.unitsPerBox.toString()),
@@ -648,143 +844,260 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               ]
             : <Map<String, TextEditingController>>[]);
 
-    final qtyCtrl = TextEditingController(text: _qty.toString());
-    final noteCtrl = TextEditingController();
-    final newBoxesCtrl = TextEditingController();
-    final newUnitsCtrl = TextEditingController();
+    // ── 仅箱数 state — same specs as existing, only boxes editable ──
+    // Each entry: { unitsPerBox (readonly), boxesCtrl }
+    final boxesOnlySpecs = _configs.isNotEmpty
+        ? _configs
+            .map((c) => {
+                  'unitsPerBox': c.unitsPerBox,
+                  'ctrl': TextEditingController(text: c.boxes.toString()),
+                })
+            .toList()
+        : [
+            {
+              'unitsPerBox': _units > 0 ? _units : 1,
+              'ctrl': TextEditingController(text: _boxes.toString()),
+            }
+          ];
 
-    // Default to config mode when we have any current inventory structure to show
-    bool useConfigMode = _qty > 0;
+    // ── SKU更正 state ──
+    Sku? selectedCorrectSku;
+
+    // ── shared ──
+    final noteCtrl = TextEditingController();
     String? err;
     bool saving = false;
+
+    // Helper — add empty config row (up to 3)
+    void addConfigRow(void Function(void Function()) setS) {
+      if (configRows.length >= 3) return;
+      setS(() => configRows.add({
+            'boxes': TextEditingController(text: '0'),
+            'units': TextEditingController(text: '1'),
+          }));
+    }
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          // Real-time total preview
-          final previewTotal = useConfigMode
-              ? configRows.fold<int>(0, (s, row) {
-                  final b = int.tryParse(row['boxes']!.text) ?? 0;
-                  final u = int.tryParse(row['units']!.text) ?? 1;
-                  return s + b * u;
-                })
-              : (int.tryParse(qtyCtrl.text) ?? 0);
+          // ── live preview ──
+          final configsTotal = configRows.fold<int>(0, (s, row) {
+            final b = int.tryParse(row['boxes']!.text) ?? 0;
+            final u = int.tryParse(row['units']!.text) ?? 1;
+            return s + b * u;
+          });
+          final boxesOnlyTotal = boxesOnlySpecs.fold<int>(0, (s, spec) {
+            final b = int.tryParse((spec['ctrl'] as TextEditingController).text) ?? 0;
+            final u = spec['unitsPerBox'] as int;
+            return s + b * u;
+          });
+          final previewTotal = adjustMode == 'qty'
+              ? (int.tryParse(qtyCtrl.text) ?? 0)
+              : adjustMode == 'boxes_only'
+                  ? boxesOnlyTotal
+                  : configsTotal;
 
-          return AlertDialog(
-            title: const Text('库存调整'),
-            content: SizedBox(
-              width: 340,
-              child: SingleChildScrollView(
-                child: Column(
-                mainAxisSize: MainAxisSize.min,
+          // ── header info bar ──
+          Widget headerBar() => Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${widget.skuCode}  @  ${widget.locationCode}',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text('当前库存: $_qtyLabel',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange.shade700)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+          // ── 按总数量 panel ──
+          Widget qtyPanel() => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '调整后总件数 *',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      suffixText: '件',
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${widget.skuCode}  @  ${widget.locationCode}',
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text('当前库存: $_qtyLabel',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.blue.shade700)),
-                      ],
-                    ),
+                    onChanged: (_) => setS(() {}),
                   ),
-                  const SizedBox(height: 12),
-
-                  // Mode toggle
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                          value: false,
-                          label: Text('按总数量'),
-                          icon: Icon(Icons.numbers, size: 16)),
-                      ButtonSegment(
-                          value: true,
-                          label: Text('按箱规'),
-                          icon: Icon(Icons.view_list, size: 16)),
-                    ],
-                    selected: {useConfigMode},
-                    onSelectionChanged: (v) => setS(() => useConfigMode = v.first),
+                  const SizedBox(height: 6),
+                  Text(
+                    '适用场景：盘点差异、货损等，直接修正总件数。',
+                    style: TextStyle(
+                        fontSize: 12, color: Colors.grey.shade600),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
+                  _previewRow(previewTotal, _qty),
+                ],
+              );
 
-                  // Total qty mode
-                  if (!useConfigMode) ...[
-                    TextField(
-                      controller: qtyCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '调整后总件数 *',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        suffixText: '件',
+          // ── 仅箱数 panel — units readonly, only boxes editable ──
+          Widget boxesOnlyPanel() => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '每箱件数保持不变，仅修改各规格箱数：',
+                    style: TextStyle(
+                        fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  ...List.generate(boxesOnlySpecs.length, (i) {
+                    final spec = boxesOnlySpecs[i];
+                    final ctrl = spec['ctrl'] as TextEditingController;
+                    final u = spec['unitsPerBox'] as int;
+                    final b = int.tryParse(ctrl.text) ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // 每箱件数 — 只读
+                          Container(
+                            width: 80,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: Colors.grey.shade300),
+                            ),
+                            child: Column(
+                              children: [
+                                Text('$u',
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold)),
+                                Text('件/箱',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade500)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // 箱数 — 可编辑
+                          Expanded(
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: '箱数',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                                suffixText: '箱',
+                              ),
+                              onChanged: (_) => setS(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // 小计
+                          SizedBox(
+                            width: 48,
+                            child: Text(
+                              '=${b * u}件',
+                              style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 11),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
                       ),
-                      onChanged: (_) => setS(() {}),
-                    ),
-                    const SizedBox(height: 6),
-                    // Show how the total will be stored in terms of carton spec
-                    Builder(builder: (_) {
-                      final qty = int.tryParse(qtyCtrl.text) ?? 0;
-                      // Use single existing spec if evenly divisible
-                      final singleUnits = _configs.length == 1
-                          ? _configs.first.unitsPerBox
-                          : (_configs.isEmpty && _units > 1
-                              ? _units
-                              : 0);
-                      final canUseSpec = singleUnits > 1 && qty > 0 && qty % singleUnits == 0;
-                      return Text(
-                        canUseSpec
-                            ? '将按当前箱规存储为 ${qty ~/ singleUnits} 箱 × $singleUnits件/箱 = $qty件'
-                            : '用于盘点差异、货损等场景，直接修正总件数。',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: canUseSpec
-                              ? Colors.green.shade700
-                              : Colors.grey.shade600,
-                        ),
-                      );
-                    }),
-                  ],
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  _previewRow(boxesOnlyTotal, _qty),
+                ],
+              );
 
-                  // Config mode
-                  if (useConfigMode) ...[
-                    const Text('各箱规库存:',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
+          // ── 按箱规/箱数 panel ──
+          Widget configsPanel() => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('各箱规库存（最多3组）:',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      if (configRows.length < 3)
+                        TextButton.icon(
+                          icon: const Icon(Icons.add, size: 15),
+                          label: const Text('新增箱规',
+                              style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => addConfigRow(setS),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (configRows.isEmpty)
+                    TextButton.icon(
+                      icon: const Icon(Icons.add_box_outlined),
+                      label: const Text('添加第一组箱规'),
+                      onPressed: () => addConfigRow(setS),
+                    )
+                  else
                     ...List.generate(configRows.length, (i) {
                       final row = configRows[i];
-                      final units = int.tryParse(row['units']!.text) ?? 1;
-                      final boxes = int.tryParse(row['boxes']!.text) ?? 0;
+                      final u =
+                          int.tryParse(row['units']!.text) ?? 1;
+                      final b =
+                          int.tryParse(row['boxes']!.text) ?? 0;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Expanded(
-                              child: TextField(
-                                controller: row['boxes'],
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: '箱数',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  suffixText: '箱',
-                                ),
-                                onChanged: (_) => setS(() {}),
+                            // 箱规编号
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color:
+                                    Colors.orange.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text('${i + 1}',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange)),
                               ),
                             ),
                             const SizedBox(width: 6),
+                            // 件/箱
                             Expanded(
                               child: TextField(
                                 controller: row['units'],
@@ -798,15 +1111,40 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                 onChanged: (_) => setS(() {}),
                               ),
                             ),
+                            const SizedBox(width: 6),
+                            // 箱数
+                            Expanded(
+                              child: TextField(
+                                controller: row['boxes'],
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: '箱数',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  suffixText: '箱',
+                                ),
+                                onChanged: (_) => setS(() {}),
+                              ),
+                            ),
                             const SizedBox(width: 4),
-                            Text('=${boxes * units}件',
-                                style: const TextStyle(
-                                    color: Colors.grey, fontSize: 11)),
+                            // 小计
+                            SizedBox(
+                              width: 44,
+                              child: Text(
+                                '=${b * u}件',
+                                style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 11),
+                                textAlign: TextAlign.right,
+                              ),
+                            ),
+                            // 删除按钮
                             IconButton(
                               icon: const Icon(Icons.close,
-                                  size: 18, color: Colors.red),
+                                  size: 16, color: Colors.red),
                               onPressed: () => setS(() {
-                                final removed = configRows.removeAt(i);
+                                final removed =
+                                    configRows.removeAt(i);
                                 removed['boxes']!.dispose();
                                 removed['units']!.dispose();
                               }),
@@ -817,202 +1155,375 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         ),
                       );
                     }),
-                    const SizedBox(height: 4),
-                    // Add new config row
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(6),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('新增箱规',
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade600)),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: newBoxesCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                    labelText: '箱数',
-                                    border: OutlineInputBorder(),
-                                    isDense: true,
-                                    suffixText: '箱',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: TextField(
-                                  controller: newUnitsCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                    labelText: '每箱件数',
-                                    border: OutlineInputBorder(),
-                                    isDense: true,
-                                    suffixText: '件/箱',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              FilledButton(
-                                onPressed: () {
-                                  final b =
-                                      int.tryParse(newBoxesCtrl.text) ?? 0;
-                                  final u =
-                                      int.tryParse(newUnitsCtrl.text) ?? 0;
-                                  if (b > 0 && u > 0) {
-                                    setS(() {
-                                      configRows.add({
-                                        'boxes': TextEditingController(
-                                            text: b.toString()),
-                                        'units': TextEditingController(
-                                            text: u.toString()),
-                                      });
-                                      newBoxesCtrl.clear();
-                                      newUnitsCtrl.clear();
-                                    });
-                                  }
-                                },
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Text('添加'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 8),
+                  _previewRow(previewTotal, _qty),
+                ],
+              );
 
-                  // Preview total
-                  const SizedBox(height: 12),
+          // ── SKU更正 panel ──
+          Widget skuCorrectPanel() => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Current SKU info
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                        horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.orange.shade200),
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.purple.shade200),
                     ),
                     child: Row(
                       children: [
-                        const Text('调整后总库存: ',
-                            style: TextStyle(fontSize: 13)),
-                        Text('$previewTotal 件',
+                        Text('当前：',
                             style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: previewTotal != _qty
-                                  ? Colors.orange.shade700
-                                  : Colors.green.shade700,
-                            )),
+                                fontSize: 12,
+                                color: Colors.grey.shade600)),
+                        Text(widget.skuCode,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Icon(Icons.arrow_forward, size: 14,
+                            color: Colors.purple.shade400),
+                        const SizedBox(width: 8),
+                        Text(
+                          selectedCorrectSku?.sku ?? '（请从下方选择）',
+                          style: TextStyle(
+                            fontWeight: selectedCorrectSku != null
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 14,
+                            color: selectedCorrectSku != null
+                                ? Colors.purple.shade700
+                                : Colors.grey.shade400,
+                          ),
+                        ),
+                        if (selectedCorrectSku != null)
+                          Icon(Icons.check_circle,
+                              size: 14,
+                              color: Colors.green.shade600),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 10),
-                  _noteField(noteCtrl),
-
-                  if (err != null) ...[
-                    const SizedBox(height: 8),
-                    Text(err!,
-                        style: const TextStyle(
-                            color: Colors.red, fontSize: 13)),
-                  ],
+                  // SKU search
+                  _SkuSearchField(
+                    labelText: '搜索新 SKU 编码或名称',
+                    excludeSkuCode: widget.skuCode,
+                    onSelected: (sku) => setS(() => selectedCorrectSku = sku),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.inventory_2_outlined,
+                            size: 14, color: Colors.grey.shade500),
+                        const SizedBox(width: 6),
+                        Text('库存数量 $_qtyLabel 将保留不变',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
                 ],
+              );
+
+          return AlertDialog(
+            title: const Text('库存调整'),
+            contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            content: SizedBox(
+              width: 360,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    headerBar(),
+                    const SizedBox(height: 10),
+
+                    // ── 4-way mode selector ──
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SegmentedButton<String>(
+                        style: SegmentedButton.styleFrom(
+                          textStyle: const TextStyle(fontSize: 11),
+                        ),
+                        segments: const [
+                          ButtonSegment(
+                            value: 'qty',
+                            label: Text('总数量'),
+                            icon: Icon(Icons.numbers, size: 14),
+                          ),
+                          ButtonSegment(
+                            value: 'boxes_only',
+                            label: Text('仅箱数'),
+                            icon: Icon(Icons.view_column, size: 14),
+                          ),
+                          ButtonSegment(
+                            value: 'configs',
+                            label: Text('按箱规'),
+                            icon: Icon(Icons.view_list, size: 14),
+                          ),
+                          ButtonSegment(
+                            value: 'sku_correct',
+                            label: Text('SKU更正'),
+                            icon: Icon(Icons.find_replace, size: 14),
+                          ),
+                        ],
+                        selected: {adjustMode},
+                        onSelectionChanged: (v) => setS(() {
+                          adjustMode = v.first;
+                          err = null;
+                          selectedCorrectSku = null;
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── mode-specific panel ──
+                    if (adjustMode == 'qty') qtyPanel(),
+                    if (adjustMode == 'boxes_only') boxesOnlyPanel(),
+                    if (adjustMode == 'configs') configsPanel(),
+                    if (adjustMode == 'sku_correct') skuCorrectPanel(),
+
+                    const SizedBox(height: 12),
+
+                    // ── reason note (all modes) ──
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: adjustMode == 'sku_correct'
+                            ? '更正原因 *（必填）'
+                            : '调整原因 *（必填）',
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        helperText: adjustMode == 'sku_correct'
+                            ? '例：录错货号、暂存转正式SKU'
+                            : '例：盘点差异、货损、退货补库',
+                      ),
+                    ),
+
+                    if (err != null) ...[
+                      const SizedBox(height: 8),
+                      Text(err!,
+                          style: const TextStyle(
+                              color: Colors.red, fontSize: 13)),
+                    ],
+                    const SizedBox(height: 4),
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-              TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+            actions: [
+              TextButton(
+                  onPressed: () => ctx.pop(),
+                  child: const Text('取消')),
               FilledButton(
-                style:
-                    FilledButton.styleFrom(backgroundColor: Colors.orange),
+                style: FilledButton.styleFrom(
+                    backgroundColor: adjustMode == 'sku_correct'
+                        ? Colors.purple
+                        : Colors.orange),
                 onPressed: saving
                     ? null
                     : () async {
-                        if (useConfigMode) {
-                          if (configRows.isEmpty) {
-                            setS(() => err = '至少需要一种箱规');
+                        final note = noteCtrl.text.trim();
+                        if (note.isEmpty) {
+                          setS(() => err = '请填写原因（必填）');
+                          return;
+                        }
+
+                        // ── SKU更正 submit ──
+                        if (adjustMode == 'sku_correct') {
+                          if (selectedCorrectSku == null) {
+                            setS(() => err = '请从下拉列表中选择新 SKU');
                             return;
                           }
-                          final configs = configRows.map((row) {
-                            final b =
-                                int.tryParse(row['boxes']!.text) ?? 0;
-                            final u =
-                                int.tryParse(row['units']!.text) ?? 0;
-                            return {'boxes': b, 'unitsPerBox': u};
+                          if (selectedCorrectSku!.sku.toUpperCase() ==
+                              widget.skuCode.toUpperCase()) {
+                            setS(() => err = '新旧 SKU 不能相同');
+                            return;
+                          }
+                          if (widget.inventoryRecordId == null) {
+                            setS(() => err = '无法获取库存记录 ID，请关闭后重试');
+                            return;
+                          }
+                          setS(() { saving = true; err = null; });
+                          try {
+                            await _invService.correctSku(
+                              inventoryId: widget.inventoryRecordId!,
+                              newSkuCode: selectedCorrectSku!.sku,
+                              note: note,
+                            );
+                            if (ctx.mounted) ctx.pop();
+                            widget.onChanged?.call();
+                            _load();
+                          } catch (e) {
+                            setS(() => saving = false);
+                            // 目标SKU已存在 → 弹合并确认框
+                            if (e is DioException &&
+                                e.response?.data is Map &&
+                                e.response?.data['code'] == 'MERGE_REQUIRED') {
+                              final msg = e.response!.data['message'] as String;
+                              if (!ctx.mounted) return;
+                              final confirm = await showDialog<bool>(
+                                context: ctx,
+                                builder: (c) => AlertDialog(
+                                  title: const Text('目标SKU已有库存'),
+                                  content: Text(msg),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(c, false),
+                                      child: const Text('取消'),
+                                    ),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.orange),
+                                      onPressed: () => Navigator.pop(c, true),
+                                      child: const Text('确认合并'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm != true) return;
+                              // 重提交，附带 allowMerge
+                              setS(() { saving = true; err = null; });
+                              try {
+                                await _invService.correctSku(
+                                  inventoryId: widget.inventoryRecordId!,
+                                  newSkuCode: selectedCorrectSku!.sku,
+                                  note: note,
+                                  allowMerge: true,
+                                );
+                                if (ctx.mounted) ctx.pop();
+                                widget.onChanged?.call();
+                                _load();
+                              } catch (e2) {
+                                setS(() { saving = false; err = _friendly(e2); });
+                              }
+                            } else {
+                              setS(() => err = _friendly(e));
+                            }
+                          }
+                          return;
+                        }
+
+                        // ── 仅箱数 submit ──
+                        if (adjustMode == 'boxes_only') {
+                          final configs = boxesOnlySpecs.map((spec) {
+                            final b = int.tryParse(
+                                    (spec['ctrl'] as TextEditingController)
+                                        .text) ??
+                                0;
+                            return {
+                              'boxes': b,
+                              'unitsPerBox': spec['unitsPerBox'] as int,
+                            };
                           }).toList();
-                          if (configs.any(
-                              (c) => c['boxes']! <= 0 || c['unitsPerBox']! <= 0)) {
-                            setS(() => err = '请输入有效的箱数和每箱件数');
+                          if (configs.every((c) => c['boxes']! <= 0)) {
+                            setS(() => err = '至少填写一组的箱数（> 0）');
                             return;
                           }
+                          // Filter out zero-box specs
+                          final nonZero =
+                              configs.where((c) => c['boxes']! > 0).toList();
                           setS(() {
                             saving = true;
                             err = null;
                           });
+                          try {
+                            await _invService.stockAdjust(
+                              skuCode: widget.skuCode,
+                              locationId: widget.locationId,
+                              configurations: nonZero,
+                              adjustMode: 'boxes_only',
+                              note: note,
+                            );
+                            if (ctx.mounted) ctx.pop();
+                            widget.onChanged?.call();
+                            _load();
+                          } catch (e) {
+                            setS(() {
+                              saving = false;
+                              err = _friendly(e);
+                            });
+                          }
+                          return;
+                        }
+
+                        // ── 按箱规 submit ──
+                        if (adjustMode == 'configs') {
+                          if (configRows.isEmpty) {
+                            setS(() => err = '至少需要一组箱规');
+                            return;
+                          }
+                          final configs = configRows.map((row) {
+                            final b = int.tryParse(row['boxes']!.text) ?? 0;
+                            final u = int.tryParse(row['units']!.text) ?? 0;
+                            return {'boxes': b, 'unitsPerBox': u};
+                          }).toList();
+                          if (configs.any(
+                              (c) => c['boxes']! <= 0 || c['unitsPerBox']! <= 0)) {
+                            setS(() => err = '请输入有效的箱数和每箱件数（均需 > 0）');
+                            return;
+                          }
+                          setS(() { saving = true; err = null; });
                           try {
                             await _invService.stockAdjust(
                               skuCode: widget.skuCode,
                               locationId: widget.locationId,
                               configurations: configs,
-                              note: noteCtrl.text.trim().isEmpty
-                                  ? null
-                                  : noteCtrl.text.trim(),
+                              adjustMode: 'configs',
+                              note: note,
                             );
                             if (ctx.mounted) ctx.pop();
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
-                            setS(() {
-                              saving = false;
-                              err = '库存调整失败: $e';
-                            });
+                            setS(() { saving = false; err = _friendly(e); });
                           }
-                        } else {
-                          final qty = int.tryParse(qtyCtrl.text);
-                          if (qty == null || qty < 0) {
-                            setS(() => err = '请输入有效件数（≥0）');
-                            return;
-                          }
-                          setS(() {
-                            saving = true;
-                            err = null;
-                          });
-                          try {
-                            await _invService.stockAdjust(
-                              skuCode: widget.skuCode,
-                              locationId: widget.locationId,
-                              quantity: qty,
-                              note: noteCtrl.text.trim().isEmpty
-                                  ? null
-                                  : noteCtrl.text.trim(),
-                            );
-                            if (ctx.mounted) ctx.pop();
-                            widget.onChanged?.call();
-                            _load();
-                          } catch (e) {
-                            setS(() {
-                              saving = false;
-                              err = '库存调整失败: $e';
-                            });
-                          }
+                          return;
+                        }
+
+                        // ── 按总数量 submit ──
+                        final qty = int.tryParse(qtyCtrl.text);
+                        if (qty == null || qty < 0) {
+                          setS(() => err = '请输入有效件数（≥ 0）');
+                          return;
+                        }
+                        setS(() { saving = true; err = null; });
+                        try {
+                          await _invService.stockAdjust(
+                            skuCode: widget.skuCode,
+                            locationId: widget.locationId,
+                            quantity: qty,
+                            adjustMode: 'qty',
+                            note: note,
+                          );
+                          if (ctx.mounted) ctx.pop();
+                          widget.onChanged?.call();
+                          _load();
+                        } catch (e) {
+                          setS(() { saving = false; err = _friendly(e); });
                         }
                       },
-                child: saving ? _spinner() : const Text('确认调整'),
+                child: saving
+                    ? _spinner()
+                    : Text(adjustMode == 'sku_correct'
+                        ? '确认更正'
+                        : adjustMode == 'boxes_only'
+                            ? '确认箱数调整'
+                            : '确认调整'),
               ),
             ],
           );
@@ -1025,11 +1536,47 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       row['boxes']?.dispose();
       row['units']?.dispose();
     }
+    for (final spec in boxesOnlySpecs) {
+      (spec['ctrl'] as TextEditingController).dispose();
+    }
     qtyCtrl.dispose();
     noteCtrl.dispose();
-    newBoxesCtrl.dispose();
-    newUnitsCtrl.dispose();
   }
+
+  // ── preview total row ──
+  Widget _previewRow(int previewTotal, int currentQty) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Row(
+          children: [
+            const Text('调整后总库存: ', style: TextStyle(fontSize: 13)),
+            Text(
+              '$previewTotal 件',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: previewTotal != currentQty
+                    ? Colors.orange.shade700
+                    : Colors.green.shade700,
+              ),
+            ),
+            if (previewTotal != currentQty) ...[
+              Text(
+                '  (${previewTotal > currentQty ? '+' : ''}${previewTotal - currentQty})',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: previewTotal > currentQty
+                        ? Colors.green.shade600
+                        : Colors.red.shade600),
+              ),
+            ],
+          ],
+        ),
+      );
 
   // ── 共用 helper widgets ──
   Widget _qtyRow(TextEditingController boxesCtrl, TextEditingController unitsCtrl,
@@ -1070,36 +1617,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
         ),
       );
 
+
   Widget _spinner() => const SizedBox(
         width: 16, height: 16,
         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
       );
-
-  Color _typeColor(String type) {
-    switch (type) {
-      case 'IN': return Colors.green;
-      case 'OUT': return Colors.red;
-      case 'ADJUST': return Colors.orange;
-      default: return Colors.grey;
-    }
-  }
-
-  String _typeLabel(String type) {
-    switch (type) {
-      case 'IN': return '入库';
-      case 'OUT': return '出库';
-      case 'ADJUST': return '调整';
-      default: return type;
-    }
-  }
-
-  String _txDetail(TransactionRecord r) {
-    if (r.type == 'IN' && r.boxes != null && r.unitsPerBox != null) {
-      return '${r.boxes}箱 × ${r.unitsPerBox} = ${r.quantity}件';
-    }
-    if (r.type == 'ADJUST') return '调整为 ${r.quantity}件';
-    return '${r.quantity}件';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1176,7 +1698,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 ? Text('待补充库存信息',
                     style: TextStyle(color: Colors.grey.shade500, fontSize: 12))
                 : (_configs.isEmpty
-                    ? Text('$_boxes箱 × $_units件/箱',
+                    ? Text(
+                        _boxesOnlyMode
+                            ? '$_boxes箱 · 箱规待确认'
+                            : '$_boxes箱 × $_units件/箱',
                         style: const TextStyle(color: Colors.grey, fontSize: 12))
                     : Wrap(
                         spacing: 10,
@@ -1188,17 +1713,61 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       )),
           ),
 
-          // 主操作按钮行
-          if (widget.canEdit)
+          // 主操作按钮行 — each button only shown when user has the matching permission
+          if (_canStockIn || _canStockOut || _canAdjust)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: Row(
                 children: [
-                  _actionBtn('入库', Icons.add_circle_outline, Colors.green, _showStockInDialog),
+                  if (_canStockIn) ...[
+                    _actionBtn('入库', Icons.add_circle_outline, Colors.green, _showStockInDialog),
+                  ],
+                  if (_canStockIn && (_canStockOut || _canAdjust)) const SizedBox(width: 8),
+                  if (_canStockOut) ...[
+                    _actionBtn('出库', Icons.remove_circle_outline, Colors.red, _showStockOutDialog),
+                  ],
+                  if (_canStockOut && _canAdjust) const SizedBox(width: 8),
+                  if (_canAdjust) ...[
+                    _actionBtn('库存调整', Icons.tune, Colors.orange, _showAdjustDialog),
+                  ],
+                ],
+              ),
+            ),
+
+          // 暂存转正式按钮行 — only shown for pending records with adjust permission
+          if (_isPending && _canAdjust)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.check_circle_outline, size: 15,
+                          color: Colors.teal),
+                      label: const Text('确认为正式',
+                          style: TextStyle(color: Colors.teal, fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                      ),
+                      onPressed: _showConfirmPendingDialog,
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  _actionBtn('出库', Icons.remove_circle_outline, Colors.red, _showStockOutDialog),
-                  const SizedBox(width: 8),
-                  _actionBtn('库存调整', Icons.tune, Colors.orange, _showAdjustDialog),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.call_split, size: 15,
+                          color: Colors.deepPurple),
+                      label: const Text('拆分为正式SKU',
+                          style: TextStyle(color: Colors.deepPurple, fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                            color: Colors.deepPurple.withValues(alpha: 0.5)),
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                      ),
+                      onPressed: _showSplitPendingDialog,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1232,17 +1801,30 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
           const Divider(height: 16),
 
-          // 流水记录标题
+          // 最近变动标题
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 0, 8, 8),
             child: Row(
               children: [
-                const Text('入出库记录',
+                const Text('最近变动',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                 const Spacer(),
-                if (_records != null)
-                  Text('共 ${_records!.length} 条',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: _viewAllHistory,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('查看全部',
+                          style: TextStyle(fontSize: 12, color: Colors.blue.shade600)),
+                      Icon(Icons.chevron_right, size: 16, color: Colors.blue.shade600),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -1258,64 +1840,702 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           label: const Text('加载失败，点击重试'),
                           onPressed: _load,
                         ))
-                    : _records!.isEmpty
-                        ? const Center(
-                            child: Text('暂无记录', style: TextStyle(color: Colors.grey)))
-                        : ListView.separated(
-                            controller: scrollCtrl,
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            itemCount: _records!.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (_, i) {
-                              final r = _records![i];
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: _typeColor(r.type).withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                            color: _typeColor(r.type).withValues(alpha: 0.4)),
-                                      ),
-                                      child: Text(_typeLabel(r.type),
-                                          style: TextStyle(
-                                            color: _typeColor(r.type),
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 12,
-                                          )),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(_txDetail(r),
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w500, fontSize: 14)),
-                                          if (r.note != null && r.note!.isNotEmpty)
-                                            Text(r.note!,
-                                                style: const TextStyle(
-                                                    color: Colors.grey, fontSize: 12)),
-                                        ],
-                                      ),
-                                    ),
-                                    Text(
-                                      DateFormat('MM-dd HH:mm').format(r.createdAt.toLocal()),
-                                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                                    ),
-                                  ],
+                    : (_recentRecords == null || _recentRecords!.isEmpty)
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.history, size: 40,
+                                    color: Colors.grey.shade300),
+                                const SizedBox(height: 8),
+                                Text('暂无入出库记录',
+                                    style: TextStyle(
+                                        color: Colors.grey.shade400, fontSize: 13)),
+                                const SizedBox(height: 4),
+                                TextButton(
+                                  onPressed: _viewAllHistory,
+                                  child: const Text('查看全部记录',
+                                      style: TextStyle(fontSize: 13)),
                                 ),
-                              );
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollCtrl,
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                            itemCount: _recentRecords!.length + 1,
+                            itemBuilder: (_, i) {
+                              if (i == _recentRecords!.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.history, size: 16),
+                                    label: const Text('查看全部记录'),
+                                    onPressed: _viewAllHistory,
+                                  ),
+                                );
+                              }
+                              final r = _recentRecords![i];
+                              return _AuditCard(record: r);
                             },
                           ),
           ),
         ],
       ),
     );
+  }
+
+  // ── 确认为正式 ──
+  Future<void> _showConfirmPendingDialog() async {
+    final noteCtrl = TextEditingController();
+    bool changeSku = false;
+    Sku? selectedNewSku;
+    String? err;
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('确认为正式库存'),
+          content: SizedBox(
+            width: 340,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Info banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.skuCode,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text('${widget.locationCode}  ·  $_qtyLabel',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600)),
+                        const SizedBox(height: 2),
+                        const Text('暂存 → 正式库存',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.teal,
+                                fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Optional SKU change toggle
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: changeSku,
+                        onChanged: (v) => setS(() {
+                          changeSku = v ?? false;
+                          if (!changeSku) selectedNewSku = null;
+                        }),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const Text('同时更正SKU编码', style: TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                  if (changeSku) ...[
+                    const SizedBox(height: 6),
+                    _SkuSearchField(
+                      labelText: '搜索新 SKU 编码或名称',
+                      excludeSkuCode: widget.skuCode,
+                      onSelected: (sku) => setS(() {
+                        selectedNewSku = sku;
+                        err = null;
+                      }),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+
+                  // Note field
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: noteCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: '原因 *',
+                      hintText: '请说明确认原因',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setS(() => err = null),
+                  ),
+
+                  if (err != null) ...[
+                    const SizedBox(height: 8),
+                    Text(err!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final note = noteCtrl.text.trim();
+                      if (note.isEmpty) {
+                        setS(() => err = '请填写原因');
+                        return;
+                      }
+                      if (changeSku && selectedNewSku == null) {
+                        setS(() => err = '请从下拉列表中选择新SKU编码');
+                        return;
+                      }
+
+                      setS(() { saving = true; err = null; });
+                      try {
+                        await _invService.confirmPending(
+                          inventoryId: _invRecord!.id,
+                          newSkuCode: changeSku ? selectedNewSku!.sku : null,
+                          note: note,
+                        );
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          widget.onChanged?.call();
+                          await _load();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('已确认为正式库存')),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        setS(() { saving = false; err = _friendly(e); });
+                      }
+                    },
+              style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+              child: saving
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2,
+                          color: Colors.white))
+                  : const Text('确认转正式'),
+            ),
+          ],
+        ),
+      ),
+    );
+    noteCtrl.dispose();
+  }
+
+  // ── 拆分为多个正式SKU ──
+  Future<void> _showSplitPendingDialog() async {
+    final noteCtrl = TextEditingController();
+
+    // ── Source metadata ───────────────────────────────────────────────────────
+    // Infer source recording mode from the live record state.
+    final validateInBoxes = _boxesOnlyMode; // box-space vs piece-space balance
+    final originalAmount  = validateInBoxes ? _boxes : _qty;
+    final amountUnit      = validateInBoxes ? '箱' : '件';
+    final sourceLabel     = _boxesOnlyMode
+        ? '仅箱数'
+        : (_configs.isEmpty && _boxes <= 1 && _qty > 0)
+            ? '按总数量'
+            : '按箱规';
+    // Default mode for each split target mirrors the source recording mode.
+    final defaultMode = _boxesOnlyMode
+        ? 'boxesOnly'
+        : (_configs.isEmpty && _boxes <= 1 && _qty > 0)
+            ? 'qty'
+            : 'carton';
+
+    // ── Per-entry helpers ────────────────────────────────────────────────────
+    Map<String, dynamic> newEntry() => {
+      'sku':      null,
+      'mode':     defaultMode,
+      'boxes':    TextEditingController(),
+      'units':    TextEditingController(),
+      'totalQty': TextEditingController(),
+    };
+    void disposeEntry(Map<String, dynamic> s) {
+      (s['boxes']    as TextEditingController).dispose();
+      (s['units']    as TextEditingController).dispose();
+      (s['totalQty'] as TextEditingController).dispose();
+    }
+
+    final splits = <Map<String, dynamic>>[newEntry()];
+    String? err;
+    bool saving = false;
+
+    // Balance contribution from each split target.
+    int splitContrib(List<Map<String, dynamic>> list) => list.fold(0, (sum, s) {
+      final mode = s['mode'] as String;
+      if (validateInBoxes) {
+        // Box space: every mode contributes its box count
+        return sum + (int.tryParse((s['boxes'] as TextEditingController).text) ?? 0);
+      }
+      if (mode == 'carton') {
+        final b = int.tryParse((s['boxes']    as TextEditingController).text) ?? 0;
+        final u = int.tryParse((s['units']    as TextEditingController).text) ?? 0;
+        return sum + b * u;
+      }
+      if (mode == 'qty') {
+        return sum + (int.tryParse((s['totalQty'] as TextEditingController).text) ?? 0);
+      }
+      return sum; // boxesOnly target in piece-space → 0 (user must switch mode)
+    });
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final total    = splitContrib(splits);
+          final balanced = total == originalAmount;
+
+          return AlertDialog(
+            title: const Text('拆分为正式SKU'),
+            content: SizedBox(
+              width: 380,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    // ── Source banner ──────────────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: Colors.deepPurple.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('原暂存: ${widget.skuCode}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13)),
+                                Text(
+                                  '${widget.locationCode}  ·  录入方式：$sourceLabel',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600),
+                                ),
+                                Text(
+                                  '总量 $originalAmount $amountUnit  ·  按${amountUnit}守恒',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.deepPurple.shade600,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: balanced
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: balanced
+                                      ? Colors.green
+                                      : Colors.orange),
+                            ),
+                            child: Text(
+                              balanced
+                                  ? '✓ 已平衡'
+                                  : '已分 $total / $originalAmount',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: balanced
+                                    ? Colors.green
+                                    : Colors.orange,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── Split entries ──────────────────────────────────────
+                    ...List.generate(splits.length, (i) {
+                      final s          = splits[i];
+                      final selectedSku = s['sku'] as Sku?;
+                      final entryMode  = s['mode'] as String;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header: index + SKU name + delete
+                            Row(
+                              children: [
+                                Container(
+                                  width: 20, height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepPurple
+                                        .withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text('${i + 1}',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.deepPurple,
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    selectedSku != null
+                                        ? '${selectedSku.sku}'
+                                            '${selectedSku.name != null ? "  ${selectedSku.name}" : ""}'
+                                        : '未选择SKU',
+                                    style: TextStyle(
+                                      fontWeight: selectedSku != null
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      fontSize: 13,
+                                      color: selectedSku != null
+                                          ? Colors.deepPurple.shade700
+                                          : Colors.grey.shade400,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (splits.length > 1)
+                                  InkWell(
+                                    onTap: () => setS(() {
+                                      disposeEntry(s);
+                                      splits.removeAt(i);
+                                    }),
+                                    child: const Icon(
+                                        Icons.remove_circle_outline,
+                                        size: 18,
+                                        color: Colors.red),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Mode selector (per entry, independently switchable)
+                            SegmentedButton<String>(
+                              segments: const [
+                                ButtonSegment(
+                                    value: 'carton',
+                                    label: Text('按箱规',
+                                        style: TextStyle(fontSize: 11)),
+                                    icon: Icon(Icons.view_list, size: 13)),
+                                ButtonSegment(
+                                    value: 'boxesOnly',
+                                    label: Text('仅箱数',
+                                        style: TextStyle(fontSize: 11)),
+                                    icon: Icon(Icons.inventory_2_outlined,
+                                        size: 13)),
+                                ButtonSegment(
+                                    value: 'qty',
+                                    label: Text('按总数量',
+                                        style: TextStyle(fontSize: 11)),
+                                    icon: Icon(Icons.numbers, size: 13)),
+                              ],
+                              selected: {entryMode},
+                              onSelectionChanged: (v) =>
+                                  setS(() => s['mode'] = v.first),
+                              style: ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // SKU picker
+                            _SkuSearchField(
+                              labelText: '搜索 SKU',
+                              onSelected: (sku) =>
+                                  setS(() => s['sku'] = sku),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Input area — changes with mode
+                            if (entryMode == 'carton') ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: s['boxes']
+                                          as TextEditingController,
+                                      decoration: const InputDecoration(
+                                        labelText: '箱数',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                        suffixText: '箱',
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                      onChanged: (_) => setS(() {}),
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 6),
+                                    child: Text('×',
+                                        style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.grey)),
+                                  ),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: s['units']
+                                          as TextEditingController,
+                                      decoration: const InputDecoration(
+                                        labelText: '件/箱',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                        suffixText: '件/箱',
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                      onChanged: (_) => setS(() {}),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '= ${(int.tryParse((s['boxes'] as TextEditingController).text) ?? 0) * (int.tryParse((s['units'] as TextEditingController).text) ?? 0)} 件',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            ] else if (entryMode == 'boxesOnly') ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: s['boxes']
+                                          as TextEditingController,
+                                      decoration: const InputDecoration(
+                                        labelText: '箱数',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                        suffixText: '箱',
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                      onChanged: (_) => setS(() {}),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text('· 箱规待确认',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.blue.shade600)),
+                                ],
+                              ),
+                            ] else ...[
+                              // qty mode
+                              TextField(
+                                controller: s['totalQty']
+                                    as TextEditingController,
+                                decoration: const InputDecoration(
+                                  labelText: '总件数',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  suffixText: '件',
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: (_) => setS(() {}),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }),
+
+                    // Add split button
+                    TextButton.icon(
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('添加拆分目标',
+                          style: TextStyle(fontSize: 13)),
+                      onPressed: () => setS(() => splits.add(newEntry())),
+                    ),
+
+                    const Divider(height: 16),
+
+                    // Note
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: '拆分原因 *',
+                        hintText: '请说明拆分原因',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onChanged: (_) => setS(() => err = null),
+                    ),
+
+                    if (err != null) ...[
+                      const SizedBox(height: 8),
+                      Text(err!,
+                          style: const TextStyle(
+                              color: Colors.red, fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving
+                    ? null
+                    : () {
+                        for (final s in splits) disposeEntry(s);
+                        Navigator.pop(ctx);
+                      },
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final note = noteCtrl.text.trim();
+                        if (note.isEmpty) {
+                          setS(() => err = '请填写拆分原因');
+                          return;
+                        }
+                        // Per-entry validation
+                        for (int i = 0; i < splits.length; i++) {
+                          final s    = splits[i];
+                          final mode = s['mode'] as String;
+                          if (s['sku'] == null) {
+                            setS(() =>
+                                err = '第 ${i + 1} 条：请从下拉列表中选择SKU');
+                            return;
+                          }
+                          if (mode == 'carton') {
+                            if ((int.tryParse((s['boxes'] as TextEditingController).text) ?? 0) <= 0) {
+                              setS(() => err = '第 ${i + 1} 条箱数必须大于0');
+                              return;
+                            }
+                            if ((int.tryParse((s['units'] as TextEditingController).text) ?? 0) <= 0) {
+                              setS(() => err = '第 ${i + 1} 条件/箱必须大于0');
+                              return;
+                            }
+                          } else if (mode == 'boxesOnly') {
+                            if ((int.tryParse((s['boxes'] as TextEditingController).text) ?? 0) <= 0) {
+                              setS(() => err = '第 ${i + 1} 条箱数必须大于0');
+                              return;
+                            }
+                          } else {
+                            if ((int.tryParse((s['totalQty'] as TextEditingController).text) ?? 0) <= 0) {
+                              setS(() => err = '第 ${i + 1} 条总件数必须大于0');
+                              return;
+                            }
+                          }
+                        }
+                        // Balance check
+                        final total = splitContrib(splits);
+                        if (total != originalAmount) {
+                          setS(() => err =
+                              '拆分总量 $total $amountUnit ≠ 原暂存 $originalAmount $amountUnit，请调整');
+                          return;
+                        }
+                        // Build payload
+                        final splitData = splits.map((s) {
+                          final mode = s['mode'] as String;
+                          final sku  = (s['sku'] as Sku).sku;
+                          if (mode == 'carton') {
+                            return <String, dynamic>{
+                              'skuCode':    sku,
+                              'boxes':      int.parse((s['boxes'] as TextEditingController).text.trim()),
+                              'unitsPerBox': int.parse((s['units'] as TextEditingController).text.trim()),
+                            };
+                          } else if (mode == 'boxesOnly') {
+                            return <String, dynamic>{
+                              'skuCode':    sku,
+                              'boxes':      int.parse((s['boxes'] as TextEditingController).text.trim()),
+                              'unitsPerBox': 0, // signals boxesOnly on backend
+                            };
+                          } else {
+                            return <String, dynamic>{
+                              'skuCode':  sku,
+                              'boxes':    0,
+                              'unitsPerBox': 0,
+                              'totalQty': int.parse((s['totalQty'] as TextEditingController).text.trim()),
+                            };
+                          }
+                        }).toList();
+
+                        setS(() { saving = true; err = null; });
+                        try {
+                          await _invService.splitPending(
+                            inventoryId: _invRecord!.id,
+                            splits: splitData,
+                            note: note,
+                          );
+                          if (mounted) {
+                            for (final s in splits) disposeEntry(s);
+                            Navigator.pop(ctx);
+                            widget.onChanged?.call();
+                            await _load();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('拆分成功，正式SKU已创建')));
+                            }
+                          }
+                        } catch (e) {
+                          setS(() { saving = false; err = _friendly(e); });
+                        }
+                      },
+                style: FilledButton.styleFrom(
+                    backgroundColor: Colors.deepPurple),
+                child: saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('确认拆分'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    noteCtrl.dispose();
   }
 
   Widget _actionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
@@ -1329,6 +2549,318 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
         ),
         onPressed: onTap,
       ),
+    );
+  }
+}
+
+// ─── Compact audit-log card for the sheet summary ────────────────────────────
+
+class _AuditCard extends StatelessWidget {
+  final ChangeRecord record;
+
+  const _AuditCard({required this.record});
+
+  static const _actionColor = <String, Color>{
+    '入库': Colors.green,
+    '录入': Colors.green,
+    '暂存': Colors.teal,
+    '出库': Colors.red,
+    '删除库存': Colors.red,
+    '调整': Colors.orange,
+    '结构修改': Colors.orange,
+    '批量转移': Colors.blue,
+    '批量复制': Colors.indigo,
+    'SKU更正': Colors.purple,
+    'SKU更正并合并': Colors.deepOrange,
+    '暂存转正式': Colors.teal,
+    '暂存拆分': Colors.deepPurple,
+  };
+
+  Color get _color =>
+      _actionColor[record.businessAction ?? ''] ?? Colors.grey.shade500;
+
+  String _extractDetail() {
+    final desc = record.description;
+    final atIdx = desc.indexOf(' @ ');
+    if (atIdx == -1) return desc;
+    final afterAt = atIdx + 3;
+    final spaceAfterLoc = desc.indexOf(' ', afterAt);
+    if (spaceAfterLoc == -1) return '';
+    return desc.substring(spaceAfterLoc + 1).trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final time = DateFormat('MM-dd HH:mm').format(record.createdAt.toLocal());
+    final color = _color;
+    final action = record.businessAction ?? '操作';
+    final detail = _extractDetail();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withValues(alpha: 0.4)),
+            ),
+            child: Text(action,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                )),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (detail.isNotEmpty)
+                  Text(detail,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(record.userName,
+                    style: TextStyle(
+                        color: Colors.grey.shade500, fontSize: 11)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(time, style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── SKU search autocomplete field ───────────────────────────────────────────
+// Reusable widget: search by keyword, show dropdown, require selection.
+
+class _SkuSearchField extends StatefulWidget {
+  final String labelText;
+  final String? excludeSkuCode; // exclude this SKU from results (e.g. current SKU)
+  final void Function(Sku sku) onSelected;
+
+  const _SkuSearchField({
+    required this.labelText,
+    required this.onSelected,
+    this.excludeSkuCode,
+  });
+
+  @override
+  State<_SkuSearchField> createState() => _SkuSearchFieldState();
+}
+
+class _SkuSearchFieldState extends State<_SkuSearchField> {
+  final _ctrl = TextEditingController();
+  final _skuService = SkuService();
+  final _focusNode = FocusNode();
+
+  List<Sku> _results = [];
+  bool _searching = false;
+  bool _showDropdown = false;
+  Sku? _selected;
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String v) {
+    _debounce?.cancel();
+    if (v.trim().isEmpty) {
+      setState(() { _results = []; _showDropdown = false; _searching = false; });
+      return;
+    }
+    setState(() => _searching = true);
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final all = await _skuService.getAll(search: v.trim());
+        final filtered = widget.excludeSkuCode != null
+            ? all.where((s) =>
+                s.sku.toUpperCase() != widget.excludeSkuCode!.toUpperCase()).toList()
+            : all;
+        if (mounted) setState(() { _results = filtered; _showDropdown = true; _searching = false; });
+      } catch (_) {
+        if (mounted) setState(() { _searching = false; _showDropdown = false; });
+      }
+    });
+  }
+
+  void _select(Sku sku) {
+    setState(() {
+      _selected = sku;
+      _showDropdown = false;
+      _ctrl.text = sku.sku;
+    });
+    _focusNode.unfocus();
+    widget.onSelected(sku);
+  }
+
+  void _clear() {
+    setState(() {
+      _selected = null;
+      _results = [];
+      _showDropdown = false;
+      _ctrl.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Selected state — show chip
+        if (_selected != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade300),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_selected!.sku,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14)),
+                      if (_selected!.name != null && _selected!.name!.isNotEmpty)
+                        Text(_selected!.name!,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                InkWell(
+                  onTap: _clear,
+                  child: Icon(Icons.close, size: 16, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+
+        // Search field — hidden when selected
+        if (_selected == null) ...[
+          TextField(
+            controller: _ctrl,
+            focusNode: _focusNode,
+            decoration: InputDecoration(
+              labelText: widget.labelText,
+              hintText: '输入编码或品名搜索',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              suffixIcon: _searching
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  : _ctrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 16),
+                          onPressed: () { _ctrl.clear(); setState(() { _results = []; _showDropdown = false; }); },
+                        )
+                      : const Icon(Icons.search, size: 18),
+            ),
+            onChanged: _onChanged,
+          ),
+          if (_showDropdown) ...[
+            const SizedBox(height: 2),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 180),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: _results.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text('未找到匹配的SKU',
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 13)),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: _results.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(height: 1, color: Colors.grey.shade100),
+                      itemBuilder: (_, i) {
+                        final sku = _results[i];
+                        return InkWell(
+                          onTap: () => _select(sku),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(sku.sku,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13)),
+                                      if (sku.name != null && sku.name!.isNotEmpty)
+                                        Text(sku.name!,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey.shade500)),
+                                    ],
+                                  ),
+                                ),
+                                if (sku.isArchived)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade200,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('已停用',
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey.shade500)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ],
+      ],
     );
   }
 }

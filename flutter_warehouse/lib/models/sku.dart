@@ -34,6 +34,8 @@ class Sku {
   final int? minStock;
   final List<SkuLocation> locations;
   final int totalQty;
+  // 'active' | 'archived' — null/missing treated as 'active' (backwards compat)
+  final String status;
 
   Sku({
     required this.id,
@@ -44,6 +46,7 @@ class Sku {
     this.minStock,
     this.locations = const [],
     this.totalQty = 0,
+    this.status = 'active',
   });
 
   factory Sku.fromJson(Map<String, dynamic> json) => Sku(
@@ -58,6 +61,7 @@ class Sku {
                 .toList() ??
             [],
         totalQty: (json['totalQty'] as num?)?.toInt() ?? 0,
+        status: json['status'] as String? ?? 'active',
       );
 
   Map<String, dynamic> toJson() => {
@@ -66,9 +70,12 @@ class Sku {
         if (name != null) 'name': name,
         if (barcode != null) 'barcode': barcode,
         if (cartonQty != null) 'cartonQty': cartonQty,
+        'status': status,
       };
 
   String get displayName => name != null && name!.isNotEmpty ? name! : sku;
+
+  bool get isArchived => status == 'archived';
 
   /// True when every location for this SKU is in boxes-only mode (no per-box qty known).
   bool get allBoxesOnly => locations.isNotEmpty && locations.every((l) => l.boxesOnly);

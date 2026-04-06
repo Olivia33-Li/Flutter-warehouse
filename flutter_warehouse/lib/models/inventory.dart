@@ -51,9 +51,11 @@ class InventoryRecord {
     this.boxesOnlyMode = false,
   });
 
-  int get totalQty => configurations.isNotEmpty
-      ? configurations.fold(0, (s, c) => s + c.qty)
-      : boxes * unitsPerBox;
+  int get totalQty {
+    if (boxesOnlyMode || quantityUnknown) return 0;
+    if (configurations.isNotEmpty) return configurations.fold(0, (s, c) => s + c.qty);
+    return boxes * unitsPerBox;
+  }
 
   int get totalBoxes => configurations.isNotEmpty
       ? configurations.fold(0, (s, c) => s + c.boxes)

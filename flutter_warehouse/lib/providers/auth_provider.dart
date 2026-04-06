@@ -8,6 +8,12 @@ final currentUserProvider = StateNotifierProvider<UserNotifier, User?>(
   (ref) => UserNotifier(ref.read(authServiceProvider)),
 );
 
+final recentAccountsProvider = StateNotifierProvider<RecentAccountsNotifier, List<RecentAccount>>(
+  (ref) => RecentAccountsNotifier(ref.read(authServiceProvider)),
+);
+
+// ─── UserNotifier ──────────────────────────────────────────────────────────────
+
 class UserNotifier extends StateNotifier<User?> {
   final AuthService _authService;
 
@@ -39,4 +45,30 @@ class UserNotifier extends StateNotifier<User?> {
     await _authService.logout();
     state = null;
   }
+}
+
+// ─── RecentAccountsNotifier ───────────────────────────────────────────────────
+
+class RecentAccountsNotifier extends StateNotifier<List<RecentAccount>> {
+  final AuthService _authService;
+
+  RecentAccountsNotifier(this._authService) : super([]) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    state = await _authService.getRecentAccounts();
+  }
+
+  Future<void> remove(String username) async {
+    await _authService.removeRecentAccount(username);
+    await _load();
+  }
+
+  Future<void> clearAll() async {
+    await _authService.clearRecentAccounts();
+    state = [];
+  }
+
+  Future<void> refresh() async => _load();
 }

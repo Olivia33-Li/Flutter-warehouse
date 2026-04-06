@@ -1,7 +1,11 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'dart:async';
+import 'dart:js_interop';
+import 'dart:typed_data';
+import 'package:web/web.dart' as web;
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../core/constants.dart';
 import 'api_service.dart';
 
 class ImportError {
@@ -242,20 +246,35 @@ class ImportService {
 
   /// Downloads a detailed Excel report for the given import log record.
   Future<void> exportLog(ImportLogRecord record) async {
-    final response = await _api.get(
-      '/import/logs/${record.id}/export',
-      options: Options(responseType: ResponseType.bytes),
-    );
-    final bytes = response.data as List<int>;
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(AppConstants.tokenKey) ?? '';
     final fmt = DateFormat('yyyyMMdd_HHmm');
     final filename = 'import_${record.importType}_${fmt.format(record.createdAt)}.xlsx';
-    final blob = html.Blob([bytes],
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', filename)
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    final url = '${AppConstants.baseUrl}/import/logs/${record.id}/export';
+
+    final xhr = web.XMLHttpRequest();
+    xhr.open('GET', url);
+    xhr.responseType = 'blob';
+    xhr.setRequestHeader('Authorization', 'Bearer $token');
+
+    final completer = Completer<void>();
+    xhr.onLoad.listen((_) {
+      if (xhr.status == 200) {
+        final blob = xhr.response as web.Blob;
+        final blobUrl = web.URL.createObjectURL(blob);
+        (web.document.createElement('a') as web.HTMLAnchorElement)
+          ..href = blobUrl
+          ..setAttribute('download', filename)
+          ..click();
+        web.URL.revokeObjectURL(blobUrl);
+        completer.complete();
+      } else {
+        completer.completeError('HTTP ${xhr.status}');
+      }
+    });
+    xhr.onError.listen((_) => completer.completeError('Network error'));
+    xhr.send();
+    return completer.future;
   }
 
   // ─── Templates ───────────────────────────────────────────────────────────
@@ -298,11 +317,15 @@ class ImportService {
     }
 
     const bom = '\uFEFF';
-    final blob = html.Blob(['$bom$content'], 'text/csv;charset=utf-8');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
+    final blob = web.Blob(
+      ['$bom$content'.toJS].toJS,
+      web.BlobPropertyBag(type: 'text/csv;charset=utf-8'),
+    );
+    final url = web.URL.createObjectURL(blob);
+    (web.document.createElement('a') as web.HTMLAnchorElement)
+      ..href = url
       ..setAttribute('download', filename)
       ..click();
-    html.Url.revokeObjectUrl(url);
+    web.URL.revokeObjectURL(url);
   }
 }

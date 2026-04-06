@@ -52,6 +52,7 @@ class InventoryService {
     int? unitsPerBox,
     String? note,
     bool boxesOnlyMode = false,
+    bool pendingCount = false,
   }) async {
     await _api.post('/transactions/in', data: {
       'skuCode': skuCode,
@@ -60,6 +61,7 @@ class InventoryService {
       if (unitsPerBox != null) 'unitsPerBox': unitsPerBox,
       if (note != null && note.isNotEmpty) 'note': note,
       if (boxesOnlyMode) 'boxesOnlyMode': true,
+      if (pendingCount) 'pendingCount': true,
     });
   }
 
@@ -67,12 +69,14 @@ class InventoryService {
     required String skuCode,
     required String locationId,
     required int quantity,
+    List<Map<String, int>>? configurations, // per-spec removal for 按箱规 mode
     String? note,
   }) async {
     await _api.post('/transactions/out', data: {
       'skuCode': skuCode,
       'locationId': locationId,
       'quantity': quantity,
+      if (configurations != null && configurations.isNotEmpty) 'configurations': configurations,
       if (note != null && note.isNotEmpty) 'note': note,
     });
   }
@@ -82,6 +86,7 @@ class InventoryService {
     required String locationId,
     int? quantity,
     List<Map<String, int>>? configurations,
+    String adjustMode = 'qty', // 'qty' | 'configs' | 'boxes_only'
     String? note,
   }) async {
     await _api.post('/transactions/adjust', data: {
@@ -89,7 +94,46 @@ class InventoryService {
       'locationId': locationId,
       if (quantity != null) 'quantity': quantity,
       if (configurations != null) 'configurations': configurations,
+      'adjustMode': adjustMode,
       if (note != null && note.isNotEmpty) 'note': note,
+    });
+  }
+
+  Future<void> correctSku({
+    required String inventoryId,
+    required String newSkuCode,
+    required String note,
+    bool allowMerge = false,
+  }) async {
+    await _api.post('/transactions/correct-sku', data: {
+      'inventoryId': inventoryId,
+      'newSkuCode': newSkuCode,
+      'note': note,
+      if (allowMerge) 'allowMerge': true,
+    });
+  }
+
+  Future<void> confirmPending({
+    required String inventoryId,
+    String? newSkuCode,
+    required String note,
+  }) async {
+    await _api.post('/transactions/confirm-pending', data: {
+      'inventoryId': inventoryId,
+      if (newSkuCode != null && newSkuCode.isNotEmpty) 'newSkuCode': newSkuCode,
+      'note': note,
+    });
+  }
+
+  Future<void> splitPending({
+    required String inventoryId,
+    required List<Map<String, dynamic>> splits,
+    required String note,
+  }) async {
+    await _api.post('/transactions/split-pending', data: {
+      'inventoryId': inventoryId,
+      'splits': splits,
+      'note': note,
     });
   }
 

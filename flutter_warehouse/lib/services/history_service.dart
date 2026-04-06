@@ -8,6 +8,8 @@ class HistoryService {
     String? action,
     String? entity,
     String? businessAction,
+    String? type,       // IN | OUT | ADJUST | TRANSFER — mapped to businessActions on backend
+    String? skuCode,    // filters by "skuCode @ locationCode" in description
     String? keyword,
     String? startDate,
     String? endDate,
@@ -21,6 +23,8 @@ class HistoryService {
       if (action != null) 'action': action,
       if (entity != null) 'entity': entity,
       if (businessAction != null) 'businessAction': businessAction,
+      if (type != null) 'type': type,
+      if (skuCode != null && skuCode.isNotEmpty) 'skuCode': skuCode,
       if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
       if (startDate != null) 'startDate': startDate,
       if (endDate != null) 'endDate': endDate,

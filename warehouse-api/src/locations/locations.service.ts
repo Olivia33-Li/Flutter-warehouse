@@ -15,14 +15,69 @@ export class LocationsService {
   ) {}
 
   async findAll(search?: string) {
-    const filter: any = {};
-    if (search) {
-      filter.$or = [
-        { code: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
+    // Normalize: strip common separators, lowercase for matching
+    const norm = (s: string) => s.toLowerCase().replace(/[-_/\s"'.]/g, '');
+
+    let locations = await this.locationModel.find({}).lean();
+
+    // Pull lightweight inventory stats for all locations at once
+    // Exclude tombstone records left by merge/split operations — they are zero-qty and must not affect counts.
+    const allInv = await this.inventoryModel
+      .find({ stockStatus: { $nin: ['completed_merge', 'completed_split'] } })
+      .populate('skuId', 'sku name')
+      .lean();
+
+    type InvStat = {
+      skuCount: number;
+      totalQty: number;
+      totalBoxes: number;
+      skuCodes: string[];
+      skuNames: string[];
+    };
+    const statMap = new Map<string, InvStat>();
+    for (const inv of allInv) {
+      const locKey = inv.locationId.toString();
+      if (!statMap.has(locKey)) {
+        statMap.set(locKey, { skuCount: 0, totalQty: 0, totalBoxes: 0, skuCodes: [], skuNames: [] });
+      }
+      const stat = statMap.get(locKey)!;
+      // Only count SKUs that actually have stock (boxes > 0, quantity > 0, or quantityUnknown)
+      if ((inv.boxes ?? 0) > 0 || (inv.quantity ?? 0) > 0 || (inv as any).quantityUnknown) {
+        stat.skuCount++;
+      }
+      stat.totalBoxes += inv.boxes ?? 0;
+      if (!(inv as any).boxesOnlyMode) stat.totalQty += inv.quantity ?? 0;
+      const sku = inv.skuId as any;
+      if (sku?.sku) stat.skuCodes.push(sku.sku);
+      if (sku?.name) stat.skuNames.push(sku.name);
     }
-    return this.locationModel.find(filter).lean();
+
+    // Filter with fuzzy matching across code, description, skuCodes, skuNames
+    if (search && search.trim()) {
+      const q = norm(search.trim());
+      locations = locations.filter((loc) => {
+        const stat = statMap.get((loc._id as any).toString());
+        const fields = [
+          loc.code,
+          loc.description ?? '',
+          ...(stat?.skuCodes ?? []),
+          ...(stat?.skuNames ?? []),
+        ];
+        return fields.some((f) => norm(f).includes(q));
+      });
+    }
+
+    return locations.map((loc) => {
+      const stat = statMap.get((loc._id as any).toString()) ?? {
+        skuCount: 0, totalQty: 0, totalBoxes: 0, skuCodes: [], skuNames: [],
+      };
+      return {
+        ...loc,
+        skuCount: stat.skuCount,
+        totalQty: stat.totalQty,
+        totalBoxes: stat.totalBoxes,
+      };
+    });
   }
 
   async findOne(id: string) {
@@ -30,7 +85,7 @@ export class LocationsService {
     if (!location) throw new NotFoundException('位置不存在');
 
     const inventory = await this.inventoryModel
-      .find({ locationId: new Types.ObjectId(id) })
+      .find({ locationId: new Types.ObjectId(id), stockStatus: { $nin: ['completed_merge', 'completed_split'] } })
       .populate('skuId', 'sku name barcode cartonQty')
       .lean();
 

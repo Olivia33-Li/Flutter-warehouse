@@ -593,6 +593,101 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     }
   }
 
+  // ── Archive / Restore ────────────────────────────────────────────────────────
+
+  Future<void> _archiveSku() async {
+    final data = _data!;
+    final skuCode = data['sku'] as String;
+
+    // Pre-check: does this SKU have inventory?
+    final inventoryList = (data['inventory'] as List?) ?? [];
+    if (inventoryList.isNotEmpty) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('确认归档'),
+          content: Text(
+            '$skuCode 仍有 ${inventoryList.length} 条库存记录。\n\n'
+            '归档后该 SKU 不允许新入库，但现有库存仍可查看和出库。\n\n'
+            '确认归档？',
+          ),
+          actions: [
+            TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade700),
+              onPressed: () => ctx.pop(true),
+              child: const Text('确认归档'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    } else {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('确认归档'),
+          content: Text('确定归档 SKU $skuCode？归档后不允许新入库。'),
+          actions: [
+            TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade700),
+              onPressed: () => ctx.pop(true),
+              child: const Text('确认归档'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+
+    try {
+      await _skuService.archive(widget.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$skuCode 已归档')));
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('操作失败: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _restoreSku() async {
+    final skuCode = _data?['sku'] as String? ?? '';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('恢复 SKU'),
+        content: Text('确定将 $skuCode 恢复为"在用"状态？'),
+        actions: [
+          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => ctx.pop(true),
+            child: const Text('确认恢复'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _skuService.restore(widget.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$skuCode 已恢复为在用')));
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('操作失败: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
@@ -601,6 +696,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     if (_error != null) return Scaffold(appBar: AppBar(), body: ErrorView(message: _error!, onRetry: _load));
 
     final data = _data!;
+    final isArchived = (data['status'] as String? ?? 'active') == 'archived';
     final inventory = (data['inventory'] as List?)
         ?.map((e) => InventoryRecord.fromJson(e))
         .toList() ?? [];
@@ -624,8 +720,44 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(data['sku'] ?? ''),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(data['sku'] ?? ''),
+            if (isArchived) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Archived',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
+          // Archive / Restore — admin only
+          if (user?.isAdmin == true)
+            isArchived
+                ? IconButton(
+                    icon: const Icon(Icons.unarchive_outlined),
+                    tooltip: '恢复 SKU',
+                    onPressed: _restoreSku,
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.archive_outlined),
+                    tooltip: '归档 SKU',
+                    onPressed: _archiveSku,
+                  ),
           if (user != null)
             IconButton(
               icon: const Icon(Icons.edit),
@@ -634,7 +766,8 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
             ),
         ],
       ),
-      floatingActionButton: user?.canEdit == true
+      // Archived SKUs: disable the add-inventory FAB
+      floatingActionButton: user?.canEdit == true && !isArchived
           ? FloatingActionButton(
               onPressed: _showInventoryDialog,
               child: const Icon(Icons.add_location),
@@ -643,6 +776,29 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── Archived banner ────────────────────────────────────────────
+          if (isArchived)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                border: Border.all(color: Colors.orange.shade200),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.archive_outlined, size: 18, color: Colors.orange.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '此 SKU 已归档，不允许新入库。现有库存仍可查看和出库。',
+                      style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -700,6 +856,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           inventoryRecordId: record.id,
                           showLocNav: true,
                           canEdit: user?.canEdit == true,
+                          canStockIn:  user?.can('inv:stock_in')  == true,
+                          canStockOut: user?.can('inv:stock_out') == true,
+                          canAdjust:   user?.can('inv:adjust')    == true,
                           quantityUnknown: record.quantityUnknown,
                           onChanged: _load,
                         ),

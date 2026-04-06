@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web/web.dart' as web;
+import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/inventory_service.dart';
 import '../../services/api_service.dart';
+import '../../models/user.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -17,11 +20,11 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  // 编辑 Profile
+  // ── Edit Profile ────────────────────────────────────────────────────────────
+
   Future<void> _showEditProfileDialog(String currentName) async {
     final nameCtrl = TextEditingController(text: currentName);
     String? err;
-
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -52,7 +55,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 try {
                   final response = await ApiService.instance.dio
                       .patch('/auth/profile', data: {'name': nameCtrl.text.trim()});
-                  // 更新本地 provider
                   ref.read(currentUserProvider.notifier).updateName(response.data['name']);
                   if (ctx.mounted) ctx.pop();
                   if (mounted) {
@@ -72,12 +74,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // 修改密码
+  // ── Change Password ─────────────────────────────────────────────────────────
+
   Future<void> _showChangePasswordDialog() async {
     final oldCtrl = TextEditingController();
     final newCtrl = TextEditingController();
     String? err;
-
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -132,30 +134,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // 导出 Excel
-  Future<void> _exportExcel() async {
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('正在生成 Excel，请稍候...')));
+  // ── Export Excel ────────────────────────────────────────────────────────────
 
-      final response = await ApiService.instance.dio.get(
-        '/export/excel',
-        options: Options(responseType: ResponseType.bytes),
-      );
+  Future<void> _exportExcel() async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('正在生成 Excel，请稍候...')));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(AppConstants.tokenKey) ?? '';
+      final url = '${AppConstants.baseUrl}/export/excel';
 
       final now = DateTime.now();
       final filename =
           'warehouse_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
 
-      final blob = html.Blob(
-        [response.data as List<int>],
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: url)
-        ..setAttribute('download', filename)
-        ..click();
-      html.Url.revokeObjectUrl(url);
+      final xhr = web.XMLHttpRequest();
+      xhr.open('GET', url);
+      xhr.responseType = 'blob';
+      xhr.setRequestHeader('Authorization', 'Bearer $token');
+
+      final completer = Completer<void>();
+      xhr.onLoad.listen((_) {
+        if (xhr.status == 200) {
+          final blob = xhr.response as web.Blob;
+          final blobUrl = web.URL.createObjectURL(blob);
+          (web.document.createElement('a') as web.HTMLAnchorElement)
+            ..href = blobUrl
+            ..setAttribute('download', filename)
+            ..click();
+          web.URL.revokeObjectURL(blobUrl);
+          completer.complete();
+        } else {
+          completer.completeError('HTTP ${xhr.status}');
+        }
+      });
+      xhr.onError.listen((_) => completer.completeError('网络错误'));
+      xhr.send();
+      await completer.future;
 
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -171,60 +187,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  // 用户管理（admin）
-  Future<void> _showUsersDialog() async {
-    try {
-      final response = await ApiService.instance.dio.get('/users');
-      final users = response.data as List;
-      if (!mounted) return;
+  // ── User Management Dialog ──────────────────────────────────────────────────
 
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('用户管理'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: users.length,
-              itemBuilder: (_, i) {
-                final u = users[i];
-                return ListTile(
-                  title: Text(u['name']),
-                  subtitle: Text('@${u['username']}'),
-                  trailing: DropdownButton<String>(
-                    value: u['role'],
-                    items: ['admin', 'editor', 'viewer']
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
-                    onChanged: (role) async {
-                      if (role == null) return;
-                      try {
-                        await ApiService.instance.dio
-                            .patch('/users/${u['_id']}/role', data: {'role': role});
-                        if (ctx.mounted) Navigator.of(ctx).pop();
-                        _showUsersDialog();
-                      } catch (_) {}
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => ctx.pop(), child: const Text('关闭')),
-          ],
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('加载失败: $e')));
-    }
+  Future<void> _showUsersDialog() async {
+    showDialog(
+      context: context,
+      builder: (ctx) => _UserManagementDialog(),
+    );
   }
 
-  // 清空所有业务数据
+  // ── Switch Account ──────────────────────────────────────────────────────────
+
+  Future<void> _switchAccount() async {
+    await ref.read(currentUserProvider.notifier).logout();
+    if (mounted) context.go('/login');
+  }
+
+  // ── Clear All Data ──────────────────────────────────────────────────────────
+
   Future<void> _confirmClearAllData() async {
-    // First confirmation
     final confirm1 = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -256,7 +237,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (confirm1 != true || !mounted) return;
 
-    // Second confirmation: type to confirm
     final confirmCtrl = TextEditingController();
     String? confirmErr;
     final confirm2 = await showDialog<bool>(
@@ -329,11 +309,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         children: [
-          // 用户信息
+          // ── 用户信息 ─────────────────────────────────────────────────────
           ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
+            leading: CircleAvatar(
+              backgroundColor: _roleColor(user?.role ?? 'staff').withOpacity(0.15),
+              child: Text(
+                (user?.name.isNotEmpty == true ? user!.name[0] : '?').toUpperCase(),
+                style: TextStyle(color: _roleColor(user?.role ?? 'staff'),
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
             title: Text(user?.name ?? ''),
-            subtitle: Text('@${user?.username ?? ''}  •  ${user?.role ?? ''}'),
+            subtitle: Text('@${user?.username ?? ''}  ·  ${user?.roleLabel ?? ''}'),
             trailing: IconButton(
               icon: const Icon(Icons.edit),
               tooltip: '编辑个人信息',
@@ -350,19 +337,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: _showChangePasswordDialog,
           ),
 
-          // 用户管理（仅 admin）
-          if (user?.isAdmin == true)
+          // 切换账号
+          ListTile(
+            leading: const Icon(Icons.switch_account),
+            title: const Text('切换账号'),
+            subtitle: const Text('退出当前账号并返回登录页'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _switchAccount,
+          ),
+
+          const Divider(),
+
+          // 用户管理（仅管理员）
+          if (user?.canManageUsers == true)
             ListTile(
               leading: const Icon(Icons.people),
               title: const Text('用户管理'),
+              subtitle: const Text('创建账号 / 分配角色 / 停用账号'),
               trailing: const Icon(Icons.chevron_right),
               onTap: _showUsersDialog,
             ),
 
-          const Divider(),
-
-          // 数据导入（仅 admin）
-          if (user?.isAdmin == true)
+          // 数据导入（仅管理员）
+          if (user?.canImport == true)
             ListTile(
               leading: const Icon(Icons.upload_file),
               title: const Text('数据导入'),
@@ -371,19 +368,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () => context.push('/import'),
             ),
 
-          // 导出 Excel
-          ListTile(
-            leading: const Icon(Icons.download),
-            title: const Text('导出 Excel'),
-            subtitle: const Text('导出全部 SKU、库位、库存及流水记录'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _exportExcel,
-          ),
+          // 导出 Excel（管理员 + 仓库主管）
+          if (user?.canExport == true)
+            ListTile(
+              leading: const Icon(Icons.download),
+              title: const Text('导出 Excel'),
+              subtitle: const Text('导出全部 SKU、库位、库存及流水记录'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _exportExcel,
+            ),
 
           const Divider(),
 
-          // 危险区域（仅 admin）
-          if (user?.isAdmin == true) ...[
+          // 危险区域（仅管理员）
+          if (user?.canHighRisk == true) ...[
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Text('危险区域',
@@ -412,5 +410,415 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Color _roleColor(String role) {
+    switch (role) {
+      case 'admin':      return Colors.red.shade700;
+      case 'supervisor': return Colors.blue.shade700;
+      default:           return Colors.green.shade700;
+    }
+  }
+}
+
+// ─── User Management Dialog ───────────────────────────────────────────────────
+
+class _UserManagementDialog extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_UserManagementDialog> createState() => _UserManagementDialogState();
+}
+
+class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
+  List<Map<String, dynamic>> _users = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final response = await ApiService.instance.dio.get('/users');
+      setState(() => _users = List<Map<String, dynamic>>.from(response.data as List));
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _showCreateDialog() async {
+    final userCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    String role = 'staff';
+    String? err;
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('创建账号'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: userCtrl,
+                  decoration: const InputDecoration(
+                      labelText: '用户名', border: OutlineInputBorder(), isDense: true),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                      labelText: '显示名称', border: OutlineInputBorder(), isDense: true),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                      labelText: '初始密码（至少6位）', border: OutlineInputBorder(), isDense: true),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  decoration: const InputDecoration(
+                      labelText: '角色', border: OutlineInputBorder(), isDense: true),
+                  items: const [
+                    DropdownMenuItem(value: 'admin',      child: Text('管理员')),
+                    DropdownMenuItem(value: 'supervisor', child: Text('仓库主管')),
+                    DropdownMenuItem(value: 'staff',      child: Text('普通员工')),
+                  ],
+                  onChanged: (v) => setS(() => role = v ?? 'staff'),
+                ),
+                if (err != null) ...[
+                  const SizedBox(height: 8),
+                  Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: saving ? null : () => ctx.pop(), child: const Text('取消')),
+            FilledButton(
+              onPressed: saving ? null : () async {
+                if (userCtrl.text.trim().isEmpty || nameCtrl.text.trim().isEmpty || passCtrl.text.length < 6) {
+                  setS(() => err = '请填写完整信息，密码至少6位');
+                  return;
+                }
+                setS(() { saving = true; err = null; });
+                try {
+                  await ApiService.instance.dio.post('/users', data: {
+                    'username': userCtrl.text.trim().toLowerCase(),
+                    'name': nameCtrl.text.trim(),
+                    'password': passCtrl.text,
+                    'role': role,
+                  });
+                  if (ctx.mounted) ctx.pop();
+                  _load();
+                } on DioException catch (e) {
+                  final msg = e.response?.data?['message'];
+                  setS(() { saving = false; err = msg is List ? msg.join(', ') : (msg ?? '创建失败'); });
+                }
+              },
+              child: saving
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('创建'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setRole(String userId, String currentRole) async {
+    String newRole = currentRole;
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('修改角色'),
+          content: DropdownButtonFormField<String>(
+            value: newRole,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem(value: 'admin',      child: Text('管理员')),
+              DropdownMenuItem(value: 'supervisor', child: Text('仓库主管')),
+              DropdownMenuItem(value: 'staff',      child: Text('普通员工')),
+            ],
+            onChanged: (v) => setS(() => newRole = v ?? currentRole),
+          ),
+          actions: [
+            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await ApiService.instance.dio.patch('/users/$userId/role', data: {'role': newRole});
+                  if (ctx.mounted) ctx.pop();
+                  _load();
+                } catch (_) {}
+              },
+              child: const Text('确认'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleActive(String userId, bool currentlyActive) async {
+    final action = currentlyActive ? '停用' : '启用';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('确认$action'),
+        content: Text('确定要$action该账号吗？${currentlyActive ? '停用后该用户将无法登录。' : ''}'),
+        actions: [
+          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+          FilledButton(
+            style: currentlyActive
+                ? FilledButton.styleFrom(backgroundColor: Colors.red)
+                : null,
+            onPressed: () => ctx.pop(true),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final endpoint = currentlyActive ? '/users/$userId/disable' : '/users/$userId/enable';
+      await ApiService.instance.dio.patch(endpoint);
+      _load();
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'];
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg ?? '操作失败'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _resetPassword(String userId) async {
+    final ctrl = TextEditingController();
+    String? err;
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('重置密码'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                    labelText: '新密码（至少6位）', border: OutlineInputBorder()),
+              ),
+              if (err != null) ...[
+                const SizedBox(height: 8),
+                Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+            FilledButton(
+              onPressed: () async {
+                if (ctrl.text.length < 6) {
+                  setS(() => err = '密码至少6位');
+                  return;
+                }
+                try {
+                  await ApiService.instance.dio
+                      .patch('/users/$userId/reset-password', data: {'newPassword': ctrl.text});
+                  if (ctx.mounted) ctx.pop();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('密码已重置')));
+                  }
+                } on DioException catch (e) {
+                  final msg = e.response?.data?['message'];
+                  setS(() => err = msg ?? '重置失败');
+                }
+              },
+              child: const Text('重置'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = ref.watch(currentUserProvider);
+
+    return Dialog(
+      child: SizedBox(
+        width: 480,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              child: Row(
+                children: [
+                  const Text('用户管理',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.person_add, size: 16),
+                    label: const Text('创建账号'),
+                    onPressed: _showCreateDialog,
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => context.pop()),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Body
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('加载失败: $_error',
+                    style: const TextStyle(color: Colors.red)),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 480),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _users.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final u = _users[i];
+                    final uid = u['_id'] as String? ?? '';
+                    final role = u['role'] as String? ?? 'staff';
+                    final isActive = u['isActive'] != false;
+                    final isSelf = uid == (currentUser?.id ?? '');
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: isActive
+                            ? _roleColor(role).withOpacity(0.12)
+                            : Colors.grey.shade200,
+                        child: Text(
+                          (u['name'] as String? ?? '?').isNotEmpty
+                              ? (u['name'] as String)[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            color: isActive ? _roleColor(role) : Colors.grey,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      title: Row(
+                        children: [
+                          Text(u['name'] as String? ?? '',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: isActive ? null : Colors.grey)),
+                          if (isSelf) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text('我', style: TextStyle(
+                                  fontSize: 10, color: Colors.blue.shade700)),
+                            ),
+                          ],
+                          if (!isActive) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text('已停用',
+                                  style: TextStyle(fontSize: 10, color: Colors.red.shade700)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      subtitle: Text(
+                        '@${u['username'] ?? ''}  ·  ${_roleLabelOf(role)}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: isActive ? Colors.grey.shade600 : Colors.grey.shade400),
+                      ),
+                      trailing: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(value: 'role',
+                              child: ListTile(dense: true, leading: Icon(Icons.badge),
+                                  title: Text('修改角色'), contentPadding: EdgeInsets.zero)),
+                          PopupMenuItem(value: 'toggle',
+                              child: ListTile(dense: true,
+                                  leading: Icon(isActive ? Icons.block : Icons.check_circle,
+                                      color: isActive ? Colors.red : Colors.green),
+                                  title: Text(isActive ? '停用账号' : '启用账号',
+                                      style: TextStyle(
+                                          color: isActive ? Colors.red : Colors.green)),
+                                  contentPadding: EdgeInsets.zero)),
+                          const PopupMenuItem(value: 'password',
+                              child: ListTile(dense: true, leading: Icon(Icons.lock_reset),
+                                  title: Text('重置密码'), contentPadding: EdgeInsets.zero)),
+                        ],
+                        onSelected: (action) async {
+                          if (action == 'role')     await _setRole(uid, role);
+                          if (action == 'toggle')   await _toggleActive(uid, isActive);
+                          if (action == 'password') await _resetPassword(uid);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _roleColor(String role) {
+    switch (role) {
+      case 'admin':      return Colors.red.shade700;
+      case 'supervisor': return Colors.blue.shade700;
+      default:           return Colors.green.shade700;
+    }
+  }
+
+  String _roleLabelOf(String role) {
+    switch (role) {
+      case 'admin':      return '管理员';
+      case 'supervisor': return '仓库主管';
+      default:           return '普通员工';
+    }
   }
 }

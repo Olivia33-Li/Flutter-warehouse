@@ -412,11 +412,18 @@ export class ImportService {
       .limit(limit)
       .lean();
 
-    return { records, total, page };
+    const serialized = records.map((r) => ({
+      ...r,
+      _id: (r._id as any).toString(),
+    }));
+
+    return { records: serialized, total, page };
   }
 
   async exportLog(id: string): Promise<Buffer> {
+    console.log('[exportLog] called with id:', id);
     const log = await this.importLogModel.findById(id).lean();
+    console.log('[exportLog] found:', !!log);
     if (!log) throw new NotFoundException('导入记录不存在');
 
     const workbook = new ExcelJS.Workbook();

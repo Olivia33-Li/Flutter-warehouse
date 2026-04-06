@@ -1000,6 +1000,8 @@ class _LogCardState extends State<_LogCard> {
 
   Future<void> _exportLog() async {
     setState(() => _exporting = true);
+    // ignore: avoid_print
+    print('[exportLog] record.id="${widget.record.id}" type=${widget.record.importType}');
     try {
       await _service.exportLog(widget.record);
     } catch (e) {

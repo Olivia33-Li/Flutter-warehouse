@@ -26,7 +26,7 @@ export class Inventory {
   @Prop({ type: Number, default: 0, min: 0 })
   quantity: number;
 
-  @Prop({ type: String, enum: ['confirmed', 'pending_count', 'temporary'], default: 'confirmed' })
+  @Prop({ type: String, enum: ['confirmed', 'pending_count', 'temporary', 'completed_split', 'completed_merge'], default: 'confirmed' })
   stockStatus: string;
 
   @Prop({ type: Boolean, default: false })
