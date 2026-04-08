@@ -25,8 +25,16 @@ class UserNotifier extends StateNotifier<User?> {
     state = await _authService.getCurrentUser();
   }
 
-  Future<void> login({required String username, required String password}) async {
-    state = await _authService.login(username: username, password: password);
+  Future<void> login({
+    required String username,
+    required String password,
+    bool rememberMe = false,
+  }) async {
+    state = await _authService.login(
+      username: username,
+      password: password,
+      rememberMe: rememberMe,
+    );
   }
 
   Future<void> register({
@@ -39,6 +47,13 @@ class UserNotifier extends StateNotifier<User?> {
 
   void updateName(String name) {
     if (state != null) state = state!.copyWith(name: name);
+  }
+
+  void clearMustChangePassword() {
+    if (state != null) {
+      state = state!.copyWith(mustChangePassword: false);
+      _authService.persistUser(state!);
+    }
   }
 
   Future<void> logout() async {

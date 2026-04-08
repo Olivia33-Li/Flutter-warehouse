@@ -78,6 +78,7 @@ export class AuthService {
     if (!valid) throw new BadRequestException('原密码错误');
 
     user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    user.mustChangePassword = false;
     await user.save();
     return { message: '密码修改成功' };
   }
@@ -125,6 +126,7 @@ export class AuthService {
         roleLabel: ROLE_LABEL[role],
         isActive: user.isActive !== false,
         lastLoginAt: user.lastLoginAt,
+        mustChangePassword: user.mustChangePassword === true,
       },
     };
   }

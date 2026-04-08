@@ -19,6 +19,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _loading = false;
   String? _error;
   bool _obscure = true;
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -39,6 +40,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref.read(currentUserProvider.notifier).login(
         username: username,
         password: password,
+        rememberMe: _rememberMe,
       );
       // Refresh recent accounts after successful login
       await ref.read(recentAccountsProvider.notifier).refresh();
@@ -157,13 +159,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _login(),
                 ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _rememberMe = !_rememberMe),
+                      child: Text('记住我',
+                          style: TextStyle(
+                              color: Colors.grey.shade700, fontSize: 14)),
+                    ),
+                  ],
+                ),
                 if (_error != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(_error!,
                       style: const TextStyle(color: Colors.red),
                       textAlign: TextAlign.center),
                 ],
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -176,10 +194,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : const Text('登录'),
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => context.go('/register'),
-                  child: const Text('没有账号？注册'),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => context.go('/register'),
+                      child: const Text('没有账号？注册'),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/forgot-password'),
+                      child: Text('忘记密码？',
+                          style: TextStyle(color: Colors.grey.shade600)),
+                    ),
+                  ],
                 ),
               ],
             ),

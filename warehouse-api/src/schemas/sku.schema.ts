@@ -22,6 +22,12 @@ export class Sku {
   // 'active' (default) | 'archived' — null/undefined treated as 'active' for backwards compat
   @Prop({ type: String, enum: ['active', 'archived'], default: 'active' })
   status: SkuStatus;
+
+  @Prop({
+    type: [{ barcode: String, changedBy: String, source: String, changedAt: Date, _id: false }],
+    default: [],
+  })
+  barcodeHistory: { barcode: string; changedBy: string; source: string; changedAt: Date }[];
 }
 
 export const SkuSchema = SchemaFactory.createForClass(Sku);

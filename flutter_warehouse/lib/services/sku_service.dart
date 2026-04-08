@@ -46,6 +46,12 @@ class SkuService {
     return Sku.fromJson(response.data);
   }
 
+  /// Returns { skuCode, currentBarcode, history: [{barcode, changedBy, source, changedAt}] }
+  Future<Map<String, dynamic>> getBarcodeHistory(String id) async {
+    final response = await _api.get('/skus/$id/barcode-history');
+    return response.data as Map<String, dynamic>;
+  }
+
   // Returns { message, hasStock }
   Future<Map<String, dynamic>> archive(String id) async {
     final response = await _api.patch('/skus/$id/archive');

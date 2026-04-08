@@ -10,6 +10,7 @@ import { HistoryModule } from './history/history.module';
 import { ImportModule } from './import/import.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { ExportModule } from './export/export.module';
+import { PasswordResetModule } from './password-reset/password-reset.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ExportModule } from './export/export.module';
     ImportModule,
     TransactionsModule,
     ExportModule,
+    PasswordResetModule,
   ],
 })
 export class AppModule {}

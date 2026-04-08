@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { SkusService } from './skus.service';
 import { CreateSkuDto, UpdateSkuDto } from './dto/sku.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -52,7 +52,16 @@ export class SkusController {
   @Patch(':id')
   @RequirePermission(PERM.SKU_WRITE)
   update(@Param('id') id: string, @Body() dto: UpdateSkuDto, @CurrentUser() user: any) {
+    if (dto.barcode !== undefined && user.role !== 'admin') {
+      throw new ForbiddenException('只有管理员可以修改条码');
+    }
     return this.skusService.update(id, dto, user);
+  }
+
+  @Get(':id/barcode-history')
+  @RequirePermission(PERM.SKU_VIEW)
+  getBarcodeHistory(@Param('id') id: string) {
+    return this.skusService.getBarcodeHistory(id);
   }
 
   @Delete(':id')

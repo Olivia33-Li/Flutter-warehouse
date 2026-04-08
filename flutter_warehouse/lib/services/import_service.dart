@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:js_interop';
-import 'dart:typed_data';
 import 'package:web/web.dart' as web;
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
@@ -148,6 +147,8 @@ class ImportLogRecord {
         'skus' => 'SKU 主档',
         'locations' => '库位主档',
         'inventory' => '库存明细',
+        'sku-barcode-update' => 'SKU 条形码更新',
+        'sku-carton-qty-update' => 'SKU 箱规更新',
         _ => importType,
       };
 
@@ -204,6 +205,21 @@ class ImportService {
 
   // ─── Import (write) ──────────────────────────────────────────────────────
 
+  Future<ImportPreview> validateSkuBarcodeUpdate(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/sku-barcode-update/validate',
+        data: FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportPreview.fromJson(response.data);
+  }
+
+  Future<ImportPreview> validateSkuCartonQtyUpdate(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/sku-carton-qty-update/validate',
+        data: FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportPreview.fromJson(response.data);
+  }
+
+  // ─── Import (write) ──────────────────────────────────────────────────────
+  // (skuBarcodeUpdate / skuCartonQtyUpdate declared below)
+
   Future<ImportResult> importSkus(List<int> bytes, String filename) async {
     final response = await _api.post('/import/skus',
         data: FormData.fromMap(
@@ -222,6 +238,18 @@ class ImportService {
     final response = await _api.post('/import/inventory',
         data: FormData.fromMap(
             {'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportResult.fromJson(response.data);
+  }
+
+  Future<ImportResult> importSkuBarcodeUpdate(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/sku-barcode-update',
+        data: FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)}));
+    return ImportResult.fromJson(response.data);
+  }
+
+  Future<ImportResult> importSkuCartonQtyUpdate(List<int> bytes, String filename) async {
+    final response = await _api.post('/import/sku-carton-qty-update',
+        data: FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)}));
     return ImportResult.fromJson(response.data);
   }
 
@@ -246,8 +274,11 @@ class ImportService {
 
   /// Downloads a detailed Excel report for the given import log record.
   Future<void> exportLog(ImportLogRecord record) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AppConstants.tokenKey) ?? '';
+    String token = AuthTokenCache.token ?? '';
+    if (token.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      token = prefs.getString(AppConstants.tokenKey) ?? '';
+    }
     final fmt = DateFormat('yyyyMMdd_HHmm');
     final filename = 'import_${record.importType}_${fmt.format(record.createdAt)}.xlsx';
     final url = '${AppConstants.baseUrl}/import/logs/${record.id}/export';
@@ -311,6 +342,18 @@ class ImportService {
             'XYZ-003,C1A,,,0,pending_count,待清点,specific\r\n'
             'MAIN-001,D1A,,,,,,generic\r\n';
         filename = 'inventory_detail_template.csv';
+
+      case 'sku-barcode-update':
+        content = 'sku_code,barcode\r\n'
+            'ABC-001,1234567890123\r\n'
+            'DEF-002,9876543210987\r\n';
+        filename = 'sku_barcode_update_template.csv';
+
+      case 'sku-carton-qty-update':
+        content = 'sku_code,default_carton_qty\r\n'
+            'ABC-001,12\r\n'
+            'DEF-002,6\r\n';
+        filename = 'sku_carton_qty_update_template.csv';
 
       default:
         return;

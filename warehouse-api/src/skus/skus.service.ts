@@ -126,18 +126,47 @@ export class SkusService {
   }
 
   async update(id: string, dto: UpdateSkuDto, user: any) {
-    const sku = await this.skuModel.findByIdAndUpdate(id, dto, { new: true });
+    const sku = await this.skuModel.findById(id);
     if (!sku) throw new NotFoundException('SKU 不存在');
+
+    const barcodeChanged = dto.barcode !== undefined && dto.barcode !== sku.barcode;
+
+    if (dto.name !== undefined) sku.name = dto.name;
+    if (dto.cartonQty !== undefined) sku.cartonQty = dto.cartonQty;
+    if (dto.barcode !== undefined) sku.barcode = dto.barcode;
+
+    if (barcodeChanged) {
+      sku.barcodeHistory.push({
+        barcode: dto.barcode!,
+        changedBy: user.name,
+        source: 'manual',
+        changedAt: new Date(),
+      });
+    }
+
+    await sku.save();
 
     await this.historyService.log({
       userId: user._id.toString(),
       userName: user.name,
       action: 'edit',
       entity: 'sku',
-      description: `编辑 SKU: ${sku.sku}`,
+      description: barcodeChanged
+        ? `编辑 SKU: ${sku.sku}（条码已更新）`
+        : `编辑 SKU: ${sku.sku}`,
     });
 
     return sku;
+  }
+
+  async getBarcodeHistory(id: string) {
+    const sku = await this.skuModel.findById(id).lean();
+    if (!sku) throw new NotFoundException('SKU 不存在');
+    return {
+      skuCode: sku.sku,
+      currentBarcode: sku.barcode ?? null,
+      history: (sku.barcodeHistory ?? []).slice().reverse(),
+    };
   }
 
   async archive(id: string, user: any) {

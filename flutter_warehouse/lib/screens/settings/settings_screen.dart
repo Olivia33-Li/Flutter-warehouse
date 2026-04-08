@@ -141,9 +141,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('正在生成 Excel，请稍候...')));
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey) ?? '';
-      final url = '${AppConstants.baseUrl}/export/excel';
+      // Use in-memory token first (covers non-remember-me sessions),
+      // fall back to SharedPreferences for remember-me sessions after restart.
+      String token = AuthTokenCache.token ?? '';
+      if (token.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        token = prefs.getString(AppConstants.tokenKey) ?? '';
+      }
+      const url = '${AppConstants.baseUrl}/export/excel';
 
       final now = DateTime.now();
       final filename =
@@ -357,6 +362,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: _showUsersDialog,
             ),
+            ListTile(
+              leading: const Icon(Icons.lock_reset),
+              title: const Text('密码重置申请'),
+              subtitle: const Text('处理用户的忘记密码申请'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/password-reset-requests'),
+            ),
 
           // 数据导入（仅管理员）
           if (user?.canImport == true)
@@ -489,7 +501,7 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: role,
+                  initialValue: role,
                   decoration: const InputDecoration(
                       labelText: '角色', border: OutlineInputBorder(), isDense: true),
                   items: const [
@@ -548,7 +560,7 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
         builder: (ctx, setS) => AlertDialog(
           title: const Text('修改角色'),
           content: DropdownButtonFormField<String>(
-            value: newRole,
+            initialValue: newRole,
             decoration: const InputDecoration(border: OutlineInputBorder()),
             items: const [
               DropdownMenuItem(value: 'admin',      child: Text('管理员')),

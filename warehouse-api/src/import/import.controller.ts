@@ -78,6 +78,42 @@ export class ImportController {
     return this.importService.importInventory(file.buffer, file.originalname, user);
   }
 
+  // ─── SKU barcode update ───────────────────────────────────────────────────────
+
+  @Post('sku-barcode-update/validate')
+  @RequirePermission(PERM.DATA_IMPORT)
+  @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
+  validateSkuBarcodeUpdate(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('请上传文件');
+    return this.importService.validateSkuBarcodeUpdate(file.buffer, file.originalname);
+  }
+
+  @Post('sku-barcode-update')
+  @RequirePermission(PERM.DATA_IMPORT)
+  @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
+  importSkuBarcodeUpdate(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
+    if (!file) throw new BadRequestException('请上传文件');
+    return this.importService.importSkuBarcodeUpdate(file.buffer, file.originalname, user);
+  }
+
+  // ─── SKU carton qty update ────────────────────────────────────────────────────
+
+  @Post('sku-carton-qty-update/validate')
+  @RequirePermission(PERM.DATA_IMPORT)
+  @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
+  validateSkuCartonQtyUpdate(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('请上传文件');
+    return this.importService.validateSkuCartonQtyUpdate(file.buffer, file.originalname);
+  }
+
+  @Post('sku-carton-qty-update')
+  @RequirePermission(PERM.DATA_IMPORT)
+  @UseInterceptors(FileInterceptor('file', FILE_OPTIONS))
+  importSkuCartonQtyUpdate(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
+    if (!file) throw new BadRequestException('请上传文件');
+    return this.importService.importSkuCartonQtyUpdate(file.buffer, file.originalname, user);
+  }
+
   // ─── Logs ─────────────────────────────────────────────────────────────────────
 
   // Export must be declared BEFORE the list route to avoid NestJS routing conflicts

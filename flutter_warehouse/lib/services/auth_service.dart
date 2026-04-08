@@ -10,6 +10,9 @@ class AuthService {
   static const _recentAccountsKey = 'recent_accounts_v2';
   static const _maxRecentAccounts = 5;
 
+  // In-memory user (same session, no prefs needed)
+  static User? _memUser;
+
   // ── Auth ────────────────────────────────────────────────────────────────────
 
   Future<User> register({
@@ -22,18 +25,20 @@ class AuthService {
       'name': name,
       'password': password,
     });
-    return _saveAndReturn(response.data);
+    // Register always persists (first-time setup flow)
+    return _saveAndReturn(response.data, rememberMe: true);
   }
 
   Future<User> login({
     required String username,
     required String password,
+    bool rememberMe = false,
   }) async {
     final response = await _api.post('/auth/login', data: {
       'username': username,
       'password': password,
     });
-    return _saveAndReturn(response.data);
+    return _saveAndReturn(response.data, rememberMe: rememberMe);
   }
 
   Future<void> changePassword({
@@ -46,23 +51,53 @@ class AuthService {
     });
   }
 
+  /// Restores session on app startup.
+  /// - In the same process: reads from static [_memUser].
+  /// - After restart: only restores if remember-me was set.
   Future<User?> getCurrentUser() async {
+    // Same process session
+    if (_memUser != null) return _memUser;
+
+    // Cross-restart: only when remember-me flag is set
     final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(AppConstants.rememberMeKey) != true) return null;
+
     final userJson = prefs.getString(AppConstants.userKey);
     if (userJson == null) return null;
     try {
-      return User.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
+      final user = User.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
+      // Warm up caches
+      _memUser = user;
+      AuthTokenCache.token = prefs.getString(AppConstants.tokenKey);
+      AuthTokenCache.refreshToken = prefs.getString(AppConstants.refreshTokenKey);
+      return user;
     } catch (_) {
       return null;
     }
   }
 
   Future<void> logout() async {
+    // Clear in-memory session
+    _memUser = null;
+    AuthTokenCache.token = null;
+    AuthTokenCache.refreshToken = null;
+
+    // Clear persisted session
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.tokenKey);
     await prefs.remove(AppConstants.refreshTokenKey);
     await prefs.remove(AppConstants.userKey);
+    await prefs.remove(AppConstants.rememberMeKey);
     // Recent accounts list is kept intentionally on logout
+  }
+
+  /// Updates stored user after a profile change (e.g. name edit, mustChangePassword cleared).
+  Future<void> persistUser(User user) async {
+    _memUser = user;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(AppConstants.rememberMeKey) == true) {
+      await prefs.setString(AppConstants.userKey, jsonEncode(user.toJson()));
+    }
   }
 
   // ── Recent accounts ─────────────────────────────────────────────────────────
@@ -94,22 +129,39 @@ class AuthService {
 
   // ── Internals ────────────────────────────────────────────────────────────────
 
-  Future<User> _saveAndReturn(Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConstants.tokenKey, data['accessToken'] as String);
-    await prefs.setString(AppConstants.refreshTokenKey, data['refreshToken'] as String);
+  Future<User> _saveAndReturn(Map<String, dynamic> data,
+      {required bool rememberMe}) async {
+    final accessToken = data['accessToken'] as String;
+    final refreshToken = data['refreshToken'] as String;
     final user = User.fromJson(data['user'] as Map<String, dynamic>);
-    await prefs.setString(AppConstants.userKey, jsonEncode(user.toJson()));
+
+    // Always keep in memory for this session
+    _memUser = user;
+    AuthTokenCache.token = accessToken;
+    AuthTokenCache.refreshToken = refreshToken;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.rememberMeKey, rememberMe);
+
+    if (rememberMe) {
+      await prefs.setString(AppConstants.tokenKey, accessToken);
+      await prefs.setString(AppConstants.refreshTokenKey, refreshToken);
+      await prefs.setString(AppConstants.userKey, jsonEncode(user.toJson()));
+    } else {
+      // Clear any stale persisted session from a previous remember-me login
+      await prefs.remove(AppConstants.tokenKey);
+      await prefs.remove(AppConstants.refreshTokenKey);
+      await prefs.remove(AppConstants.userKey);
+    }
+
     await _addRecentAccount(user);
     return user;
   }
 
   Future<void> _addRecentAccount(User user) async {
     final accounts = await getRecentAccounts();
-    // Remove existing entry for this username, then insert at front
     accounts.removeWhere((a) => a.username == user.username);
     accounts.insert(0, RecentAccount.fromUser(user));
-    // Keep only the most recent N
     if (accounts.length > _maxRecentAccounts) {
       accounts.removeRange(_maxRecentAccounts, accounts.length);
     }
@@ -118,6 +170,8 @@ class AuthService {
 
   Future<void> _persistRecentAccounts(List<RecentAccount> accounts) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_recentAccountsKey, jsonEncode(accounts.map((a) => a.toJson()).toList()));
+    await prefs.setString(
+        _recentAccountsKey,
+        jsonEncode(accounts.map((a) => a.toJson()).toList()));
   }
 }

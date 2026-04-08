@@ -5,4 +5,6 @@ class AppConstants {
   static const String tokenKey = 'access_token';
   static const String refreshTokenKey = 'refresh_token';
   static const String userKey = 'current_user';
+  /// true = user chose "Remember me"; session persists across restarts.
+  static const String rememberMeKey = 'remember_me';
 }

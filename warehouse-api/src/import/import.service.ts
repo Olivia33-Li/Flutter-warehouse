@@ -158,12 +158,29 @@ export class ImportService {
       const existing = await this.skuModel.findOne({ sku: skuCode });
       if (existing) {
         if (name) existing.name = name;
-        if (barcode) existing.barcode = barcode;
         if (cartonQty) existing.cartonQty = cartonQty;
+        if (barcode && barcode !== existing.barcode) {
+          existing.barcode = barcode;
+          existing.barcodeHistory.push({
+            barcode,
+            changedBy: user.name,
+            source: 'import',
+            changedAt: new Date(),
+          });
+        }
         await existing.save();
         updated++;
       } else {
-        await this.skuModel.create({ sku: skuCode, name, barcode, cartonQty });
+        const created_sku = await this.skuModel.create({ sku: skuCode, name, barcode, cartonQty });
+        if (barcode) {
+          created_sku.barcodeHistory.push({
+            barcode,
+            changedBy: user.name,
+            source: 'import',
+            changedAt: new Date(),
+          });
+          await created_sku.save();
+        }
         created++;
       }
     }
@@ -396,6 +413,203 @@ export class ImportService {
     });
 
     return { total: records.length, created, updated, skipped, errors };
+  }
+
+  // ─── SKU barcode update ───────────────────────────────────────────────────────
+
+  async validateSkuBarcodeUpdate(buffer: Buffer, filename: string) {
+    const records = await this._parseFile(buffer, filename);
+    const rows: any[] = [];
+    let willUpdate = 0, willSkip = 0, errorCount = 0;
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const rowNum = i + 2;
+      const skuCode = this._str(row['sku_code'] || row['sku']).toUpperCase();
+      const barcode = this._str(row['barcode']);
+
+      if (!skuCode) {
+        rows.push({ row: rowNum, action: 'skip', summary: '缺少 sku_code，已跳过', error: null });
+        willSkip++;
+        continue;
+      }
+      if (!barcode) {
+        rows.push({ row: rowNum, action: 'skip', summary: `${skuCode} 条形码为空，已跳过`, error: null });
+        willSkip++;
+        continue;
+      }
+
+      const existing = await this.skuModel.findOne({ sku: skuCode });
+      if (!existing) {
+        const err = `SKU ${skuCode} 不存在`;
+        rows.push({ row: rowNum, action: 'skip', summary: err, error: err });
+        willSkip++;
+        errorCount++;
+        continue;
+      }
+      if (existing.barcode === barcode) {
+        rows.push({ row: rowNum, action: 'skip', summary: `${skuCode} 条形码无变化，已跳过`, error: null });
+        willSkip++;
+        continue;
+      }
+
+      rows.push({ row: rowNum, action: 'update', summary: `更新条形码: ${skuCode} → ${barcode}`, error: null });
+      willUpdate++;
+    }
+
+    return { total: records.length, willCreate: 0, willUpdate, willSkip, errorCount, rows };
+  }
+
+  async importSkuBarcodeUpdate(buffer: Buffer, filename: string, user: any) {
+    const records = await this._parseFile(buffer, filename);
+    let updated = 0, skipped = 0;
+    const errors: { row: number; message: string }[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const rowNum = i + 2;
+      const skuCode = this._str(row['sku_code'] || row['sku']).toUpperCase();
+      const barcode = this._str(row['barcode']);
+
+      if (!skuCode || !barcode) { skipped++; continue; }
+
+      const existing = await this.skuModel.findOne({ sku: skuCode });
+      if (!existing) {
+        errors.push({ row: rowNum, message: `SKU ${skuCode} 不存在` });
+        skipped++;
+        continue;
+      }
+      if (existing.barcode === barcode) { skipped++; continue; }
+
+      existing.barcode = barcode;
+      existing.barcodeHistory.push({
+        barcode,
+        changedBy: user.name,
+        source: 'import',
+        changedAt: new Date(),
+      });
+      await existing.save();
+      updated++;
+    }
+
+    await this.importLogModel.create({
+      userId: user._id,
+      userName: user.name,
+      importType: 'sku-barcode-update',
+      filename,
+      total: records.length,
+      created: 0,
+      updated,
+      skipped,
+      importErrors: errors,
+    });
+
+    await this.historyService.log({
+      userId: user._id.toString(),
+      userName: user.name,
+      action: 'import',
+      entity: 'sku',
+      description: `SKU 条形码批量更新 [${filename}]: 更新 ${updated}，跳过 ${skipped}`,
+    });
+
+    return { total: records.length, created: 0, updated, skipped, errors };
+  }
+
+  // ─── SKU carton qty update ────────────────────────────────────────────────────
+
+  async validateSkuCartonQtyUpdate(buffer: Buffer, filename: string) {
+    const records = await this._parseFile(buffer, filename);
+    const rows: any[] = [];
+    let willUpdate = 0, willSkip = 0, errorCount = 0;
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const rowNum = i + 2;
+      const skuCode = this._str(row['sku_code'] || row['sku']).toUpperCase();
+      const rawQty = row['default_carton_qty'] || row['carton_qty'] || '';
+      const cartonQty = parseInt(rawQty);
+
+      if (!skuCode) {
+        rows.push({ row: rowNum, action: 'skip', summary: '缺少 sku_code，已跳过', error: null });
+        willSkip++;
+        continue;
+      }
+      if (!rawQty || isNaN(cartonQty) || cartonQty < 1) {
+        rows.push({ row: rowNum, action: 'skip', summary: `${skuCode} 箱规为空或无效，已跳过`, error: null });
+        willSkip++;
+        continue;
+      }
+
+      const existing = await this.skuModel.findOne({ sku: skuCode });
+      if (!existing) {
+        const err = `SKU ${skuCode} 不存在`;
+        rows.push({ row: rowNum, action: 'skip', summary: err, error: err });
+        willSkip++;
+        errorCount++;
+        continue;
+      }
+      if (existing.cartonQty === cartonQty) {
+        rows.push({ row: rowNum, action: 'skip', summary: `${skuCode} 箱规无变化（${cartonQty}），已跳过`, error: null });
+        willSkip++;
+        continue;
+      }
+
+      const oldQty = existing.cartonQty ?? '未填';
+      rows.push({ row: rowNum, action: 'update', summary: `更新箱规: ${skuCode}  ${oldQty} → ${cartonQty}`, error: null });
+      willUpdate++;
+    }
+
+    return { total: records.length, willCreate: 0, willUpdate, willSkip, errorCount, rows };
+  }
+
+  async importSkuCartonQtyUpdate(buffer: Buffer, filename: string, user: any) {
+    const records = await this._parseFile(buffer, filename);
+    let updated = 0, skipped = 0;
+    const errors: { row: number; message: string }[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const rowNum = i + 2;
+      const skuCode = this._str(row['sku_code'] || row['sku']).toUpperCase();
+      const rawQty = row['default_carton_qty'] || row['carton_qty'] || '';
+      const cartonQty = parseInt(rawQty);
+
+      if (!skuCode || !rawQty || isNaN(cartonQty) || cartonQty < 1) { skipped++; continue; }
+
+      const existing = await this.skuModel.findOne({ sku: skuCode });
+      if (!existing) {
+        errors.push({ row: rowNum, message: `SKU ${skuCode} 不存在` });
+        skipped++;
+        continue;
+      }
+      if (existing.cartonQty === cartonQty) { skipped++; continue; }
+
+      existing.cartonQty = cartonQty;
+      await existing.save();
+      updated++;
+    }
+
+    await this.importLogModel.create({
+      userId: user._id,
+      userName: user.name,
+      importType: 'sku-carton-qty-update',
+      filename,
+      total: records.length,
+      created: 0,
+      updated,
+      skipped,
+      importErrors: errors,
+    });
+
+    await this.historyService.log({
+      userId: user._id.toString(),
+      userName: user.name,
+      action: 'import',
+      entity: 'sku',
+      description: `SKU 箱规批量更新 [${filename}]: 更新 ${updated}，跳过 ${skipped}`,
+    });
+
+    return { total: records.length, created: 0, updated, skipped, errors };
   }
 
   // ─── Logs ─────────────────────────────────────────────────────────────────────

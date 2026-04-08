@@ -77,6 +77,8 @@ class User {
   final String role; // 'admin' | 'supervisor' | 'staff'
   final bool isActive;
   final DateTime? lastLoginAt;
+  /// When true, user must change their password before using the app.
+  final bool mustChangePassword;
 
   User({
     required this.id,
@@ -85,6 +87,7 @@ class User {
     required this.role,
     this.isActive = true,
     this.lastLoginAt,
+    this.mustChangePassword = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -96,6 +99,7 @@ class User {
         lastLoginAt: json['lastLoginAt'] != null
             ? DateTime.tryParse(json['lastLoginAt'].toString())
             : null,
+        mustChangePassword: json['mustChangePassword'] == true,
       );
 
   Map<String, dynamic> toJson() => {
@@ -105,15 +109,17 @@ class User {
         'role': role,
         'isActive': isActive,
         if (lastLoginAt != null) 'lastLoginAt': lastLoginAt!.toIso8601String(),
+        'mustChangePassword': mustChangePassword,
       };
 
-  User copyWith({String? name, String? role, bool? isActive}) => User(
+  User copyWith({String? name, String? role, bool? isActive, bool? mustChangePassword}) => User(
         id: id,
         username: username,
         name: name ?? this.name,
         role: role ?? this.role,
         isActive: isActive ?? this.isActive,
         lastLoginAt: lastLoginAt,
+        mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       );
 
   // ── Role helpers ────────────────────────────────────────────────────────────

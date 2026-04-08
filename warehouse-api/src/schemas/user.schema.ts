@@ -32,6 +32,13 @@ export class User {
 
   @Prop({ type: Date })
   lastLoginAt: Date;
+
+  /**
+   * When true, user must change their password on next login.
+   * Set to true after admin resets the password to a temporary value.
+   */
+  @Prop({ type: Boolean, default: false })
+  mustChangePassword: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
