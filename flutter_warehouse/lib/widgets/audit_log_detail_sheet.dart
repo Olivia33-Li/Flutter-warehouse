@@ -103,25 +103,28 @@ class AuditLogDetailSheet extends StatelessWidget {
       maxChildSize: 0.95,
       builder: (_, ctrl) => Column(
         children: [
-          const SizedBox(height: 8),
+          // ── Handle ───────────────────────────────────────────────────
+          const SizedBox(height: 10),
           Container(
-            width: 40,
+            width: 36,
             height: 4,
             decoration: BoxDecoration(
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2)),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          // ── Header ───────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
-                      color: bg, borderRadius: BorderRadius.circular(12)),
+                      color: bg,
+                      borderRadius: BorderRadius.circular(12)),
                   child: Icon(icon, size: 24, color: fg),
                 ),
                 const SizedBox(width: 12),
@@ -129,29 +132,49 @@ class AuditLogDetailSheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(label,
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17,
-                              color: fg)),
-                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(label,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.black87)),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              record.entity.toLowerCase(),
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: fg),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(Icons.person_outline,
-                              size: 13, color: Colors.grey.shade500),
+                              size: 13, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
                           Text(record.userName,
                               style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade600)),
-                          const SizedBox(width: 8),
+                                  color: Colors.grey.shade500)),
+                          const SizedBox(width: 10),
                           Icon(Icons.access_time,
-                              size: 13, color: Colors.grey.shade500),
+                              size: 13, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
                           Text(_formatFull(record.createdAt),
                               style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade600)),
+                                  color: Colors.grey.shade500)),
                         ],
                       ),
                     ],
@@ -160,8 +183,8 @@ class AuditLogDetailSheet extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: Colors.grey.shade100),
           Expanded(
             child: ListView(
               controller: ctrl,
@@ -730,30 +753,37 @@ class AuditLogDetailSheet extends StatelessWidget {
       Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: Colors.grey.shade100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
               child: Row(
                 children: [
-                  Icon(icon, size: 15, color: Colors.grey.shade600),
+                  Icon(icon, size: 14, color: Colors.grey.shade500),
                   const SizedBox(width: 6),
                   Text(title,
                       style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: Colors.grey.shade700)),
+                          color: Colors.grey.shade600)),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: Colors.grey.shade100),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: children,
@@ -765,20 +795,21 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── Label-value row ─────────────────────────────────────────────────────────
   Widget _row(String label, dynamic value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: 80,
+              width: 72,
               child: Text(label,
-                  style: const TextStyle(
-                      color: Colors.grey, fontSize: 13)),
+                  style: TextStyle(
+                      color: Colors.grey.shade500, fontSize: 13)),
             ),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(value?.toString() ?? '-',
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
+                      fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87)),
             ),
           ],
         ),

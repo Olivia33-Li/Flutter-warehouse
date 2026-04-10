@@ -35,7 +35,7 @@ class TransactionRecord {
     return TransactionRecord(
       id: json['_id'] ?? '',
       skuCode: json['skuCode'] ?? '',
-      locationCode: locationCode as String,
+      locationCode: locationCode,
       type: json['type'] ?? '',
       quantity: (json['quantity'] as num?)?.toInt() ?? 0,
       boxes: (json['boxes'] as num?)?.toInt(),

@@ -254,7 +254,6 @@ class _ImportTab extends StatefulWidget {
   final List<String> notes;
 
   const _ImportTab({
-    super.key,
     required this.type,
     required this.title,
     required this.description,

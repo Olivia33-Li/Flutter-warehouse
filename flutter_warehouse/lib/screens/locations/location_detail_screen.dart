@@ -568,8 +568,9 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       final data = e.response?.data;
                       if (data is Map) {
                         final m = data['message'];
-                        if (m is String && m.isNotEmpty) msg = m;
-                        else if (m is List && m.isNotEmpty) msg = m.first.toString();
+                        if (m is String && m.isNotEmpty) {
+                          msg = m;
+                        } else if (m is List && m.isNotEmpty) { msg = m.first.toString(); }
                       } else if (e.response?.statusCode == 400) {
                         msg = '参数错误，请检查输入';
                       }
@@ -586,213 +587,296 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     );
   }
 
+  // ── Design tokens ──────────────────────────────────────────────────────────
+  static const _bgColor    = Color(0xFFF5F3F0);
+  static const _primary    = Color(0xFF4A6CF7);
+  static const _titleColor = Color(0xFF1A1A2E);
+  static const _mutedColor = Color(0xFF8E8E9A);
+  static const _hintColor  = Color(0xFFB5B5C0);
+  static const _tileBg     = Color(0xFFF9F8F6);
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
 
-    if (_loading) return Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator()));
-    if (_error != null) return Scaffold(appBar: AppBar(), body: ErrorView(message: _error!, onRetry: _load));
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: _bgColor,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: _bgColor,
+        body: ErrorView(message: _error!, onRetry: _load),
+      );
+    }
 
-    final data = _data!;
+    final data      = _data!;
     final inventory = (data['inventory'] as List?)
-        ?.map((e) => InventoryRecord.fromJson(e))
-        .toList() ?? [];
+        ?.map((e) => InventoryRecord.fromJson(e)).toList() ?? [];
+    final skuCount  = (data['skuCount']   as num?)?.toInt() ?? 0;
+    final totalBoxes= (data['totalBoxes'] as num?)?.toInt() ?? 0;
+    final totalQty  = (data['totalQty']   as num?)?.toInt() ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: Text(data['code'] ?? '')),
-      floatingActionButton: user?.canEdit == true
-          ? FloatingActionButton(
-              onPressed: _showInventoryDialog,
-              child: const Icon(Icons.add),
-            )
-          : null,
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: _bgColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Custom header ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
                 children: [
-                  _info('位置代码', data['code']),
-                  if (data['description'] != null)
-                    _info('描述', data['description']),
-                  const Divider(),
-                  _info('SKU 种类', '${data['skuCount'] ?? 0}'),
-                  () {
-                    final totalBoxes = (data['totalBoxes'] as num?)?.toInt() ?? 0;
-                    final totalQty   = (data['totalQty']   as num?)?.toInt() ?? 0;
-                    final pendingBoxes = inventory
-                        .where((r) => r.boxesOnlyMode && r.boxes > 0)
-                        .fold(0, (s, r) => s + r.boxes);
-                    return Column(
-                      children: [
-                        _info('总箱数',
-                            pendingBoxes > 0
-                                ? '$totalBoxes箱（其中待确认 $pendingBoxes箱）'
-                                : '$totalBoxes 箱'),
-                        _info('总件数', '$totalQty 件'),
-                      ],
-                    );
-                  }(),
-                  const Divider(),
-                  // 已检查开关
-                  Row(
-                    children: [
-                      const SizedBox(
-                        width: 80,
-                        child: Text('已检查',
-                            style: TextStyle(color: Colors.grey, fontSize: 13)),
-                      ),
-                      Switch(
-                        value: data['checked'] == true,
-                        onChanged: (val) async {
-                          await _locationService.check(widget.id, checked: val);
-                          _load();
-                        },
-                      ),
-                    ],
-                  ),
-                  // 上次检查
-                  _traceRow(
-                    label: '上次检查',
-                    record: _latestCheck,
-                    emptyText: '无检查记录',
-                    icon: Icons.check_circle_outline,
-                    iconColor: Colors.green,
-                  ),
-                  const SizedBox(height: 4),
-                  // 上次变更
-                  _traceRow(
-                    label: '上次变更',
-                    record: _latestOp,
-                    emptyText: '无变更记录',
-                    icon: Icons.edit_outlined,
-                    iconColor: Colors.blue,
-                  ),
-                  // Changed-after-check warning
-                  if (() {
-                    final changedAt = data['lastInventoryChangedAt'] as String?;
-                    final checkedAt = data['lastCheckedAt'] as String?;
-                    if (changedAt == null || checkedAt == null) return false;
-                    final changed = DateTime.tryParse(changedAt);
-                    final checked = DateTime.tryParse(checkedAt);
-                    return changed != null && checked != null && changed.isAfter(checked);
-                  }()) ...[
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  GestureDetector(
+                    onTap: () => context.pop(),
+                    child: Container(
+                      width: 32, height: 32,
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.orange.shade300),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 1))],
                       ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_amber_outlined,
-                              size: 14, color: Colors.orange.shade700),
-                          const SizedBox(width: 6),
-                          Text('检查后库存已变更',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.orange.shade700,
-                                  fontWeight: FontWeight.w500)),
-                        ],
-                      ),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: _titleColor),
                     ),
-                  ],
+                  ),
+                  Expanded(
+                    child: Text(
+                      data['code'] ?? '',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: _titleColor, letterSpacing: -0.16),
+                    ),
+                  ),
+                  const SizedBox(width: 32),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          // ── SKU 列表标题行 + 操作按钮 ────────────────────────────────────────
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                children: [
+                  _buildSummaryCard(data, totalBoxes, skuCount, totalQty),
+                  const SizedBox(height: 20),
+                  _buildSkuSectionHeader(inventory, user),
+                  const SizedBox(height: 10),
+                  _buildFilterChips(),
+                  const SizedBox(height: 10),
+                  Builder(builder: (_) {
+                    final filtered = _filteredInventory(inventory);
+                    if (filtered.isEmpty) return _buildEmptyState(inventory);
+                    return Column(
+                      children: filtered.map((r) => _buildSkuCard(r, data, user)).toList(),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: user?.canEdit == true
+          ? GestureDetector(
+              onTap: _showInventoryDialog,
+              child: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.9),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: _primary.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 2))],
+                ),
+                child: const Icon(Icons.add, size: 18, color: Colors.white),
+              ),
+            )
+          : null,
+    );
+  }
+
+  // ── Summary card ────────────────────────────────────────────────────────────
+
+  Widget _buildSummaryCard(Map<String, dynamic> data, int totalBoxes, int skuCount, int totalQty) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 1))],
+      ),
+      child: Column(
+        children: [
           Row(
             children: [
-              Builder(builder: (_) {
-                final filtered = _filteredInventory(inventory);
-                final total = inventory.length;
-                final shown = filtered.length;
-                return Text(
-                  shown == total
-                      ? '库存 SKU ($total)'
-                      : '库存 SKU ($shown / $total)',
-                  style: Theme.of(context).textTheme.titleMedium,
-                );
-              }),
-              const Spacer(),
-              if (inventory.isNotEmpty && user?.canEdit == true) ...[
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.swap_horiz, size: 16),
-                  label: const Text('转移', style: TextStyle(fontSize: 13)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.blue,
-                    side: const BorderSide(color: Colors.blue),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () => _showTransferCopyDialog(
-                      isTransfer: true, inventory: inventory),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.copy_outlined, size: 16),
-                  label: const Text('复制', style: TextStyle(fontSize: 13)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange,
-                    side: const BorderSide(color: Colors.orange),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () => _showTransferCopyDialog(
-                      isTransfer: false, inventory: inventory),
-                ),
-              ],
+              _statTile('SKU',  Icons.grid_view_rounded,       '$skuCount'),
+              const SizedBox(width: 10),
+              _statTile('总箱数', Icons.inventory_2_outlined,    '$totalBoxes'),
+              const SizedBox(width: 10),
+              _statTile('总件数', Icons.numbers_outlined, totalQty > 0 ? '$totalQty' : '—'),
             ],
           ),
-          // ── 筛选 chips ────────────────────────────────────────────────────────
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFF2F1EF)),
+          const SizedBox(height: 10),
+          // 已检查 toggle
+          Row(
+            children: [
+              const Text('已检查', style: TextStyle(fontSize: 12, color: _hintColor)),
+              const Spacer(),
+              Transform.scale(
+                scale: 0.75,
+                alignment: Alignment.centerRight,
+                child: Switch(
+                  value: data['checked'] == true,
+                  onChanged: (val) async {
+                    await _locationService.check(widget.id, checked: val);
+                    _load();
+                  },
+                  activeThumbColor: _primary,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 1, color: Color(0xFFF5F4F2)),
+          _summaryInfoRow(
+            '上次检查',
+            _latestCheck == null ? '无检查记录' : _formatDate(_latestCheck!.createdAt.toIso8601String()),
+            tappable: _latestCheck != null,
+            onTap: _latestCheck != null ? () => _traceRowTap(_latestCheck!) : null,
+          ),
+          const Divider(height: 1, color: Color(0xFFF5F4F2)),
+          _summaryInfoRow(
+            '上次变更',
+            _latestOp == null ? '无变更记录' : _formatDate(_latestOp!.createdAt.toIso8601String()),
+            tappable: _latestOp != null,
+            onTap: _latestOp != null ? () => _traceRowTap(_latestOp!) : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _traceRowTap(ChangeRecord record) {
+    AuditLogDetailSheet.show(context, record);
+  }
+
+  Widget _statTile(String label, IconData icon, String value) {
+    return Expanded(
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(color: _tileBg, borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 11, color: _hintColor),
+                const SizedBox(width: 4),
+                Text(label, style: const TextStyle(fontSize: 10, color: _hintColor)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: _titleColor)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryInfoRow(String label, String value, {bool tappable = false, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, color: _hintColor)),
+            const Spacer(),
+            Text(value, style: const TextStyle(fontSize: 12, color: _mutedColor)),
+            if (tappable) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, size: 14, color: Colors.grey.shade400),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── SKU section header ──────────────────────────────────────────────────────
+
+  Widget _buildSkuSectionHeader(List<InventoryRecord> inventory, dynamic user) {
+    final filtered = _filteredInventory(inventory);
+    final total = inventory.length;
+    final shown = filtered.length;
+    final label = shown == total ? '库存 SKU ($total)' : '库存 SKU ($shown / $total)';
+
+    return Row(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: _hintColor)),
+        const Spacer(),
+        if (inventory.isNotEmpty && user?.canEdit == true) ...[
+          _headerActionBtn(
+            icon: Icons.swap_horiz,
+            label: '转移',
+            bg: _primary.withValues(alpha: 0.06),
+            fg: _primary.withValues(alpha: 0.7),
+            onTap: () => _showTransferCopyDialog(isTransfer: true, inventory: inventory),
+          ),
+          const SizedBox(width: 8),
+          _headerActionBtn(
+            icon: Icons.copy_outlined,
+            label: '复制',
+            bg: const Color(0xFFFDF5E8),
+            fg: const Color(0xFFD4A020),
+            onTap: () => _showTransferCopyDialog(isTransfer: false, inventory: inventory),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _headerActionBtn({required IconData icon, required String label, required Color bg, required Color fg, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 25,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: fg),
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: fg)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Empty state ─────────────────────────────────────────────────────────────
+
+  Widget _buildEmptyState(List<InventoryRecord> inventory) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 32, color: _hintColor),
+          const SizedBox(height: 12),
+          Text(
+            inventory.isEmpty ? '暂无匹配的 SKU' : _filterEmptyMessage(),
+            style: const TextStyle(fontSize: 13, color: _hintColor),
+          ),
           if (inventory.isNotEmpty) ...[
             const SizedBox(height: 8),
-            _buildFilterChips(),
+            GestureDetector(
+              onTap: () => setState(() { _stockFilter = 'all'; _statusFilter = 'all'; }),
+              child: Text('清除筛选', style: TextStyle(fontSize: 12, color: _primary.withValues(alpha: 0.7))),
+            ),
           ],
-          const SizedBox(height: 8),
-          // ── 筛选后的 SKU 列表 ────────────────────────────────────────────────
-          Builder(builder: (_) {
-            final filtered = _filteredInventory(inventory);
-            if (filtered.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Column(
-                  children: [
-                    Icon(Icons.filter_list_off,
-                        size: 48, color: Colors.grey.shade300),
-                    const SizedBox(height: 12),
-                    Text(
-                      _filterEmptyMessage(),
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 14),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => setState(() {
-                        _stockFilter = 'all';
-                        _statusFilter = 'all';
-                      }),
-                      child: const Text('清除筛选，查看全部'),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return Column(
-              children: filtered
-                  .map((record) => _buildSkuCard(record, data, user))
-                  .toList(),
-            );
-          }),
         ],
       ),
     );
@@ -848,264 +932,226 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
         : '当前筛选「$parts」下暂无 SKU';
   }
 
-  // ── 筛选 chips 组件 ───────────────────────────────────────────────────────────
+  // ── Filter chips ────────────────────────────────────────────────────────────
 
   Widget _buildFilterChips() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              Text('库存:',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.grey.shade600)),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: '全部',
-                selected: _stockFilter == 'all',
-                onTap: () => setState(() => _stockFilter = 'all'),
-              ),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: '有库存',
-                selected: _stockFilter == 'has_stock',
-                onTap: () => setState(() => _stockFilter = 'has_stock'),
-                color: Colors.green,
-              ),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: '0库存',
-                selected: _stockFilter == 'zero_stock',
-                onTap: () => setState(() => _stockFilter = 'zero_stock'),
-                color: Colors.grey,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              Text('业务:',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.grey.shade600)),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: '全部',
-                selected: _statusFilter == 'all',
-                onTap: () => setState(() => _statusFilter = 'all'),
-              ),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: '正常',
-                selected: _statusFilter == 'normal',
-                onTap: () => setState(() => _statusFilter = 'normal'),
-                color: Colors.blue,
-              ),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: '暂存',
-                selected: _statusFilter == 'pending',
-                onTap: () => setState(() => _statusFilter = 'pending'),
-                color: Colors.orange,
-              ),
-            ],
-          ),
-        ),
+        Row(children: [
+          const Text('库存:', style: TextStyle(fontSize: 10, color: _hintColor)),
+          const SizedBox(width: 10),
+          _filterChip(label: '全部',   selected: _stockFilter == 'all',        onTap: () => setState(() => _stockFilter = 'all')),
+          const SizedBox(width: 8),
+          _filterChip(label: '有库存', selected: _stockFilter == 'has_stock',   onTap: () => setState(() => _stockFilter = 'has_stock')),
+          const SizedBox(width: 8),
+          _filterChip(label: '0库存',  selected: _stockFilter == 'zero_stock',  onTap: () => setState(() => _stockFilter = 'zero_stock')),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          const Text('业务:', style: TextStyle(fontSize: 10, color: _hintColor)),
+          const SizedBox(width: 10),
+          _filterChip(label: '全部', selected: _statusFilter == 'all',     onTap: () => setState(() => _statusFilter = 'all')),
+          const SizedBox(width: 8),
+          _filterChip(label: '正常', selected: _statusFilter == 'normal',  onTap: () => setState(() => _statusFilter = 'normal')),
+          const SizedBox(width: 8),
+          _filterChip(label: '暂存', selected: _statusFilter == 'pending', onTap: () => setState(() => _statusFilter = 'pending')),
+        ]),
       ],
     );
   }
 
-  Widget _filterChip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    final c = color ?? Theme.of(context).colorScheme.primary;
+  Widget _filterChip({required String label, required bool selected, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        height: 25,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: selected ? c.withValues(alpha: 0.1) : Colors.grey.shade100,
+          color: selected ? _primary.withValues(alpha: 0.08) : _bgColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? c : Colors.grey.shade300,
-            width: selected ? 1.5 : 1,
-          ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: selected ? c : Colors.grey.shade600,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: selected ? _primary : _mutedColor,
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ── SKU 卡片（带状态标签） ─────────────────────────────────────────────────────
+  // ── SKU card ────────────────────────────────────────────────────────────────
 
-  Widget _buildSkuCard(
-    InventoryRecord record,
-    Map<String, dynamic> data,
-    dynamic user,
-  ) {
-    final pending = _isPending(record);
-    final hasStock = record.quantityUnknown ||
-        record.totalQty > 0 ||
-        (record.boxesOnlyMode && record.boxes > 0);
-    final zeroStock = !hasStock;
-    final dimmed = zeroStock;
+  Widget _buildSkuCard(InventoryRecord record, Map<String, dynamic> data, dynamic user) {
+    final pending  = _isPending(record);
+    final hasStock = record.quantityUnknown || record.totalQty > 0 || (record.boxesOnlyMode && record.boxes > 0);
+    final dimmed   = !hasStock;
 
-    return Card(
-      child: ListTile(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                record.skuCode,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: dimmed ? Colors.grey.shade400 : null,
-                ),
-              ),
+    Widget badge;
+    if (pending) {
+      badge = record.quantityUnknown
+          ? _modeBadge('待清点', bg: const Color(0xFFF0E6FF), fg: const Color(0xFF7B5EA7))
+          : _modeBadge('暂存',   bg: const Color(0xFFFFF0E0), fg: const Color(0xFFC07020));
+    } else if (record.boxesOnlyMode) {
+      badge = _modeBadge('仅箱数', bg: const Color(0xFFE8F0FF), fg: _primary);
+    } else {
+      badge = _modeBadge('按箱规', bg: const Color(0xFFEEF6EF), fg: const Color(0xFF5A9A6B));
+    }
+
+    String qtyLine;
+    if (record.quantityUnknown) {
+      qtyLine = '待补充库存信息';
+    } else if (record.boxesOnlyMode) {
+      qtyLine = '${record.boxes}箱 · 箱规待确认';
+    } else {
+      qtyLine = '${record.boxes}箱 · ${record.totalQty}件';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 1))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => InventoryDetailSheet(
+              skuCode: record.skuCode,
+              skuId: record.skuId,
+              locationId: widget.id,
+              locationCode: data['code'] ?? '',
+              totalQty: record.totalQty,
+              boxes: record.boxes,
+              unitsPerBox: record.unitsPerBox,
+              configurations: record.configurations,
+              inventoryRecordId: record.id,
+              showSkuNav: true,
+              canEdit: user?.canEdit == true,
+              canStockIn:  user?.can('inv:stock_in')  == true,
+              canStockOut: user?.can('inv:stock_out') == true,
+              canAdjust:   user?.can('inv:adjust')    == true,
+              quantityUnknown: record.quantityUnknown,
+              onChanged: _load,
             ),
-            if (pending) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: record.quantityUnknown
-                      ? Colors.purple.shade50
-                      : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: record.quantityUnknown
-                        ? Colors.purple.shade200
-                        : Colors.orange.shade300,
-                  ),
-                ),
-                child: Text(
-                  record.quantityUnknown ? '待清点' : '暂存',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: record.quantityUnknown
-                        ? Colors.purple.shade700
-                        : Colors.orange.shade700,
-                  ),
-                ),
-              ),
-            ],
-            if (record.boxesOnlyMode && !pending) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Text(
-                  '仅箱数',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade700,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        subtitle: record.skuName != null
-            ? Text(
-                record.skuName!,
-                style: TextStyle(
-                    color: dimmed ? Colors.grey.shade400 : null),
-              )
-            : null,
-        onTap: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          builder: (_) => InventoryDetailSheet(
-            skuCode: record.skuCode,
-            skuId: record.skuId,
-            locationId: widget.id,
-            locationCode: data['code'] ?? '',
-            totalQty: record.totalQty,
-            boxes: record.boxes,
-            unitsPerBox: record.unitsPerBox,
-            configurations: record.configurations,
-            inventoryRecordId: record.id,
-            showSkuNav: true,
-            canEdit: user?.canEdit == true,
-            canStockIn:  user?.can('inv:stock_in')  == true,
-            canStockOut: user?.can('inv:stock_out') == true,
-            canAdjust:   user?.can('inv:adjust')    == true,
-            quantityUnknown: record.quantityUnknown,
-            onChanged: _load,
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              record.qtyDisplay,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: dimmed
-                    ? Colors.grey.shade400
-                    : zeroStock
-                        ? Colors.grey.shade500
-                        : null,
-              ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(color: _bgColor, borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.inventory_2_outlined, size: 14, color: _mutedColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            record.skuCode,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: dimmed ? _hintColor : _titleColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          badge,
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        qtyLine,
+                        style: TextStyle(fontSize: 12, color: dimmed ? const Color(0xFFD0D0D8) : _mutedColor),
+                      ),
+                    ],
+                  ),
+                ),
+                if (user?.canEdit == true)
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_horiz, size: 18, color: _hintColor),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onSelected: (v) async {
+                      if (v == 'delete') {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('确认删除'),
+                            content: Text('确定删除 ${data['code']} 中的\n${record.skuCode} 当前库存记录吗？\n此操作不可恢复。'),
+                            actions: [
+                              TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+                              FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.red), onPressed: () => ctx.pop(true), child: const Text('删除')),
+                            ],
+                          ),
+                        );
+                        if (ok == true) {
+                          await _inventoryService.delete(record.id);
+                          _load();
+                        }
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('删除', style: TextStyle(color: Colors.red))])),
+                    ],
+                  )
+                else
+                  const Icon(Icons.chevron_right, size: 16, color: _hintColor),
+              ],
             ),
-            if (user?.canEdit == true)
-              IconButton(
-                icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                onPressed: () async {
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('确认删除'),
-                      content: Text(
-                          '确定删除 ${data['code']} 中的\n'
-                          '${record.skuCode} 当前库存记录吗？\n'
-                          '此操作不可恢复。'),
-                      actions: [
-                        TextButton(
-                            onPressed: () => ctx.pop(false),
-                            child: const Text('取消')),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red),
-                          onPressed: () => ctx.pop(true),
-                          child: const Text('删除'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (ok == true) {
-                    await _inventoryService.delete(record.id);
-                    _load();
-                  }
-                },
-              ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _transferEmptyState({required bool isTransfer, required String srcCode}) {
+    final iconBg = isTransfer ? const Color(0xFFE8F3FF) : const Color(0xFFFFF8ED);
+    final iconColor = isTransfer ? const Color(0xFF4A6CF7) : const Color(0xFFD4A020);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48, height: 48,
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Icon(Icons.inbox_outlined, size: 22, color: iconColor),
+          ),
+          const SizedBox(height: 12),
+          const Text('该库位暂无可操作的 SKU',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF8E8E9A))),
+          const SizedBox(height: 6),
+          Text('请确认库位 $srcCode 是否已录入库存，\n或联系管理员检查数据',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: Color(0xFFC5C5CE), height: 1.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeBadge(String label, {required Color bg, required Color fg}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
+      child: Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: fg)),
     );
   }
 
@@ -1115,7 +1161,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
   }) async {
     final label = isTransfer ? '转移' : '复制';
     final srcCode = (_data?['code'] ?? '') as String;
-    final accent = isTransfer ? Colors.blue : Colors.orange;
+    final accent = isTransfer ? const Color(0xFF4A9EFF) : const Color(0xFFD4A020);
 
     final searchCtrl = TextEditingController();
     // All selected by default
@@ -1137,167 +1183,143 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
         builder: (ctx, setS) {
           // ── Step 1: SKU Selection ─────────────────────────────────────────
           Widget step1Content() {
-            final allSelected = selectedSkus.length == inventory.length;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '选择要$label的 SKU（来源：$srcCode）',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 8),
-                Row(
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: inventory.length,
+              itemBuilder: (_, i) {
+                final r = inventory[i];
+                final checked = selectedSkus.contains(r.skuCode);
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '${inventory.length} 种 SKU · 已选 ${selectedSkus.length} 种',
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => setS(() {
-                        if (allSelected) {
-                          selectedSkus = {};
+                    GestureDetector(
+                      onTap: () => setS(() {
+                        if (checked) {
+                          selectedSkus.remove(r.skuCode);
                         } else {
-                          selectedSkus =
-                              inventory.map((r) => r.skuCode).toSet();
+                          selectedSkus.add(r.skuCode);
                         }
                       }),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      child: Text(
-                        allSelected ? '取消全选' : '全选',
-                        style: const TextStyle(fontSize: 12),
+                      child: Container(
+                        color: checked
+                            ? accent.withValues(alpha: 0.06)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        child: Row(
+                          children: [
+                            // Custom square checkbox
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: checked
+                                    ? accent
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                                border: checked
+                                    ? null
+                                    : Border.all(
+                                        color: const Color(0xFFD0CEC9),
+                                        width: 1.1),
+                              ),
+                              child: checked
+                                  ? const Icon(Icons.check,
+                                      size: 13, color: Colors.white)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    r.skuCode,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1A1A2E)),
+                                  ),
+                                  Text(
+                                    _configText(r),
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w400,
+                                        color: Color(0xFFB5B5C0)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              r.qtyDisplay,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1A1A2E)),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                    if (i < inventory.length - 1)
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFF5F4F2), indent: 20, endIndent: 20),
                   ],
-                ),
-                const Divider(height: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 320),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: inventory.length,
-                    itemBuilder: (_, i) {
-                      final r = inventory[i];
-                      final checked = selectedSkus.contains(r.skuCode);
-                      return InkWell(
-                        onTap: () => setS(() {
-                          if (checked) {
-                            selectedSkus.remove(r.skuCode);
-                          } else {
-                            selectedSkus.add(r.skuCode);
-                          }
-                        }),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 5, horizontal: 2),
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: checked,
-                                onChanged: (v) => setS(() {
-                                  if (v == true) {
-                                    selectedSkus.add(r.skuCode);
-                                  } else {
-                                    selectedSkus.remove(r.skuCode);
-                                  }
-                                }),
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      r.skuCode,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: checked
-                                            ? null
-                                            : Colors.grey.shade400,
-                                      ),
-                                    ),
-                                    Text(
-                                      _configText(r),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: checked
-                                            ? Colors.grey.shade600
-                                            : Colors.grey.shade400,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                r.qtyDisplay,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: checked
-                                      ? null
-                                      : Colors.grey.shade400,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                );
+              },
             );
           }
 
           // ── Step 2: Location Search ───────────────────────────────────────
-          Widget step2Content() => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '已选 ${selectedSkus.length} 种 SKU，请选择目标库位',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: accent,
-                          fontWeight: FontWeight.w500),
-                    ),
+          Widget step2Content() {
+            final createColor = isTransfer ? const Color(0xFF4A9EFF) : Colors.green.shade700;
+            final createBg = isTransfer ? const Color(0xFFE8F3FF) : Colors.green.shade50;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Info pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(100),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
+                  child: Text(
+                    '已选 ${selectedSkus.length} 种 SKU，请选择目标库位',
+                    style: TextStyle(fontSize: 13, color: accent, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Custom search input
+                Container(
+                  width: double.infinity,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9F8F6),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFEAE8E4), width: 1.2),
+                  ),
+                  child: TextField(
                     controller: searchCtrl,
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E)),
                     decoration: InputDecoration(
-                      hintText: '搜索库位编号...',
-                      border: const OutlineInputBorder(),
+                      hintText: '输入库位编码...',
+                      hintStyle: const TextStyle(color: Color(0xFFC5C5CE), fontSize: 14),
+                      border: InputBorder.none,
                       isDense: true,
-                      prefixIcon: const Icon(Icons.search, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFFB5B5C0)),
                       suffixIcon: searching
                           ? const Padding(
-                              padding: EdgeInsets.all(10),
-                              child: SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2)))
-                          : null,
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
+                          : searchCtrl.text.isNotEmpty
+                              ? GestureDetector(
+                                  onTap: () => setS(() { searchCtrl.clear(); searchResults = []; }),
+                                  child: const Icon(Icons.close, size: 16, color: Color(0xFFB5B5C0)),
+                                )
+                              : null,
                     ),
                     onChanged: (v) async {
                       if (v.isEmpty) {
@@ -1306,13 +1328,10 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       }
                       setS(() => searching = true);
                       try {
-                        final res =
-                            await _locationService.getAll(search: v);
+                        final res = await _locationService.getAll(search: v);
                         if (ctx.mounted) {
                           setS(() {
-                            searchResults = res
-                                .where((l) => l.id != widget.id)
-                                .toList();
+                            searchResults = res.where((l) => l.id != widget.id).toList();
                             searching = false;
                           });
                         }
@@ -1323,143 +1342,137 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                       }
                     },
                   ),
-                  if (loadingTarget) ...[
-                    const SizedBox(height: 12),
-                    const Center(child: CircularProgressIndicator()),
-                  ],
-                  if (searchResults.isNotEmpty && !loadingTarget)
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      decoration: BoxDecoration(
-                        border:
-                            Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: searchResults
-                            .take(8)
-                            .map((l) => ListTile(
-                                  dense: true,
-                                  title: Text(l.code),
-                                  subtitle: l.description != null
-                                      ? Text(l.description!)
-                                      : null,
-                                  onTap: () async {
-                                    setS(() {
-                                      target = l;
-                                      searchResults = [];
-                                      loadingTarget = true;
-                                      error = null;
-                                    });
-                                    try {
-                                      final tgtData =
-                                          await _locationService
-                                              .getOne(l.id);
-                                      final tInv = ((tgtData[
-                                                      'inventory']
-                                                  as List?) ??
-                                              [])
-                                          .map((e) =>
-                                              InventoryRecord
-                                                  .fromJson(e))
-                                          .toList();
-                                      final tCodes = tInv
-                                          .map((r) => r.skuCode)
-                                          .toSet();
-                                      setS(() {
-                                        conflictSkus = selectedSkus
-                                            .intersection(tCodes)
-                                            .toList();
-                                        resolution = null;
-                                        loadingTarget = false;
-                                        step = 3;
-                                      });
-                                    } catch (e) {
-                                      setS(() {
-                                        loadingTarget = false;
-                                        error = '加载目标库位失败';
-                                      });
-                                    }
-                                  },
-                                ))
-                            .toList(),
-                      ),
+                ),
+                // Empty state
+                if (searchCtrl.text.isEmpty && searchResults.isEmpty && !loadingTarget && !searching) ...[
+                  const SizedBox(height: 28),
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.search, size: 28, color: Color(0xFFD0CEC9)),
+                        SizedBox(height: 10),
+                        Text('输入库位编码以搜索目标位置',
+                            style: TextStyle(color: Color(0xFFB5B5C0), fontSize: 13)),
+                      ],
                     ),
-                  // 新建库位
-                  if (searchCtrl.text.trim().isNotEmpty &&
-                      !searching &&
-                      !loadingTarget &&
-                      (searchResults.isEmpty ||
-                          searchResults.every((l) =>
-                              l.code.toUpperCase() !=
-                              searchCtrl.text
-                                  .trim()
-                                  .toUpperCase()))) ...[
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () async {
-                        final code =
-                            searchCtrl.text.trim().toUpperCase();
-                        setS(() {
-                          loadingTarget = true;
-                          error = null;
-                        });
-                        try {
-                          final newLoc =
-                              await _locationService.create(code: code);
-                          setS(() {
-                            target = newLoc;
-                            searchResults = [];
-                            conflictSkus = [];
-                            resolution = null;
-                            loadingTarget = false;
-                            step = 3;
-                          });
-                        } catch (e) {
-                          setS(() {
-                            loadingTarget = false;
-                            error = '创建库位失败: $e';
-                          });
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                          border:
-                              Border.all(color: Colors.green.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.add_location_alt_outlined,
-                                size: 16,
-                                color: Colors.green.shade700),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '新建库位 "${searchCtrl.text.trim().toUpperCase()}" 并$label到此',
-                                style: TextStyle(
-                                    color: Colors.green.shade700,
-                                    fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (error != null) ...[
-                    const SizedBox(height: 8),
-                    Text(error!,
-                        style: const TextStyle(
-                            color: Colors.red, fontSize: 13)),
-                  ],
+                  ),
+                  const SizedBox(height: 28),
                 ],
-              );
+                if (loadingTarget) ...[
+                  const SizedBox(height: 20),
+                  const Center(child: CircularProgressIndicator()),
+                  const SizedBox(height: 20),
+                ],
+                // Search results
+                if (searchResults.isNotEmpty && !loadingTarget)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFF0EFEC)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: searchResults.take(8).map((l) => InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () async {
+                          setS(() { target = l; searchResults = []; loadingTarget = true; error = null; });
+                          try {
+                            final tgtData = await _locationService.getOne(l.id);
+                            final tInv = ((tgtData['inventory'] as List?) ?? [])
+                                .map((e) => InventoryRecord.fromJson(e))
+                                .toList();
+                            final tCodes = tInv.map((r) => r.skuCode).toSet();
+                            setS(() {
+                              conflictSkus = selectedSkus.intersection(tCodes).toList();
+                              resolution = null;
+                              loadingTarget = false;
+                              step = 3;
+                            });
+                          } catch (e) {
+                            setS(() { loadingTarget = false; error = '加载目标库位失败'; });
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(l.code, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A1A2E))),
+                                    if (l.description != null)
+                                      Text(l.description!, style: const TextStyle(fontSize: 12, color: Color(0xFF8E8E9A))),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade400),
+                            ],
+                          ),
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                // 新建库位
+                if (searchCtrl.text.trim().isNotEmpty &&
+                    !searching &&
+                    !loadingTarget &&
+                    (searchResults.isEmpty ||
+                        searchResults.every((l) =>
+                            l.code.toUpperCase() != searchCtrl.text.trim().toUpperCase()))) ...[
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      final code = searchCtrl.text.trim().toUpperCase();
+                      setS(() { loadingTarget = true; error = null; });
+                      try {
+                        final newLoc = await _locationService.create(code: code);
+                        setS(() {
+                          target = newLoc;
+                          searchResults = [];
+                          conflictSkus = [];
+                          resolution = null;
+                          loadingTarget = false;
+                          step = 3;
+                        });
+                      } catch (e) {
+                        setS(() { loadingTarget = false; error = '创建库位失败: $e'; });
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: createBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.sync, size: 16, color: createColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '新建库位 "${searchCtrl.text.trim().toUpperCase()}" 并$label到此',
+                              style: TextStyle(color: createColor, fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ],
+              ],
+            );
+          }
 
           // ── Step 3: Confirm ───────────────────────────────────────────────
           Widget step3Content() {
@@ -1641,129 +1654,248 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
             );
           }
 
-          return AlertDialog(
-            title: Row(
-              children: [
-                Icon(
-                    isTransfer
-                        ? Icons.swap_horiz
-                        : Icons.copy_outlined,
-                    size: 20,
-                    color: accent),
-                const SizedBox(width: 8),
-                Text('批量$label库存'),
-              ],
-            ),
-            content: SizedBox(
-              width: 360,
-              child: SingleChildScrollView(
-                child: switch (step) {
-                  1 => step1Content(),
-                  2 => step2Content(),
-                  _ => step3Content(),
-                },
+          // ── Cancel / Back callback ───────────────────────────────────
+          void onBack() {
+            if (saving) return;
+            if (step == 1) {
+              ctx.pop();
+            } else if (step == 2) {
+              setS(() { step = 1; error = null; searchCtrl.clear(); searchResults = []; });
+            } else {
+              setS(() { step = 2; target = null; conflictSkus = []; resolution = null; error = null; searchCtrl.clear(); searchResults = []; });
+            }
+          }
+
+          // ── Next / Confirm callback ──────────────────────────────────
+          Future<void> onNext() async {
+            if (step == 1) {
+              if (selectedSkus.isNotEmpty) setS(() => step = 2);
+              return;
+            }
+            if (step != 3) return;
+            if (conflictSkus.isNotEmpty && resolution == null) return;
+            setS(() { saving = true; error = null; });
+            try {
+              final Map<String, dynamic> result;
+              final tgtCode = target!.code;
+              if (isTransfer) {
+                result = await _locationService.transfer(sourceId: widget.id, targetLocationId: target!.id, skuCodes: selectedSkus.toList(), conflictResolution: resolution);
+              } else {
+                result = await _locationService.copy(sourceId: widget.id, targetLocationId: target!.id, skuCodes: selectedSkus.toList(), conflictResolution: resolution);
+              }
+              if (ctx.mounted) ctx.pop();
+              _load();
+              if (mounted) _showOperationResultDialog(isTransfer: isTransfer, result: result, targetCode: tgtCode);
+            } catch (e) {
+              setS(() { saving = false; error = '$label失败: $e'; });
+            }
+          }
+
+          final bool nextEnabled = step == 1
+              ? selectedSkus.isNotEmpty
+              : step == 3
+                  ? !saving && (conflictSkus.isEmpty || resolution != null)
+                  : false;
+
+          // ── Figma-style Dialog ────────────────────────────────────────
+          final iconBg = isTransfer ? const Color(0xFFE8F3FF) : const Color(0xFFFFF8ED);
+          final iconColor = isTransfer ? const Color(0xFF4A6CF7) : const Color(0xFFD4A020);
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 60, offset: Offset(0, 20))],
               ),
-            ),
-            actions: [
-              // ── Left: Cancel / Back ──────────────────────────────────
-              TextButton(
-                onPressed: saving
-                    ? null
-                    : () {
-                        if (step == 1) {
-                          ctx.pop();
-                        } else if (step == 2) {
-                          setS(() {
-                            step = 1;
-                            error = null;
-                            searchCtrl.clear();
-                            searchResults = [];
-                          });
-                        } else {
-                          setS(() {
-                            step = 2;
-                            target = null;
-                            conflictSkus = [];
-                            resolution = null;
-                            error = null;
-                            searchCtrl.clear();
-                            searchResults = [];
-                          });
-                        }
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 30, height: 30,
+                              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(9)),
+                              child: Icon(isTransfer ? Icons.swap_horiz : Icons.copy_outlined, size: 15, color: iconColor),
+                            ),
+                            const SizedBox(width: 10),
+                            Text('批量$label库存', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFF1A1A2E))),
+                          ],
+                        ),
+                        if (step == 1) ...[
+                          const SizedBox(height: 10),
+                          // Pill subtitle
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: isTransfer
+                                  ? const Color(0xFFE8F3FF)
+                                  : const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '选择要$label的 SKU（来源：$srcCode）',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isTransfer
+                                    ? const Color(0xFF4A9EFF)
+                                    : const Color(0xFFD4A020),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          // Info row with toggle button
+                          Row(
+                            children: [
+                              RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(fontSize: 13),
+                                  children: [
+                                    TextSpan(
+                                      text:
+                                          '${inventory.length} 种 SKU · ',
+                                      style: const TextStyle(
+                                          color: Color(0xFF5A5A6E)),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          '已选 ${selectedSkus.length} 种',
+                                      style: TextStyle(
+                                        color: selectedSkus.isEmpty
+                                            ? const Color(0xFFB5B5C0)
+                                            : accent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () => setS(() {
+                                  if (selectedSkus.length ==
+                                      inventory.length) {
+                                    selectedSkus = {};
+                                  } else {
+                                    selectedSkus = inventory
+                                        .map((r) => r.skuCode)
+                                        .toSet();
+                                  }
+                                }),
+                                child: Text(
+                                  selectedSkus.length == inventory.length
+                                      ? '取消全选'
+                                      : '全选',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: accent),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                        ] else
+                          const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                  // Full-width divider
+                  const Divider(height: 1, color: Color(0xFFF0EFEC)),
+                  // Content
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: SingleChildScrollView(
+                      padding: step == 1
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: switch (step) {
+                        1 => inventory.isEmpty
+                            ? _transferEmptyState(isTransfer: isTransfer, srcCode: srcCode)
+                            : step1Content(),
+                        2 => step2Content(),
+                        _ => step3Content(),
                       },
-                child: Text(step == 1 ? '取消' : '← 返回'),
+                    ),
+                  ),
+                  // Footer
+                  Container(
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: Color(0xFFF0EFEC))),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: onBack,
+                          child: SizedBox(
+                            height: 52,
+                            child: Center(
+                              child: step == 1
+                              ? const Text('取消',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF8E8E9A)))
+                              : const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.arrow_back, size: 15, color: Color(0xFF8E8E9A)),
+                                    SizedBox(width: 4),
+                                    Text('返回', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF8E8E9A))),
+                                  ],
+                                ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: nextEnabled ? onNext : null,
+                            child: Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: nextEnabled ? accent : const Color(0xFFD4D2CE),
+                                borderRadius: BorderRadius.circular(100),
+                                boxShadow: nextEnabled
+                                    ? [BoxShadow(
+                                        color: accent.withValues(alpha: 0.28),
+                                        blurRadius: 18,
+                                        offset: const Offset(0, 6))]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: saving
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : Text(
+                                        step == 3
+                                            ? '确认$label ${selectedSkus.length} 种'
+                                            : step == 1
+                                                ? (selectedSkus.isEmpty
+                                                    ? '下一步'
+                                                    : '下一步（已选 ${selectedSkus.length} 种）')
+                                                : '确认$label',
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-
-              // ── Step 1: Next button ───────────────────────────────────
-              if (step == 1)
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                      backgroundColor: accent),
-                  onPressed: selectedSkus.isEmpty
-                      ? null
-                      : () => setS(() => step = 2),
-                  child:
-                      Text('下一步（已选 ${selectedSkus.length} 种）'),
-                ),
-
-              // ── Step 3: Confirm button ────────────────────────────────
-              if (step == 3)
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                      backgroundColor: accent),
-                  onPressed: saving ||
-                          (conflictSkus.isNotEmpty &&
-                              resolution == null)
-                      ? null
-                      : () async {
-                          setS(() {
-                            saving = true;
-                            error = null;
-                          });
-                          try {
-                            final Map<String, dynamic> result;
-                            final tgtCode = target!.code;
-                            if (isTransfer) {
-                              result = await _locationService.transfer(
-                                sourceId: widget.id,
-                                targetLocationId: target!.id,
-                                skuCodes: selectedSkus.toList(),
-                                conflictResolution: resolution,
-                              );
-                            } else {
-                              result = await _locationService.copy(
-                                sourceId: widget.id,
-                                targetLocationId: target!.id,
-                                skuCodes: selectedSkus.toList(),
-                                conflictResolution: resolution,
-                              );
-                            }
-                            if (ctx.mounted) ctx.pop();
-                            _load();
-                            if (mounted) {
-                              _showOperationResultDialog(
-                                isTransfer: isTransfer,
-                                result: result,
-                                targetCode: tgtCode,
-                              );
-                            }
-                          } catch (e) {
-                            setS(() {
-                              saving = false;
-                              error = '$label失败: $e';
-                            });
-                          }
-                        },
-                  child: saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white))
-                      : Text('确认$label ${selectedSkus.length} 种'),
-                ),
-            ],
+            ),
           );
         },
       ),
@@ -1937,75 +2069,6 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     );
   }
 
-  Widget _traceRow({
-    required String label,
-    required ChangeRecord? record,
-    required String emptyText,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    final (fg, bg, _) = record != null
-        ? AuditLogDetailSheet.badgeStyle(record)
-        : (Colors.grey.shade500, Colors.grey.shade100, Icons.history);
-    final badgeLabel = record != null ? AuditLogDetailSheet.badgeLabel(record) : null;
-
-    return InkWell(
-      onTap: record != null ? () => AuditLogDetailSheet.show(context, record) : null,
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 80,
-              child: Text(label,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            ),
-            Expanded(
-              child: record == null
-                  ? Text(emptyText,
-                      style: TextStyle(
-                          color: Colors.grey.shade400, fontSize: 13))
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Icon(icon, size: 13, color: iconColor),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            '${_formatDate(record.createdAt.toIso8601String())}  ·  ${record.userName}',
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        if (badgeLabel != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: bg,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(badgeLabel,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: fg)),
-                          ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.chevron_right,
-                            size: 14, color: Colors.grey.shade400),
-                      ],
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String _formatDate(String? iso) {
     if (iso == null) return '-';
     final dt = DateTime.tryParse(iso)?.toLocal();
@@ -2014,19 +2077,4 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget _info(String label, String? value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 80,
-              child: Text(label,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            ),
-            Expanded(
-                child: Text(value ?? '-',
-                    style: const TextStyle(fontWeight: FontWeight.w500))),
-          ],
-        ),
-      );
 }

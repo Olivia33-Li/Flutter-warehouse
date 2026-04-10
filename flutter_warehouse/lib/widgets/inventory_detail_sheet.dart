@@ -1632,122 +1632,131 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       expand: false,
       builder: (_, scrollCtrl) => Column(
         children: [
-          // 拖动条
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            width: 40, height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+          // ── Drag handle ──────────────────────────────────────────────────
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8E6E2),
+                borderRadius: BorderRadius.circular(100),
+              ),
             ),
           ),
 
-          // 头部
+          // ── Header: icon + SKU·location title + qty subtitle ────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Grey circle icon
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F3F0),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(Icons.location_on_outlined,
+                      size: 16, color: Color(0xFF8E8E9A)),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.skuCode,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(
+                        '${widget.skuCode} · ${widget.locationCode}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1A1A2E),
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Row(children: [
-                        const Icon(Icons.place_outlined, size: 14, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Text(widget.locationCode,
-                            style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                      ]),
+                      Text(
+                        _quantityUnknown
+                            ? '待补充库存信息'
+                            : (_configs.isEmpty
+                                ? (_boxesOnlyMode
+                                    ? '$_boxes箱 · 箱规待确认'
+                                    : '$_boxes箱 · $_qty件')
+                                : _configs
+                                    .map((c) =>
+                                        '${c.boxes}箱 · ${c.qty}件')
+                                    .join('  ·  ')),
+                        style: const TextStyle(
+                            color: Color(0xFF8E8E9A), fontSize: 12),
+                      ),
                     ],
-                  ),
-                ),
-                // 总库存徽章
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _quantityUnknown
-                        ? Colors.grey.shade100
-                        : (_qty > 0 ? Colors.green.shade50 : Colors.orange.shade50),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _quantityUnknown
-                          ? Colors.grey.shade400
-                          : (_qty > 0 ? Colors.green.shade200 : Colors.orange.shade200)),
-                  ),
-                  child: Text(
-                    _quantityUnknown ? '未填写数量' : '$_qty 件',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16,
-                      color: _quantityUnknown
-                          ? Colors.grey.shade600
-                          : (_qty > 0 ? Colors.green.shade700 : Colors.orange.shade700),
-                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          // 当前库存结构（支持多箱规）
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-            child: _quantityUnknown
-                ? Text('待补充库存信息',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12))
-                : (_configs.isEmpty
-                    ? Text(
-                        _boxesOnlyMode
-                            ? '$_boxes箱 · 箱规待确认'
-                            : '$_boxes箱 × $_units件/箱',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12))
-                    : Wrap(
-                        spacing: 10,
-                        runSpacing: 2,
-                        children: _configs.map((c) => Text(
-                              '${c.boxes}箱×${c.unitsPerBox}件/箱 = ${c.qty}件',
-                              style: const TextStyle(color: Colors.grey, fontSize: 12),
-                            )).toList(),
-                      )),
-          ),
+          const SizedBox(height: 14),
 
-          // 主操作按钮行 — each button only shown when user has the matching permission
+          // ── Action buttons ───────────────────────────────────────────────
           if (_canStockIn || _canStockOut || _canAdjust)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
               child: Row(
                 children: [
                   if (_canStockIn) ...[
-                    _actionBtn('入库', Icons.add_circle_outline, Colors.green, _showStockInDialog),
+                    _FigmaActionBtn(
+                      label: '入库',
+                      icon: Icons.south_outlined,
+                      bg: const Color(0xFFEEF6EF),
+                      border: const Color(0xFFD4E8D8),
+                      fg: const Color(0xFF5A9A6B),
+                      onTap: _showStockInDialog,
+                    ),
                   ],
-                  if (_canStockIn && (_canStockOut || _canAdjust)) const SizedBox(width: 8),
+                  if (_canStockIn && (_canStockOut || _canAdjust))
+                    const SizedBox(width: 10),
                   if (_canStockOut) ...[
-                    _actionBtn('出库', Icons.remove_circle_outline, Colors.red, _showStockOutDialog),
+                    _FigmaActionBtn(
+                      label: '出库',
+                      icon: Icons.north_outlined,
+                      bg: const Color(0xFFFEF2F2),
+                      border: const Color(0xFFF0D4D4),
+                      fg: const Color(0xFFC07068),
+                      onTap: _showStockOutDialog,
+                    ),
                   ],
-                  if (_canStockOut && _canAdjust) const SizedBox(width: 8),
+                  if (_canStockOut && _canAdjust) const SizedBox(width: 10),
                   if (_canAdjust) ...[
-                    _actionBtn('库存调整', Icons.tune, Colors.orange, _showAdjustDialog),
+                    _FigmaActionBtn(
+                      label: '库存调整',
+                      icon: Icons.tune,
+                      bg: const Color(0xFFFDF5E8),
+                      border: const Color(0xFFEDDCB8),
+                      fg: const Color(0xFFD4A020),
+                      onTap: _showAdjustDialog,
+                    ),
                   ],
                 ],
               ),
             ),
 
-          // 暂存转正式按钮行 — only shown for pending records with adjust permission
+          // ── Pending confirm / split row ───────────────────────────────────
           if (_isPending && _canAdjust)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.check_circle_outline, size: 15,
-                          color: Colors.teal),
+                      icon: const Icon(Icons.check_circle_outline,
+                          size: 15, color: Colors.teal),
                       label: const Text('确认为正式',
                           style: TextStyle(color: Colors.teal, fontSize: 12)),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
+                        side:
+                            BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
                         padding: const EdgeInsets.symmetric(vertical: 7),
                       ),
                       onPressed: _showConfirmPendingDialog,
@@ -1756,10 +1765,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.call_split, size: 15,
-                          color: Colors.deepPurple),
+                      icon: const Icon(Icons.call_split,
+                          size: 15, color: Colors.deepPurple),
                       label: const Text('拆分为正式SKU',
-                          style: TextStyle(color: Colors.deepPurple, fontSize: 12)),
+                          style:
+                              TextStyle(color: Colors.deepPurple, fontSize: 12)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
                             color: Colors.deepPurple.withValues(alpha: 0.5)),
@@ -1772,64 +1782,96 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               ),
             ),
 
-          // 次操作行
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-            child: Row(
-              children: [
-                if (widget.showSkuNav && widget.skuId != null)
-                  TextButton.icon(
-                    icon: const Icon(Icons.qr_code_2, size: 15),
-                    label: const Text('SKU 详情', style: TextStyle(fontSize: 12)),
-                    onPressed: () {
-                      context.pop();
-                      context.push('/skus/${widget.skuId}');
-                    },
-                  ),
-                if (widget.showLocNav)
-                  TextButton.icon(
-                    icon: const Icon(Icons.place_outlined, size: 15),
-                    label: const Text('库位详情', style: TextStyle(fontSize: 12)),
-                    onPressed: () {
-                      context.pop();
-                      context.push('/locations/${widget.locationId}');
-                    },
-                  ),
-              ],
-            ),
-          ),
-
-          const Divider(height: 16),
-
-          // 最近变动标题
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 8, 8),
-            child: Row(
-              children: [
-                const Text('最近变动',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                const Spacer(),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: _viewAllHistory,
+          // ── Nav links ─────────────────────────────────────────────────────
+          if (widget.showSkuNav && widget.skuId != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () {
+                    context.pop();
+                    context.push('/skus/${widget.skuId}');
+                  },
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('查看全部',
-                          style: TextStyle(fontSize: 12, color: Colors.blue.shade600)),
-                      Icon(Icons.chevron_right, size: 16, color: Colors.blue.shade600),
+                      Icon(Icons.open_in_new, size: 13,
+                          color: const Color(0xFF4A6CF7).withValues(alpha: 0.7)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'SKU 详情',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF4A6CF7).withValues(alpha: 0.7),
+                        ),
+                      ),
                     ],
+                  ),
+                ),
+              ),
+            ),
+          if (widget.showLocNav)
+            Padding(
+              padding: EdgeInsets.fromLTRB(24, widget.showSkuNav && widget.skuId != null ? 4 : 6, 24, 0),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () {
+                    context.pop();
+                    context.push('/locations/${widget.locationId}');
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.open_in_new, size: 13,
+                          color: const Color(0xFF4A6CF7).withValues(alpha: 0.7)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '库位详情',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF4A6CF7).withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Divider ──────────────────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 14, 24, 0),
+            child: Divider(height: 1, color: Color(0xFFF2F1EF)),
+          ),
+
+          // ── 最近操作 header ───────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 17, 24, 0),
+            child: Row(
+              children: [
+                const Text(
+                  '最近操作',
+                  style: TextStyle(fontSize: 11, color: Color(0xFFB5B5C0)),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: _viewAllHistory,
+                  child: Text(
+                    '查看全部记录',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF4A6CF7).withValues(alpha: 0.6),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          // 流水列表
+          // ── History list ─────────────────────────────────────────────────
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -1841,35 +1883,35 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           onPressed: _load,
                         ))
                     : (_recentRecords == null || _recentRecords!.isEmpty)
-                        ? Center(
+                        ? const Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.history, size: 40,
-                                    color: Colors.grey.shade300),
-                                const SizedBox(height: 8),
-                                Text('暂无入出库记录',
-                                    style: TextStyle(
-                                        color: Colors.grey.shade400, fontSize: 13)),
-                                const SizedBox(height: 4),
-                                TextButton(
-                                  onPressed: _viewAllHistory,
-                                  child: const Text('查看全部记录',
-                                      style: TextStyle(fontSize: 13)),
+                                Icon(Icons.history_outlined,
+                                    size: 24, color: Color(0xFFC5C5CE)),
+                                SizedBox(height: 8),
+                                Text(
+                                  '暂无操作记录',
+                                  style: TextStyle(
+                                      color: Color(0xFFC5C5CE),
+                                      fontSize: 12),
                                 ),
                               ],
                             ),
                           )
                         : ListView.builder(
                             controller: scrollCtrl,
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 0, 16, 0),
                             itemCount: _recentRecords!.length + 1,
                             itemBuilder: (_, i) {
                               if (i == _recentRecords!.length) {
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 8),
                                   child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.history, size: 16),
+                                    icon: const Icon(Icons.history,
+                                        size: 16),
                                     label: const Text('查看全部记录'),
                                     onPressed: _viewAllHistory,
                                   ),
@@ -2142,7 +2184,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                       color: Colors.grey.shade600),
                                 ),
                                 Text(
-                                  '总量 $originalAmount $amountUnit  ·  按${amountUnit}守恒',
+                                  '总量 $originalAmount $amountUnit  ·  按$amountUnit守恒',
                                   style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.deepPurple.shade600,
@@ -2273,7 +2315,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               selected: {entryMode},
                               onSelectionChanged: (v) =>
                                   setS(() => s['mode'] = v.first),
-                              style: ButtonStyle(
+                              style: const ButtonStyle(
                                 visualDensity: VisualDensity.compact,
                                 tapTargetSize:
                                     MaterialTapTargetSize.shrinkWrap,
@@ -2420,7 +2462,9 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 onPressed: saving
                     ? null
                     : () {
-                        for (final s in splits) disposeEntry(s);
+                        for (final s in splits) {
+                          disposeEntry(s);
+                        }
                         Navigator.pop(ctx);
                       },
                 child: const Text('取消'),
@@ -2505,7 +2549,9 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             note: note,
                           );
                           if (mounted) {
-                            for (final s in splits) disposeEntry(s);
+                            for (final s in splits) {
+                              disposeEntry(s);
+                            }
                             Navigator.pop(ctx);
                             widget.onChanged?.call();
                             await _load();
@@ -2538,16 +2584,55 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     noteCtrl.dispose();
   }
 
-  Widget _actionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
+}
+
+// ─── Figma-style action button (入库 / 出库 / 库存调整) ────────────────────────
+
+class _FigmaActionBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color bg;
+  final Color border;
+  final Color fg;
+  final VoidCallback onTap;
+
+  const _FigmaActionBtn({
+    required this.label,
+    required this.icon,
+    required this.bg,
+    required this.border,
+    required this.fg,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Expanded(
-      child: OutlinedButton.icon(
-        icon: Icon(icon, size: 16, color: color),
-        label: Text(label, style: TextStyle(color: color, fontSize: 13)),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: color.withValues(alpha: 0.5)),
-          padding: const EdgeInsets.symmetric(vertical: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
         ),
-        onPressed: onTap,
       ),
     );
   }

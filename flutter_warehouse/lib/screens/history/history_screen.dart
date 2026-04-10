@@ -26,7 +26,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   String? _filterDateRange;
   DateTime? _customStart;
   DateTime? _customEnd;
-  // null = all users (admin only); non-null = filter by username
   String? _filterUserName;
   bool _userFilterInitialized = false;
   int _page = 1;
@@ -36,8 +35,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    // _load() will be called after first build via didChangeDependencies
-    // to ensure the user is available from the provider
+    _keywordCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -73,10 +71,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         return (today.subtract(const Duration(days: 30)).toIso8601String(),
             now.toIso8601String());
       case 'custom':
-        return (
-          _customStart?.toIso8601String(),
-          _customEnd?.toIso8601String(),
-        );
+        return (_customStart?.toIso8601String(), _customEnd?.toIso8601String());
       default:
         return (null, null);
     }
@@ -86,16 +81,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final now = DateTime.now();
     DateTime? start = _customStart;
     DateTime? end = _customEnd;
-    // which field the calendar is editing: true=start, false=end
     bool editingStart = true;
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final calendarInitial = editingStart
-              ? (start ?? now)
-              : (end ?? now);
+          final calendarInitial =
+              editingStart ? (start ?? now) : (end ?? now);
           final calendarFirst =
               editingStart ? DateTime(2020) : (start ?? DateTime(2020));
 
@@ -110,7 +103,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 9),
                   decoration: BoxDecoration(
-                    color: active ? primary.withValues(alpha: 0.08) : Colors.transparent,
+                    color: active
+                        ? primary.withValues(alpha: 0.08)
+                        : Colors.transparent,
                     border: Border.all(
                         color: active ? primary : Colors.grey.shade300,
                         width: active ? 1.5 : 1),
@@ -128,9 +123,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         val != null ? _fmtDate(val) : '请选择',
                         style: TextStyle(
                             fontSize: 14,
-                            fontWeight: active
-                                ? FontWeight.w600
-                                : FontWeight.normal,
+                            fontWeight:
+                                active ? FontWeight.w600 : FontWeight.normal,
                             color: val != null
                                 ? (active ? primary : null)
                                 : Colors.grey.shade400),
@@ -150,7 +144,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 标题栏
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
                   child: Row(
@@ -166,8 +159,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     ],
                   ),
                 ),
-
-                // 开始 / 结束 字段按钮
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: Row(
@@ -182,11 +173,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     ],
                   ),
                 ),
-
-                // 内嵌日历 — 点选即确认，无需 OK 键
                 CalendarDatePicker(
                   key: ValueKey(editingStart),
-                  initialDate: calendarInitial.isAfter(now) ? now : calendarInitial,
+                  initialDate:
+                      calendarInitial.isAfter(now) ? now : calendarInitial,
                   firstDate: calendarFirst,
                   lastDate: now,
                   onDateChanged: (d) {
@@ -194,15 +184,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       if (editingStart) {
                         start = DateTime(d.year, d.month, d.day, 0, 0, 0);
                         if (end != null && end!.isBefore(start!)) end = null;
-                        editingStart = false; // 自动切到结束
+                        editingStart = false;
                       } else {
                         end = DateTime(d.year, d.month, d.day, 23, 59, 59);
                       }
                     });
                   },
                 ),
-
-                // 操作按钮
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   child: Row(
@@ -254,7 +242,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   String _fmtDate(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
-
   Future<void> _load({bool reset = true}) async {
     if (reset) _page = 1;
     setState(() {
@@ -263,7 +250,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     });
     try {
       final (startDate, endDate) = _dateRange();
-      // Check actions are public — don't restrict to the current user's records
       final isCheckFilter = _filterBusinessAction == '标记已检查' ||
           _filterBusinessAction == '取消已检查';
       final result = await _historyService.getAll(
@@ -318,219 +304,709 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   String _formatShort(DateTime dt) =>
       DateFormat('MM-dd HH:mm').format(dt.toLocal());
 
+  // ── Label helpers ───────────────────────────────────────────────────────────
+
+  String get _actionLabel => _filterBusinessAction ?? '操作类型';
+
+  String get _entityLabel => _filterEntity ?? '对象';
+
+  String get _dateLabel {
+    switch (_filterDateRange) {
+      case 'today':
+        return '今天';
+      case '7d':
+        return '近7天';
+      case '30d':
+        return '近30天';
+      case 'custom':
+        if (_customStart != null && _customEnd != null) {
+          return '${_fmtDate(_customStart!)}~${_fmtDate(_customEnd!)}';
+        }
+        return '自定义';
+      default:
+        return '时间';
+    }
+  }
+
+  // ── User tabs ───────────────────────────────────────────────────────────────
+
+  Widget _buildUserTabs() {
+    final currentUsername = ref.read(currentUserProvider)?.username;
+    final isAll = _filterUserName == null;
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _tabButton('全部用户', isAll, () {
+            setState(() => _filterUserName = null);
+            _load();
+          }),
+          _tabButton('我的记录', !isAll, () {
+            setState(() => _filterUserName = currentUsername);
+            _load();
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabButton(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1))
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            color: selected ? Colors.black87 : Colors.grey.shade500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Search box ──────────────────────────────────────────────────────────────
+
+  Widget _buildSearchBox() {
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: _keywordCtrl,
+        onChanged: (_) => _load(),
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          hintText: '搜索操作记录...',
+          hintStyle:
+              TextStyle(fontSize: 14, color: Colors.grey.shade400),
+          prefixIcon:
+              Icon(Icons.search, size: 20, color: Colors.grey.shade400),
+          suffixIcon: _keywordCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear,
+                      size: 18, color: Colors.grey.shade400),
+                  onPressed: () {
+                    _keywordCtrl.clear();
+                    _load();
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 11),
+        ),
+      ),
+    );
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final isAdmin = ref.watch(currentUserProvider)?.isAdmin == true;
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: Text('操作记录 ($_total)'),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(
-            ref.watch(currentUserProvider)?.isAdmin == true ? 154 : 112,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: Column(
-              children: [
-                if (ref.watch(currentUserProvider)?.isAdmin == true) ...[
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      _chip('全部用户', null, _filterUserName, (v) {
-                        setState(() => _filterUserName = v);
-                        _load();
-                      }),
-                      _chip(
-                        '我的记录',
-                        ref.read(currentUserProvider)?.username,
-                        _filterUserName,
-                        (v) {
-                          setState(() => _filterUserName = v);
-                          _load();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                SearchBar(
-                  controller: _keywordCtrl,
-                  hintText: '搜索描述 / SKU / 库位 / 用户名...',
-                  leading: const Icon(Icons.search),
-                  trailing: [
-                    if (_keywordCtrl.text.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _keywordCtrl.clear();
-                          _load();
-                        },
-                      ),
-                  ],
-                  onChanged: (_) => _load(),
+        title: const Text('操作记录',
+            style:
+                TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        actions: isAdmin
+            ? [
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: _buildUserTabs(),
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
+              ]
+            : null,
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Search + filter row ─────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSearchBox(),
+                const SizedBox(height: 10),
+                Row(
                   children: [
-                    // ── 操作类型 ──
-                    _chip('全部', null, _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    _chip('入库', '入库', _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    _chip('出库', '出库', _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    _chip('调整', '调整', _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    _chip('录入', '录入', _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    _chip('转移', '批量转移', _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    _chip('复制', '批量复制', _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    _chip('检查', '标记已检查', _filterBusinessAction, (v) {
-                      setState(() => _filterBusinessAction = v);
-                      _load();
-                    }),
-                    // ── 对象类型 ──
-                    _chip('全部对象', null, _filterEntity, (v) {
-                      setState(() => _filterEntity = v);
-                      _load();
-                    }),
-                    _chip('SKU', 'SKU', _filterEntity, (v) {
-                      setState(() => _filterEntity = v);
-                      _load();
-                    }),
-                    _chip('库位', '库位', _filterEntity, (v) {
-                      setState(() => _filterEntity = v);
-                      _load();
-                    }),
-                    _chip('库存', '库存', _filterEntity, (v) {
-                      setState(() => _filterEntity = v);
-                      _load();
-                    }),
-                    // ── 时间 ──
-                    _chip('全部时间', null, _filterDateRange, (v) {
-                      setState(() {
-                        _filterDateRange = v;
-                        _customStart = null;
-                        _customEnd = null;
-                      });
-                      _load();
-                    }),
-                    _chip('今天', 'today', _filterDateRange, (v) {
-                      setState(() => _filterDateRange = v);
-                      _load();
-                    }),
-                    _chip('近7天', '7d', _filterDateRange, (v) {
-                      setState(() => _filterDateRange = v);
-                      _load();
-                    }),
-                    _chip('近30天', '30d', _filterDateRange, (v) {
-                      setState(() => _filterDateRange = v);
-                      _load();
-                    }),
-                    FilterChip(
-                      label: Text(
-                        _filterDateRange == 'custom' &&
-                                _customStart != null &&
-                                _customEnd != null
-                            ? '${_fmtDate(_customStart!)} ~ ${_fmtDate(_customEnd!)}'
-                            : '自定义时间',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      selected: _filterDateRange == 'custom',
-                      visualDensity: VisualDensity.compact,
-                      onSelected: (_) {
-                        if (_filterDateRange == 'custom') {
-                          setState(() {
-                            _filterDateRange = null;
+                    // 操作类型 dropdown
+                    _FilterDropdown(
+                      label: _actionLabel,
+                      active: _filterBusinessAction != null,
+                      options: const [
+                        _FilterOption(label: '全部', value: null),
+                        _FilterOption(label: '导入', value: '导入'),
+                        _FilterOption(label: '新增', value: '新增SKU'),
+                        _FilterOption(label: '录入', value: '录入'),
+                        _FilterOption(label: '调整', value: '调整'),
+                        _FilterOption(label: '转移', value: '批量转移'),
+                        _FilterOption(label: '复制', value: '批量复制'),
+                        _FilterOption(label: '检查', value: '标记已检查'),
+                        _FilterOption(label: '入库', value: '入库'),
+                        _FilterOption(label: '出库', value: '出库'),
+                      ],
+                      selected: _filterBusinessAction,
+                      onSelect: (v) {
+                        setState(() => _filterBusinessAction = v);
+                        _load();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    // 对象 dropdown
+                    _FilterDropdown(
+                      label: _entityLabel,
+                      active: _filterEntity != null,
+                      options: const [
+                        _FilterOption(label: '全部', value: null),
+                        _FilterOption(label: 'SKU', value: 'SKU'),
+                        _FilterOption(label: '库位', value: '库位'),
+                        _FilterOption(label: '库存', value: '库存'),
+                      ],
+                      selected: _filterEntity,
+                      onSelect: (v) {
+                        setState(() => _filterEntity = v);
+                        _load();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    // 时间 dropdown
+                    _DateFilterDropdown(
+                      label: _dateLabel,
+                      active: _filterDateRange != null,
+                      selected: _filterDateRange,
+                      onSelect: (v) {
+                        setState(() {
+                          _filterDateRange = v;
+                          if (v != 'custom') {
                             _customStart = null;
                             _customEnd = null;
-                          });
-                          _load();
-                        } else {
-                          _pickCustomRange();
-                        }
+                          }
+                        });
+                        _load();
                       },
+                      onCustom: _pickCustomRange,
                     ),
                   ],
                 ),
               ],
             ),
           ),
-        ),
+          // ── Record count ────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+            child: Text(
+              '共 $_total 条记录',
+              style:
+                  TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ),
+          // ── List ────────────────────────────────────────────────────
+          Expanded(child: _buildList()),
+        ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? ErrorView(message: _error!, onRetry: _load)
-              : _records.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.history,
-                              size: 48, color: Colors.grey.shade300),
-                          const SizedBox(height: 12),
-                          Text('暂无操作记录',
-                              style: TextStyle(color: Colors.grey.shade500)),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: _records.length,
-                      separatorBuilder: (_, __) => const Divider(
-                          height: 1, indent: 64, endIndent: 16),
-                      itemBuilder: (_, i) {
-                        final r = _records[i];
-                        final style = AuditLogDetailSheet.badgeStyle(r);
-                        return _RecordTile(
-                          record: r,
-                          style: style,
-                          label: AuditLogDetailSheet.badgeLabel(r),
-                          summaryText: listSummary(r),
-                          timeLabel: _formatShort(r.createdAt),
-                          onTap: () => AuditLogDetailSheet.show(context, r),
-                        );
-                      },
-                    ),
     );
   }
 
-  Widget _chip(
-    String label,
-    String? value,
-    String? current,
-    ValueChanged<String?> onTap,
-  ) =>
-      Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: FilterChip(
-          label: Text(label, style: const TextStyle(fontSize: 12)),
-          selected: current == value,
-          visualDensity: VisualDensity.compact,
-          onSelected: (_) => onTap(current == value ? null : value),
+  Widget _buildList() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return ErrorView(message: _error!, onRetry: _load);
+    }
+    if (_records.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.history, size: 48, color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+            Text('暂无操作记录',
+                style: TextStyle(color: Colors.grey.shade500)),
+          ],
         ),
       );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      itemCount: _records.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final r = _records[i];
+        final style = AuditLogDetailSheet.badgeStyle(r);
+        return _RecordTile(
+          record: r,
+          style: style,
+          label: AuditLogDetailSheet.badgeLabel(r),
+          summaryText: listSummary(r),
+          timeLabel: _formatShort(r.createdAt),
+          onTap: () => AuditLogDetailSheet.show(context, r),
+        );
+      },
+    );
+  }
 }
 
-// ── List tile ─────────────────────────────────────────────────────────────────
+// ── Filter option model ───────────────────────────────────────────────────────
+
+class _FilterOption {
+  final String label;
+  final String? value;
+  const _FilterOption({required this.label, required this.value});
+}
+
+// ── Generic filter dropdown ───────────────────────────────────────────────────
+
+class _FilterDropdown extends StatefulWidget {
+  final String label;
+  final bool active;
+  final List<_FilterOption> options;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  const _FilterDropdown({
+    required this.label,
+    required this.active,
+    required this.options,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  State<_FilterDropdown> createState() => _FilterDropdownState();
+}
+
+class _FilterDropdownState extends State<_FilterDropdown> {
+  OverlayEntry? _entry;
+  final _key = GlobalKey();
+
+  void _open() {
+    if (_entry != null) {
+      _close();
+      return;
+    }
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final offset = box.localToGlobal(Offset.zero);
+    final size = box.size;
+
+    _entry = OverlayEntry(
+      builder: (_) => _DropdownOverlay(
+        anchorOffset: offset,
+        anchorSize: size,
+        options: widget.options,
+        selected: widget.selected,
+        onSelect: (v) {
+          widget.onSelect(v);
+          _close();
+        },
+        onDismiss: _close,
+      ),
+    );
+    Overlay.of(context).insert(_entry!);
+    setState(() {});
+  }
+
+  void _close() {
+    _entry?.remove();
+    _entry = null;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _entry?.remove();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final open = _entry != null;
+    return _PillButton(
+      key: _key,
+      label: widget.label,
+      active: widget.active,
+      open: open,
+      onTap: _open,
+    );
+  }
+}
+
+// ── Date filter dropdown (has custom range option) ────────────────────────────
+
+class _DateFilterDropdown extends StatefulWidget {
+  final String label;
+  final bool active;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+  final VoidCallback onCustom;
+
+  const _DateFilterDropdown({
+    required this.label,
+    required this.active,
+    required this.selected,
+    required this.onSelect,
+    required this.onCustom,
+  });
+
+  @override
+  State<_DateFilterDropdown> createState() => _DateFilterDropdownState();
+}
+
+class _DateFilterDropdownState extends State<_DateFilterDropdown> {
+  OverlayEntry? _entry;
+  final _key = GlobalKey();
+
+  static const _dateOptions = [
+    _FilterOption(label: '全部时间', value: null),
+    _FilterOption(label: '今天', value: 'today'),
+    _FilterOption(label: '近7天', value: '7d'),
+    _FilterOption(label: '近30天', value: '30d'),
+  ];
+
+  void _open() {
+    if (_entry != null) {
+      _close();
+      return;
+    }
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final offset = box.localToGlobal(Offset.zero);
+    final size = box.size;
+
+    _entry = OverlayEntry(
+      builder: (_) => _DropdownOverlay(
+        anchorOffset: offset,
+        anchorSize: size,
+        options: _dateOptions,
+        extraOption: const _FilterOption(label: '自定义时间', value: 'custom'),
+        selected: widget.selected,
+        onSelect: (v) {
+          if (v == 'custom') {
+            _close();
+            widget.onCustom();
+          } else {
+            widget.onSelect(v);
+            _close();
+          }
+        },
+        onDismiss: _close,
+      ),
+    );
+    Overlay.of(context).insert(_entry!);
+    setState(() {});
+  }
+
+  void _close() {
+    _entry?.remove();
+    _entry = null;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _entry?.remove();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final open = _entry != null;
+    return _PillButton(
+      key: _key,
+      label: widget.label,
+      active: widget.active,
+      open: open,
+      onTap: _open,
+    );
+  }
+}
+
+// ── Pill trigger button ───────────────────────────────────────────────────────
+
+class _PillButton extends StatelessWidget {
+  final String label;
+  final bool active;
+  final bool open;
+  final VoidCallback onTap;
+
+  const _PillButton({
+    super.key,
+    required this.label,
+    required this.active,
+    required this.open,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Use a soft neutral active color matching Figma (dark outline when active/open)
+    final isHighlighted = active || open;
+    final borderColor =
+        isHighlighted ? const Color(0xFF1A1A2E) : const Color(0xFFDDDDE5);
+    final bgColor = isHighlighted
+        ? const Color(0xFF1A1A2E).withValues(alpha: 0.05)
+        : Colors.white;
+    final textColor =
+        isHighlighted ? const Color(0xFF1A1A2E) : const Color(0xFF888898);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          border: Border.all(color: borderColor, width: 1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isHighlighted
+                    ? FontWeight.w600
+                    : FontWeight.normal,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(width: 2),
+            AnimatedRotation(
+              turns: open ? 0.5 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: Icon(Icons.keyboard_arrow_down,
+                  size: 14, color: textColor),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Floating dropdown overlay ─────────────────────────────────────────────────
+
+class _DropdownOverlay extends StatefulWidget {
+  final Offset anchorOffset;
+  final Size anchorSize;
+  final List<_FilterOption> options;
+  final _FilterOption? extraOption;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+  final VoidCallback onDismiss;
+
+  const _DropdownOverlay({
+    required this.anchorOffset,
+    required this.anchorSize,
+    required this.options,
+    this.extraOption,
+    required this.selected,
+    required this.onSelect,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_DropdownOverlay> createState() => _DropdownOverlayState();
+}
+
+class _DropdownOverlayState extends State<_DropdownOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 150));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+            begin: const Offset(0, -0.06), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  // Position panel: prefer below anchor, fallback above if near screen bottom
+  Offset _panelPosition(BuildContext context) {
+    final screenH = MediaQuery.of(context).size.height;
+    const gap = 6.0;
+    final panelH = (widget.options.length +
+                (widget.extraOption != null ? 1 : 0)) *
+            40.0 +
+        16.0;
+    final belowY = widget.anchorOffset.dy + widget.anchorSize.height + gap;
+    if (belowY + panelH > screenH - 40) {
+      // show above
+      return Offset(
+          widget.anchorOffset.dx, widget.anchorOffset.dy - panelH - gap);
+    }
+    return Offset(widget.anchorOffset.dx, belowY);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pos = _panelPosition(context);
+    const minWidth = 140.0;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Backdrop — Positioned.fill gives it an explicit size for hit testing
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onDismiss,
+          ),
+        ),
+        // Panel
+        Positioned(
+          left: pos.dx,
+          top: pos.dy,
+          child: FadeTransition(
+            opacity: _fade,
+            child: SlideTransition(
+              position: _slide,
+              child: GestureDetector(
+                onTap: () {}, // absorb taps so backdrop doesn't dismiss
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: minWidth),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: const Color(0xFFEEEEF3), width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ...widget.options.map((opt) => _DropdownItem(
+                                label: opt.label,
+                                selected: widget.selected == opt.value,
+                                onTap: () => widget.onSelect(opt.value),
+                              )),
+                          if (widget.extraOption != null) ...[
+                            Divider(height: 1, color: Colors.grey.shade100),
+                            _DropdownItem(
+                              label: widget.extraOption!.label,
+                              selected:
+                                  widget.selected == widget.extraOption!.value,
+                              onTap: () =>
+                                  widget.onSelect(widget.extraOption!.value),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Single dropdown item ──────────────────────────────────────────────────────
+
+class _DropdownItem extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DropdownItem({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: selected
+            ? const BoxDecoration(
+                color: Color(0xFFF5F5FA),
+              )
+            : null,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight:
+                  selected ? FontWeight.w600 : FontWeight.normal,
+              color: selected
+                  ? const Color(0xFF1A1A2E)
+                  : const Color(0xFF444455),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Record card ───────────────────────────────────────────────────────────────
+
 class _RecordTile extends StatelessWidget {
   final ChangeRecord record;
   final (Color, Color, IconData) style;
@@ -548,63 +1024,103 @@ class _RecordTile extends StatelessWidget {
     required this.onTap,
   });
 
+  (Color, Color) _entityColors() {
+    switch (record.entity) {
+      case 'SKU':
+        return (Colors.teal.shade700, Colors.teal.shade50);
+      case '库存':
+        return (Colors.green.shade700, Colors.green.shade50);
+      case '库位':
+        return (Colors.blue.shade700, Colors.blue.shade50);
+      default:
+        return (Colors.grey.shade600, Colors.grey.shade100);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final (fg, bg, icon) = style;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                  color: bg, borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, size: 18, color: fg),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                            color: bg,
-                            borderRadius: BorderRadius.circular(4)),
-                        child: Text(label,
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: fg)),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(record.entity,
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey.shade500)),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(summaryText,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w500),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text('${record.userName}  ·  $timeLabel',
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey.shade500)),
-                ],
+    final (tagFg, tagBg) = _entityColors();
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Action icon ────────────────────────────────────────
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                    color: bg, borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, size: 20, color: fg),
               ),
-            ),
-            const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
-          ],
+              const SizedBox(width: 12),
+              // ── Content ───────────────────────────────────────────
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: tagBg,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            record.entity.toLowerCase(),
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: tagFg),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      summaryText,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          height: 1.4),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${record.userName}  ·  $timeLabel',
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey.shade400),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right,
+                  size: 16, color: Colors.grey.shade300),
+            ],
+          ),
         ),
       ),
     );

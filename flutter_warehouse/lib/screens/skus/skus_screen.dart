@@ -9,6 +9,17 @@ import '../../utils/search_utils.dart';
 import '../../widgets/error_view.dart';
 import '../inventory/inventory_add_screen.dart';
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const _bgColor      = Color(0xFFF5F3F0);
+const _primary      = Color(0xFF4A6CF7);
+const _titleColor   = Color(0xFF1A1A2E);
+const _hintColor    = Color(0xFFC5C5CE);
+const _mutedColor   = Color(0xFF8E8E9A);
+const _searchBg     = Color(0xFFE8E6E3);
+const _stockGreen   = Color(0xFF67C23A);
+const _chipBg       = Color(0xFFE8F3FF);
+const _chipText     = Color(0xFF4A9EFF);
+
 class SkusScreen extends ConsumerStatefulWidget {
   const SkusScreen({super.key});
 
@@ -20,13 +31,12 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
   final _searchCtrl = TextEditingController();
   final _skuService = SkuService();
 
-  List<Sku> _allSkus = [];
+  List<Sku> _allSkus  = [];
   List<Sku> _filtered = [];
-  bool _loading = true;
+  bool _loading       = true;
   String? _error;
-  String _query = '';
-  // 'active' | 'archived' | 'all'
-  String _statusFilter = 'active';
+  String _query        = '';
+  String _statusFilter = 'active'; // 'active' | 'archived' | 'all'
   Timer? _debounce;
 
   @override
@@ -75,13 +85,12 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
   }
 
   List<Sku> _sort(List<Sku> list) {
-    // Archived always go last
-    final active = list.where((s) => !s.isArchived).toList();
+    final active   = list.where((s) => !s.isArchived).toList();
     final archived = list.where((s) => s.isArchived).toList();
 
     List<Sku> sortGroup(List<Sku> g) {
       final withStock = g.where((s) => s.totalQty > 0 || s.allBoxesOnly).toList();
-      final noStock = g.where((s) => s.totalQty == 0 && !s.allBoxesOnly).toList();
+      final noStock   = g.where((s) => s.totalQty == 0 && !s.allBoxesOnly).toList();
       withStock.sort((a, b) => a.sku.compareTo(b.sku));
       noStock.sort((a, b) => a.sku.compareTo(b.sku));
       return [...withStock, ...noStock];
@@ -101,85 +110,90 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('SKU 搜索'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(100),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                child: SearchBar(
-                  controller: _searchCtrl,
-                  hintText: '搜索 SKU / 名称 / 条码...',
-                  leading: const Icon(Icons.search),
-                  trailing: [
-                    if (_searchCtrl.text.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          _onSearchChanged('');
-                        },
-                      ),
-                  ],
-                  onChanged: _onSearchChanged,
+      backgroundColor: _bgColor,
+      floatingActionButton: user?.canEdit == true
+          ? _Fab(onTap: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const InventoryAddScreen()))
+              .then((ok) { if (ok == true) _load(); }))
+          : null,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Title ──────────────────────────────────────────────────
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 28, 20, 0),
+              child: Text(
+                'SKU 搜索',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: _titleColor,
                 ),
               ),
-              // ── Status filter chips ──────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: Row(
-                  children: [
-                    _FilterChip(
-                      label: '在用',
-                      selected: _statusFilter == 'active',
-                      onTap: () => _setStatusFilter('active'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: '含已归档',
-                      selected: _statusFilter == 'all',
-                      onTap: () => _setStatusFilter('all'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: '仅归档',
-                      selected: _statusFilter == 'archived',
-                      color: Colors.grey,
-                      onTap: () => _setStatusFilter('archived'),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Search bar ─────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _SearchBar(
+                controller: _searchCtrl,
+                onChanged: _onSearchChanged,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Filter tabs ────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  _FilterTab(
+                    label: '在用',
+                    selected: _statusFilter == 'active',
+                    onTap: () => _setStatusFilter('active'),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterTab(
+                    label: '含已归档',
+                    selected: _statusFilter == 'all',
+                    onTap: () => _setStatusFilter('all'),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterTab(
+                    label: '仅归档',
+                    selected: _statusFilter == 'archived',
+                    onTap: () => _setStatusFilter('archived'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ── List ───────────────────────────────────────────────────
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? ErrorView(message: _error!, onRetry: _load)
+                      : _filtered.isEmpty
+                          ? _emptyState()
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              itemCount: _filtered.length,
+                              itemBuilder: (_, i) => _SkuCard(
+                                sku: _filtered[i],
+                                query: _query,
+                                onTap: () => context
+                                    .push('/skus/${_filtered[i].id}')
+                                    .then((_) => _load()),
+                              ),
+                            ),
+            ),
+          ],
         ),
       ),
-      floatingActionButton: user?.canEdit == true
-          ? FloatingActionButton(
-              heroTag: 'add_inventory',
-              tooltip: '手动录入库存',
-              onPressed: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const InventoryAddScreen()))
-                  .then((ok) { if (ok == true) _load(); }),
-              child: const Icon(Icons.add_box),
-            )
-          : null,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? ErrorView(message: _error!, onRetry: _load)
-              : _filtered.isEmpty
-                  ? _emptyState()
-                  : ListView.builder(
-                      itemCount: _filtered.length,
-                      itemBuilder: (_, i) => _SkuCard(
-                        sku: _filtered[i],
-                        query: _query,
-                        onTap: () => context.push('/skus/${_filtered[i].id}').then((_) => _load()),
-                      ),
-                    ),
     );
   }
 
@@ -188,7 +202,7 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
       return Center(
         child: Text(
           _statusFilter == 'archived' ? '暂无归档 SKU' : '暂无 SKU',
-          style: TextStyle(color: Colors.grey.shade500),
+          style: const TextStyle(color: _mutedColor),
         ),
       );
     }
@@ -199,7 +213,7 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
           Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 12),
           Text('未找到 "$_query"',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 15)),
+              style: const TextStyle(color: _mutedColor, fontSize: 15)),
           const SizedBox(height: 4),
           Text('尝试缩短关键词，或忽略分隔符搜索',
               style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
@@ -209,40 +223,111 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
   }
 }
 
-// ─── Filter chip ─────────────────────────────────────────────────────────────
+// ── Search bar ────────────────────────────────────────────────────────────────
 
-class _FilterChip extends StatelessWidget {
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _SearchBar({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(
+        color: _searchBg,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+            blurStyle: BlurStyle.inner,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 14),
+          const Icon(Icons.search, size: 18, color: _hintColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: const TextStyle(fontSize: 14, color: _titleColor),
+              decoration: const InputDecoration(
+                hintText: '搜索 SKU / 名称 / 条码...',
+                hintStyle: TextStyle(fontSize: 14, color: _hintColor),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          ValueListenableBuilder(
+            valueListenable: controller,
+            builder: (_, value, __) => value.text.isNotEmpty
+                ? GestureDetector(
+                    onTap: () {
+                      controller.clear();
+                      onChanged('');
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.only(right: 14),
+                      child: Icon(Icons.close, size: 16, color: _hintColor),
+                    ),
+                  )
+                : const SizedBox(width: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Filter tab ────────────────────────────────────────────────────────────────
+
+class _FilterTab extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final Color? color;
 
-  const _FilterChip({
+  const _FilterTab({
     required this.label,
     required this.selected,
     required this.onTap,
-    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? Theme.of(context).colorScheme.primary;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? c.withOpacity(0.12) : Colors.transparent,
-          border: Border.all(color: selected ? c : Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(20),
+          color: selected ? _primary.withValues(alpha: 0.9) : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: selected
+                  ? _primary.withValues(alpha: 0.2)
+                  : Colors.black.withValues(alpha: 0.04),
+              blurRadius: selected ? 6 : 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: selected ? c : Colors.grey.shade600,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            fontWeight: FontWeight.w500,
+            color: selected ? Colors.white : _mutedColor,
           ),
         ),
       ),
@@ -250,7 +335,37 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-// ─── SKU 列表卡片 ─────────────────────────────────────────────────────────────
+// ── FAB ───────────────────────────────────────────────────────────────────────
+
+class _Fab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _Fab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: _primary.withValues(alpha: 0.9),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: _primary.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.add, color: Colors.white, size: 26),
+      ),
+    );
+  }
+}
+
+// ── SKU card ──────────────────────────────────────────────────────────────────
 
 class _SkuCard extends StatelessWidget {
   final Sku sku;
@@ -262,142 +377,164 @@ class _SkuCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isArchived = sku.isArchived;
-    final hasStock = sku.totalQty > 0 || sku.allBoxesOnly;
-    // Archived items are always visually dimmed
-    final dimmed = isArchived || !hasStock;
+    final hasStock   = sku.totalQty > 0 || sku.allBoxesOnly;
+    final dimmed     = isArchived || !hasStock;
 
-    final locCount = sku.locations.length;
     final shownLocs = sku.locations.take(3).toList();
-    final moreCount = locCount > 3 ? locCount - 3 : 0;
+    final moreCount = sku.locations.length > 3 ? sku.locations.length - 3 : 0;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      // Slightly reduced opacity for archived cards
-      color: isArchived ? Colors.grey.shade100 : null,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Row 1: SKU code + archived badge (if applicable) + stock badge
-              Row(
-                children: [
-                  if (isArchived) ...[
-                    Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Archived',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        decoration: BoxDecoration(
+          color: isArchived
+              ? Colors.white.withValues(alpha: 0.7)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1: SKU + archived badge + stock
+            Row(
+              children: [
+                if (isArchived) ...[
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                  ],
-                  Expanded(
-                    child: RichText(
-                      text: highlightMatch(
-                        sku.sku,
-                        query,
-                        baseStyle: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: dimmed ? Colors.grey.shade500 : null,
-                          decoration: isArchived ? TextDecoration.lineThrough : null,
-                          decorationColor: Colors.grey.shade400,
-                        ),
+                    child: Text(
+                      'Archived',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  if (!isArchived) _StockBadge(sku: sku),
+                ],
+                Expanded(
+                  child: RichText(
+                    text: highlightMatch(
+                      sku.sku,
+                      query,
+                      baseStyle: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: dimmed ? Colors.grey.shade400 : _titleColor,
+                        letterSpacing: -0.15,
+                        decoration: isArchived
+                            ? TextDecoration.lineThrough
+                            : null,
+                        decorationColor: Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                ),
+                if (!isArchived) _StockLabel(sku: sku),
+              ],
+            ),
+
+            // Row 2: name (subtle, if present)
+            if (sku.name != null && sku.name!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              RichText(
+                text: highlightMatch(
+                  sku.name!,
+                  query,
+                  baseStyle: TextStyle(
+                    fontSize: 12,
+                    color: dimmed ? Colors.grey.shade300 : _mutedColor,
+                  ),
+                ),
+              ),
+            ],
+
+            // Row 3: location chips
+            if (shownLocs.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  ...shownLocs.map((loc) => _LocChip(loc: loc, dimmed: dimmed)),
+                  if (moreCount > 0)
+                    _LocChip(label: '+$moreCount', dimmed: dimmed),
                 ],
               ),
-              // Row 2: name
-              if (sku.name != null && sku.name!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                RichText(
-                  text: highlightMatch(
-                    sku.name!,
-                    query,
-                    baseStyle: TextStyle(
-                      color: dimmed ? Colors.grey.shade400 : Colors.grey.shade600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-              // Row 3: location chips (show for archived too if they have stock)
-              if (shownLocs.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    ...shownLocs.map((loc) => _LocChip(loc: loc, dimmed: dimmed)),
-                    if (moreCount > 0)
-                      _LocChip(label: '+$moreCount', dimmed: dimmed),
-                  ],
-                ),
-              ] else if (!hasStock) ...[
-                const SizedBox(height: 4),
-                Text('暂无库存',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-              ],
+            ] else if (!hasStock) ...[
+              const SizedBox(height: 4),
+              const Text('暂无库存',
+                  style: TextStyle(color: _hintColor, fontSize: 12)),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _StockBadge extends StatelessWidget {
+// ── Stock label ───────────────────────────────────────────────────────────────
+
+class _StockLabel extends StatelessWidget {
   final Sku sku;
-  const _StockBadge({required this.sku});
+  const _StockLabel({required this.sku});
 
   @override
   Widget build(BuildContext context) {
-    final qty = sku.allBoxesOnly
+    final qty  = sku.allBoxesOnly
         ? sku.locations.fold(0, (s, l) => s + l.boxes)
         : sku.totalQty;
     final unit = sku.allBoxesOnly ? '箱' : '件';
-    final min = sku.minStock;
+    final min  = sku.minStock;
 
     Color color;
     IconData? icon;
 
     if (qty == 0) {
       color = Colors.grey.shade400;
-      icon = Icons.warning_amber_rounded;
+      icon  = Icons.warning_amber_rounded;
     } else if (min != null && qty <= min) {
-      color = Colors.orange.shade700;
-      icon = Icons.trending_down;
+      color = Colors.orange.shade600;
+      icon  = Icons.trending_down;
     } else {
-      color = Colors.green.shade700;
-      icon = null;
+      color = _stockGreen;
+      icon  = null;
     }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (icon != null) Icon(icon, size: 14, color: color),
-        const SizedBox(width: 2),
-        Text('共 $qty $unit',
-            style: TextStyle(color: color, fontWeight: FontWeight.w500, fontSize: 13)),
+        if (icon != null) ...[
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 2),
+        ],
+        Text(
+          '共 $qty $unit',
+          style: TextStyle(
+            fontSize: 13,
+            color: color,
+          ),
+        ),
       ],
     );
   }
 }
+
+// ── Location chip ─────────────────────────────────────────────────────────────
 
 class _LocChip extends StatelessWidget {
   final SkuLocation? loc;
@@ -414,19 +551,16 @@ class _LocChip extends StatelessWidget {
             : '${loc!.locationCode} · ${loc!.totalQty}件');
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: dimmed ? Colors.grey.shade100 : Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: dimmed ? Colors.grey.shade300 : Colors.blue.shade200,
-        ),
+        color: dimmed ? Colors.grey.shade100 : _chipBg,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
         style: TextStyle(
           fontSize: 11,
-          color: dimmed ? Colors.grey.shade400 : Colors.blue.shade700,
+          color: dimmed ? Colors.grey.shade400 : _chipText,
         ),
       ),
     );

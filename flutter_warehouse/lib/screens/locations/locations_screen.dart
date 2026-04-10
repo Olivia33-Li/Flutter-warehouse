@@ -11,6 +11,14 @@ import '../../utils/search_utils.dart';
 import '../../widgets/error_view.dart';
 import '../inventory/inventory_add_screen.dart';
 
+// ── Design tokens ──────────────────────────────────────────────────────────────
+const _bgColor    = Color(0xFFF5F3F0);
+const _primary    = Color(0xFF4A6CF7);
+const _titleColor = Color(0xFF1A1A2E);
+const _mutedColor = Color(0xFF8E8E9A);
+const _hintColor  = Color(0xFFC5C5CE);
+const _searchBg   = Color(0xFFE8E6E3);
+
 class LocationsScreen extends ConsumerStatefulWidget {
   const LocationsScreen({super.key});
 
@@ -137,94 +145,216 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('位置管理'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: SearchBar(
-              controller: _searchCtrl,
-              hintText: '搜索位置码 / 备注...',
-              leading: const Icon(Icons.search),
-              trailing: [
-                if (_searchCtrl.text.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchCtrl.clear();
-                      _onSearchChanged('');
-                    },
+      backgroundColor: _bgColor,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header: title + count ────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  const Text(
+                    '位置管理',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: _titleColor,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-              ],
-              onChanged: _onSearchChanged,
+                  const Spacer(),
+                  if (!_loading && _error == null)
+                    Text(
+                      '${_allLocations.length} 个库位',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: _mutedColor,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 14),
+
+            // ── Search bar ───────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _SearchBar(
+                controller: _searchCtrl,
+                onChanged: _onSearchChanged,
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── List / states ────────────────────────────────────────────
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? ErrorView(message: _error!, onRetry: _load)
+                      : _filtered.isEmpty
+                          ? _emptyState()
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              itemCount: _filtered.length,
+                              itemBuilder: (_, i) => _LocationCard(
+                                location: _filtered[i],
+                                query: _query,
+                                onTap: () => context
+                                    .push('/locations/${_filtered[i].id}')
+                                    .then((_) => _load()),
+                              ),
+                            ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: user?.canEdit == true
           ? Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                FloatingActionButton.small(
-                  heroTag: 'add_location',
-                  tooltip: '新增库位',
-                  onPressed: _showAddDialog,
-                  child: const Icon(Icons.add_location_alt),
-                ),
-                const SizedBox(height: 10),
-                FloatingActionButton(
-                  heroTag: 'add_inventory',
-                  tooltip: '录入库存',
-                  onPressed: () => Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (_) => const InventoryAddScreen()))
+                // Secondary: add inventory
+                GestureDetector(
+                  onTap: () => Navigator.of(context)
+                      .push(MaterialPageRoute(
+                          builder: (_) => const InventoryAddScreen()))
                       .then((ok) { if (ok == true) _load(); }),
-                  child: const Icon(Icons.add_box),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: _primary.withValues(alpha: 0.2),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.add_box_outlined,
+                        size: 20, color: _primary),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Primary: add location
+                GestureDetector(
+                  onTap: _showAddDialog,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: _primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: _primary.withValues(alpha: 0.35),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.add, size: 24, color: Colors.white),
+                  ),
                 ),
               ],
             )
           : null,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? ErrorView(message: _error!, onRetry: _load)
-              : _filtered.isEmpty
-                  ? _emptyState()
-                  : ListView.builder(
-                      itemCount: _filtered.length,
-                      itemBuilder: (_, i) => _LocationCard(
-                        location: _filtered[i],
-                        query: _query,
-                        onTap: () => context
-                            .push('/locations/${_filtered[i].id}')
-                            .then((_) => _load()),
-                      ),
-                    ),
     );
   }
 
   Widget _emptyState() {
     if (_query.isEmpty) {
-      return const Center(child: Text('暂无位置'));
+      return const Center(
+        child: Text(
+          '暂无位置',
+          style: TextStyle(color: _mutedColor, fontSize: 14),
+        ),
+      );
     }
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+          const Icon(Icons.search_off, size: 48, color: _hintColor),
           const SizedBox(height: 12),
-          Text('未找到 "$_query"',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 15)),
+          Text(
+            '未找到 "$_query"',
+            style: const TextStyle(color: _mutedColor, fontSize: 15),
+          ),
           const SizedBox(height: 4),
-          Text('尝试缩短关键词，或忽略大小写搜索',
-              style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+          const Text(
+            '尝试缩短关键词，或忽略大小写搜索',
+            style: TextStyle(color: _hintColor, fontSize: 12),
+          ),
         ],
       ),
     );
   }
 }
 
-// ─── 位置列表卡片 ──────────────────────────────────────────────────────────────
+// ── Search bar ─────────────────────────────────────────────────────────────────
+
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _SearchBar({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(
+        color: _searchBg,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 14),
+          const Icon(Icons.search, size: 18, color: _hintColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: const TextStyle(fontSize: 14, color: _titleColor),
+              decoration: InputDecoration(
+                hintText: '搜索位置码 / 备注...',
+                hintStyle: const TextStyle(fontSize: 14, color: _hintColor),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+                suffixIcon: controller.text.isNotEmpty
+                    ? GestureDetector(
+                        onTap: () {
+                          controller.clear();
+                          onChanged('');
+                        },
+                        child: const Icon(Icons.close,
+                            size: 15, color: _hintColor),
+                      )
+                    : null,
+                suffixIconConstraints:
+                    const BoxConstraints(minWidth: 32, minHeight: 0),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Location card ──────────────────────────────────────────────────────────────
 
 class _LocationCard extends StatelessWidget {
   final Location location;
@@ -240,114 +370,140 @@ class _LocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isEmpty = location.skuCount == 0;
-    final allBoxesOnly = location.totalQty == 0 && location.totalBoxes > 0;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  // Location code with highlight
-                  Expanded(
-                    child: RichText(
-                      text: highlightMatch(
-                        location.code,
-                        query,
-                        baseStyle: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: isEmpty ? Colors.grey.shade500 : null,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Top row: code + box count ──────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: RichText(
+                        text: highlightMatch(
+                          location.code,
+                          query,
+                          baseStyle: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: isEmpty
+                                ? _hintColor
+                                : _titleColor,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  // Checked badge
-                  if (location.checkedAt != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: Icon(Icons.check_circle_outline,
-                          size: 16, color: Colors.green.shade600),
-                    ),
-                  // Stock summary
-                  const SizedBox(width: 8),
-                  _stockLabel(allBoxesOnly, isEmpty),
-                ],
-              ),
-              // Description
-              if (location.description != null && location.description!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                RichText(
-                  text: highlightMatch(
-                    location.description!,
-                    query,
-                    baseStyle: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-              // Stats row: X SKU · Y箱 · Z件
-              if (!isEmpty) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _statChip(Icons.category_outlined, '${location.skuCount} SKU'),
-                    if (location.totalBoxes > 0) ...[
-                      const SizedBox(width: 8),
-                      _statChip(Icons.inventory_2_outlined, '${location.totalBoxes} 箱'),
-                    ],
-                    if (location.totalQty > 0) ...[
-                      const SizedBox(width: 8),
-                      _statChip(Icons.numbers_outlined, '${location.totalQty} 件'),
-                    ],
-                    if (location.checkedAt != null) ...[
-                      const SizedBox(width: 8),
-                      _statChip(
-                        Icons.schedule_outlined,
-                        '检查 ${_formatDate(location.checkedAt!)}',
-                        color: Colors.green.shade700,
+                    if (location.checkedAt != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Icon(Icons.check_circle_outline,
+                            size: 15, color: Colors.green.shade500),
                       ),
-                    ],
+                    _stockBadge(isEmpty),
                   ],
                 ),
+
+                // ── Description ────────────────────────────────────────
+                if (location.description != null &&
+                    location.description!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  RichText(
+                    text: highlightMatch(
+                      location.description!,
+                      query,
+                      baseStyle: const TextStyle(
+                        color: _mutedColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+
+                // ── Stats row ──────────────────────────────────────────
+                if (!isEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _statItem(Icons.category_outlined,
+                          '${location.skuCount} SKU'),
+                      if (location.totalBoxes > 0) ...[
+                        const SizedBox(width: 12),
+                        _statItem(Icons.inventory_2_outlined,
+                            '${location.totalBoxes} 箱'),
+                      ],
+                      if (location.totalQty > 0) ...[
+                        const SizedBox(width: 12),
+                        _statItem(Icons.numbers_outlined,
+                            '${location.totalQty} 件'),
+                      ],
+                      if (location.checkedAt != null) ...[
+                        const SizedBox(width: 12),
+                        _statItem(
+                          Icons.schedule_outlined,
+                          '检查 ${_formatDate(location.checkedAt!)}',
+                          color: Colors.green.shade600,
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _stockLabel(bool allBoxesOnly, bool isEmpty) {
+  Widget _stockBadge(bool isEmpty) {
     if (isEmpty) {
-      return Text('空位置',
-          style: TextStyle(color: Colors.grey.shade400, fontSize: 12));
+      return const Text(
+        '空位置',
+        style: TextStyle(color: _hintColor, fontSize: 12),
+      );
     }
-    // Prefer boxes; fall back to qty only if no boxes at all
     if (location.totalBoxes > 0) {
-      return Text('${location.totalBoxes} 箱',
-          style: TextStyle(
-              color: Colors.blue.shade700,
-              fontWeight: FontWeight.w600,
-              fontSize: 13));
+      return Text(
+        '${location.totalBoxes} 箱',
+        style: const TextStyle(
+          color: _primary,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+      );
     }
-    return Text('${location.totalQty} 件',
-        style: TextStyle(
-            color: Colors.green.shade700,
-            fontWeight: FontWeight.w600,
-            fontSize: 13));
+    return Text(
+      '${location.totalQty} 件',
+      style: const TextStyle(
+        color: Color(0xFF67C23A),
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+      ),
+    );
   }
 
-  Widget _statChip(IconData icon, String label, {Color? color}) {
-    final c = color ?? Colors.grey.shade600;
+  Widget _statItem(IconData icon, String label, {Color? color}) {
+    final c = color ?? _mutedColor;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

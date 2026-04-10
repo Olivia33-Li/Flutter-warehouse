@@ -6,6 +6,16 @@ import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 
+// ── Figma design tokens ───────────────────────────────────────────────────────
+const _bgColor       = Color(0xFFF5F3F0);
+const _primary       = Color(0xFF4A6CF7);
+const _titleColor    = Color(0xFF1A1A2E);
+const _hintColor     = Color(0xFFC5C5CE);
+const _mutedColor    = Color(0xFFB5B5C0);
+const _inputBg       = Colors.white;
+const _checkBg       = Color(0xFFF7F6F4);
+const _checkBorder   = Color(0xFFD4D2CE);
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -42,7 +52,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         password: password,
         rememberMe: _rememberMe,
       );
-      // Refresh recent accounts after successful login
       await ref.read(recentAccountsProvider.notifier).refresh();
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
@@ -60,7 +69,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _passwordCtrl.clear();
       _error = null;
     });
-    // Focus password field
     FocusScope.of(context).nextFocus();
   }
 
@@ -69,20 +77,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final recentAccounts = ref.watch(recentAccountsProvider);
 
     return Scaffold(
+      backgroundColor: _bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.warehouse, size: 72, color: Colors.blue),
-                const SizedBox(height: 12),
-                Text('仓库管理系统',
-                    style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 32),
+                // ── Logo ─────────────────────────────────────────────────
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: _primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(Icons.warehouse_rounded, size: 26, color: _primary),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '仓库管理系统',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: _titleColor,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 40),
 
-                // ── Recent accounts ──────────────────────────────────────────
+                // ── Recent accounts ───────────────────────────────────────
                 if (recentAccounts.isNotEmpty) ...[
                   _RecentAccountsSection(
                     accounts: recentAccounts,
@@ -109,103 +134,198 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 20),
                   Row(children: [
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    Expanded(child: Divider(color: _checkBorder.withValues(alpha: 0.8))),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
                       child: Text('使用其他账号登录',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                          style: TextStyle(color: _mutedColor, fontSize: 12)),
                     ),
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                    Expanded(child: Divider(color: _checkBorder.withValues(alpha: 0.8))),
                   ]),
                   const SizedBox(height: 20),
                 ],
 
-                // ── Login form ───────────────────────────────────────────────
-                TextField(
-                  controller: _usernameCtrl,
-                  decoration: InputDecoration(
-                    labelText: '用户名',
-                    prefixIcon: const Icon(Icons.person),
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => _usernameCtrl.clear(),
-                    ),
-                  ),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _passwordCtrl,
-                  obscureText: _obscure,
-                  decoration: InputDecoration(
-                    labelText: '密码',
-                    prefixIcon: const Icon(Icons.lock),
-                    border: const OutlineInputBorder(),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () => _passwordCtrl.clear(),
+                // ── Username input ────────────────────────────────────────
+                _InputCard(
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 16),
+                      const Icon(Icons.person_outline_rounded, size: 17, color: _hintColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _usernameCtrl,
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => setState(() {}),
+                          style: const TextStyle(fontSize: 14, color: _titleColor),
+                          decoration: _inputDeco('用户名',
+                            suffix: _usernameCtrl.text.isNotEmpty
+                                ? _ClearButton(onTap: () => setState(() => _usernameCtrl.clear()))
+                                : null,
+                          ),
                         ),
-                        IconButton(
-                          icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscure = !_obscure),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // ── Password input ────────────────────────────────────────
+                _InputCard(
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 16),
+                      const Icon(Icons.lock_outline_rounded, size: 17, color: _hintColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _passwordCtrl,
+                          obscureText: _obscure,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _login(),
+                          onChanged: (_) => setState(() {}),
+                          style: const TextStyle(fontSize: 14, color: _titleColor),
+                          decoration: _inputDeco('密码',
+                            suffix: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_passwordCtrl.text.isNotEmpty)
+                                  _ClearButton(onTap: () => setState(() => _passwordCtrl.clear())),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () => setState(() => _obscure = !_obscure),
+                                  child: Icon(
+                                    _obscure
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    size: 16,
+                                    color: _hintColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _login(),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _rememberMe,
-                      onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _rememberMe = !_rememberMe),
-                      child: Text('记住我',
-                          style: TextStyle(
-                              color: Colors.grey.shade700, fontSize: 14)),
-                    ),
-                  ],
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(_error!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center),
-                ],
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _loading ? null : _login,
-                    child: _loading
-                        ? const SizedBox(
-                            height: 20, width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Text('登录'),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 14),
+
+                // ── Remember me + Forgot password ─────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TextButton(
-                      onPressed: () => context.go('/register'),
-                      child: const Text('没有账号？注册'),
+                    GestureDetector(
+                      onTap: () => setState(() => _rememberMe = !_rememberMe),
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        children: [
+                          _Checkbox(checked: _rememberMe),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '记住我',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: _titleColor,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    TextButton(
-                      onPressed: () => context.go('/forgot-password'),
-                      child: Text('忘记密码？',
-                          style: TextStyle(color: Colors.grey.shade600)),
+                    GestureDetector(
+                      onTap: () => context.go('/forgot-password'),
+                      child: const Text(
+                        '忘记密码？',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: _mutedColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // ── Error message ─────────────────────────────────────────
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Color(0xFFE53935), fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                const SizedBox(height: 20),
+
+                // ── Login button ──────────────────────────────────────────
+                SizedBox(
+                  width: double.infinity,
+                  height: 49,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: _loading ? _primary.withValues(alpha: 0.5) : _primary.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: _loading
+                          ? []
+                          : [
+                              BoxShadow(
+                                color: _primary.withValues(alpha: 0.28),
+                                blurRadius: 12,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _loading ? null : _login,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Center(
+                          child: _loading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text(
+                                  '登录',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Register link ─────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      '还没有账号？',
+                      style: TextStyle(fontSize: 13, color: _mutedColor),
+                    ),
+                    GestureDetector(
+                      onTap: () => context.go('/register'),
+                      child: Text(
+                        '注册',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: _primary.withValues(alpha: 0.7),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -218,7 +338,89 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-// ─── Recent accounts section ──────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+InputDecoration _inputDeco(String hint, {Widget? suffix}) => InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(fontSize: 14, color: _hintColor),
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+      suffixIcon: suffix,
+      suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+    );
+
+class _InputCard extends StatelessWidget {
+  final Widget child;
+  const _InputCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 49,
+      decoration: BoxDecoration(
+        color: _inputBg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _ClearButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ClearButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: const Icon(Icons.close, size: 15, color: _hintColor),
+    );
+  }
+}
+
+class _Checkbox extends StatelessWidget {
+  final bool checked;
+  const _Checkbox({required this.checked});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        color: checked ? _primary : _checkBg,
+        border: Border.all(
+          color: checked ? _primary : _checkBorder,
+          width: 1.25,
+        ),
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: checked
+          ? const Icon(Icons.check, size: 11, color: Colors.white)
+          : null,
+    );
+  }
+}
+
+// ── Recent accounts section ───────────────────────────────────────────────────
 
 class _RecentAccountsSection extends StatelessWidget {
   final List<RecentAccount> accounts;
@@ -241,17 +443,21 @@ class _RecentAccountsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('最近登录',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13,
-                    fontWeight: FontWeight.w500)),
+            const Text(
+              '最近登录',
+              style: TextStyle(
+                color: _mutedColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             const Spacer(),
-            TextButton(
-              style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero, minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-              onPressed: onClearAll,
-              child: Text('清除全部',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            GestureDetector(
+              onTap: onClearAll,
+              child: const Text(
+                '清除全部',
+                style: TextStyle(color: _mutedColor, fontSize: 12),
+              ),
             ),
           ],
         ),
@@ -282,51 +488,83 @@ class _RecentAccountTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onSelect,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: _roleColor(account.role).withOpacity(0.15),
-                child: Text(
-                  account.name.isNotEmpty ? account.name[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    color: _roleColor(account.role),
-                    fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: _inputBg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onSelect,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _roleColor(account.role).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      account.name.isNotEmpty ? account.name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        color: _roleColor(account.role),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        account.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: _titleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '@${account.username}  ·  ${account.roleLabel}',
+                        style: const TextStyle(color: _mutedColor, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(account.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    Text('@${account.username}  ·  ${account.roleLabel}',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                    Text(
+                      fmt.format(account.lastLoginAt),
+                      style: const TextStyle(color: _hintColor, fontSize: 11),
+                    ),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: onRemove,
+                      child: const Icon(Icons.close, size: 15, color: _hintColor),
+                    ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(fmt.format(account.lastLoginAt),
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: onRemove,
-                    child: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -335,9 +573,9 @@ class _RecentAccountTile extends StatelessWidget {
 
   Color _roleColor(String role) {
     switch (role) {
-      case 'admin':      return Colors.red.shade700;
-      case 'supervisor': return Colors.blue.shade700;
-      default:           return Colors.green.shade700;
+      case 'admin':      return const Color(0xFFE53935);
+      case 'supervisor': return _primary;
+      default:           return const Color(0xFF43A047);
     }
   }
 }
