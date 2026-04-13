@@ -1630,7 +1630,15 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       minChildSize: 0.4,
       maxChildSize: 0.92,
       expand: false,
-      builder: (_, scrollCtrl) => Column(
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
         children: [
           // ── Drag handle ──────────────────────────────────────────────────
           Center(
@@ -1923,6 +1931,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           ),
           ),
         ],
+        ),
       ),
     );
   }

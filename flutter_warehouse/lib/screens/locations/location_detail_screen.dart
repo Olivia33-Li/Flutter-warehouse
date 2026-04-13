@@ -892,13 +892,15 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
 
   bool _matchesStockFilter(InventoryRecord r) {
     final qty = r.totalQty;
+    // 箱数用 totalBoxes：当库存存在 configurations 里时，根节点 boxes 为 0
+    final boxes = r.totalBoxes;
     return switch (_stockFilter) {
       'has_stock' =>
         // 有库存：数量>0，待清点，或仅箱数记录有箱数
-        qty > 0 || r.quantityUnknown || (r.boxesOnlyMode && r.boxes > 0),
+        qty > 0 || r.quantityUnknown || (r.boxesOnlyMode && boxes > 0),
       'zero_stock' =>
         // 0库存：数量=0 且非待清点 且非仅箱数有箱数
-        qty == 0 && !r.quantityUnknown && !(r.boxesOnlyMode && r.boxes > 0),
+        qty == 0 && !r.quantityUnknown && !(r.boxesOnlyMode && boxes > 0),
       _ => true, // 'all'
     };
   }

@@ -308,7 +308,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   String get _actionLabel => _filterBusinessAction ?? '操作类型';
 
-  String get _entityLabel => _filterEntity ?? '对象';
+  String get _entityLabel => switch (_filterEntity) {
+    'sku'       => 'SKU',
+    'location'  => '库位',
+    'inventory' => '库存',
+    _           => '对象',
+  };
 
   String get _dateLabel {
     switch (_filterDateRange) {
@@ -488,9 +493,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       active: _filterEntity != null,
                       options: const [
                         _FilterOption(label: '全部', value: null),
-                        _FilterOption(label: 'SKU', value: 'SKU'),
-                        _FilterOption(label: '库位', value: '库位'),
-                        _FilterOption(label: '库存', value: '库存'),
+                        _FilterOption(label: 'SKU', value: 'sku'),
+                        _FilterOption(label: '库位', value: 'location'),
+                        _FilterOption(label: '库存', value: 'inventory'),
                       ],
                       selected: _filterEntity,
                       onSelect: (v) {
@@ -585,6 +590,12 @@ class _FilterOption {
   const _FilterOption({required this.label, required this.value});
 }
 
+// ── Value wrapper: lets showMenu distinguish null-value selection from dismissal
+class _V<T> {
+  final T value;
+  const _V(this.value);
+}
+
 // ── Generic filter dropdown ───────────────────────────────────────────────────
 
 class _FilterDropdown extends StatefulWidget {
@@ -607,57 +618,60 @@ class _FilterDropdown extends StatefulWidget {
 }
 
 class _FilterDropdownState extends State<_FilterDropdown> {
-  OverlayEntry? _entry;
-  final _key = GlobalKey();
+  bool _isOpen = false;
 
-  void _open() {
-    if (_entry != null) {
-      _close();
-      return;
-    }
-    final box = _key.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final offset = box.localToGlobal(Offset.zero);
-    final size = box.size;
-
-    _entry = OverlayEntry(
-      builder: (_) => _DropdownOverlay(
-        anchorOffset: offset,
-        anchorSize: size,
-        options: widget.options,
-        selected: widget.selected,
-        onSelect: (v) {
-          widget.onSelect(v);
-          _close();
-        },
-        onDismiss: _close,
+  Future<void> _showOptions() async {
+    final button = context.findRenderObject()! as RenderBox;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(button.size.bottomLeft(Offset.zero),
+            ancestor: overlay),
+        button.localToGlobal(button.size.bottomRight(Offset.zero),
+            ancestor: overlay),
       ),
+      Offset.zero & overlay.size,
     );
-    Overlay.of(context).insert(_entry!);
-    setState(() {});
-  }
 
-  void _close() {
-    _entry?.remove();
-    _entry = null;
-    if (mounted) setState(() {});
-  }
+    if (mounted) setState(() => _isOpen = true);
 
-  @override
-  void dispose() {
-    _entry?.remove();
-    super.dispose();
+    final result = await showMenu<_V<String?>>(
+      context: context,
+      position: position,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      items: widget.options.map((opt) {
+        final sel = opt.value == widget.selected;
+        return PopupMenuItem<_V<String?>>(
+          value: _V(opt.value),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            opt.label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+              color: sel
+                  ? const Color(0xFF1A1A2E)
+                  : const Color(0xFF444455),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+
+    if (mounted) setState(() => _isOpen = false);
+    if (result != null) widget.onSelect(result.value);
   }
 
   @override
   Widget build(BuildContext context) {
-    final open = _entry != null;
     return _PillButton(
-      key: _key,
       label: widget.label,
       active: widget.active,
-      open: open,
-      onTap: _open,
+      open: _isOpen,
+      onTap: _showOptions,
     );
   }
 }
@@ -684,8 +698,7 @@ class _DateFilterDropdown extends StatefulWidget {
 }
 
 class _DateFilterDropdownState extends State<_DateFilterDropdown> {
-  OverlayEntry? _entry;
-  final _key = GlobalKey();
+  bool _isOpen = false;
 
   static const _dateOptions = [
     _FilterOption(label: '全部时间', value: null),
@@ -694,60 +707,84 @@ class _DateFilterDropdownState extends State<_DateFilterDropdown> {
     _FilterOption(label: '近30天', value: '30d'),
   ];
 
-  void _open() {
-    if (_entry != null) {
-      _close();
-      return;
-    }
-    final box = _key.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final offset = box.localToGlobal(Offset.zero);
-    final size = box.size;
-
-    _entry = OverlayEntry(
-      builder: (_) => _DropdownOverlay(
-        anchorOffset: offset,
-        anchorSize: size,
-        options: _dateOptions,
-        extraOption: const _FilterOption(label: '自定义时间', value: 'custom'),
-        selected: widget.selected,
-        onSelect: (v) {
-          if (v == 'custom') {
-            _close();
-            widget.onCustom();
-          } else {
-            widget.onSelect(v);
-            _close();
-          }
-        },
-        onDismiss: _close,
+  Future<void> _showOptions() async {
+    final button = context.findRenderObject()! as RenderBox;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(button.size.bottomLeft(Offset.zero),
+            ancestor: overlay),
+        button.localToGlobal(button.size.bottomRight(Offset.zero),
+            ancestor: overlay),
       ),
+      Offset.zero & overlay.size,
     );
-    Overlay.of(context).insert(_entry!);
-    setState(() {});
-  }
 
-  void _close() {
-    _entry?.remove();
-    _entry = null;
-    if (mounted) setState(() {});
-  }
+    if (mounted) setState(() => _isOpen = true);
 
-  @override
-  void dispose() {
-    _entry?.remove();
-    super.dispose();
+    final result = await showMenu<_V<String?>>(
+      context: context,
+      position: position,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      items: [
+        ..._dateOptions.map((opt) {
+          final sel = opt.value == widget.selected;
+          return PopupMenuItem<_V<String?>>(
+            value: _V(opt.value),
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              opt.label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+                color: sel
+                    ? const Color(0xFF1A1A2E)
+                    : const Color(0xFF444455),
+              ),
+            ),
+          );
+        }),
+        const PopupMenuDivider(height: 1),
+        PopupMenuItem<_V<String?>>(
+          value: const _V('custom'),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            '自定义时间',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: widget.selected == 'custom'
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+              color: widget.selected == 'custom'
+                  ? const Color(0xFF1A1A2E)
+                  : const Color(0xFF444455),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (mounted) setState(() => _isOpen = false);
+    if (result != null) {
+      if (result.value == 'custom') {
+        widget.onCustom();
+      } else {
+        widget.onSelect(result.value);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final open = _entry != null;
     return _PillButton(
-      key: _key,
       label: widget.label,
       active: widget.active,
-      open: open,
-      onTap: _open,
+      open: _isOpen,
+      onTap: _showOptions,
     );
   }
 }
@@ -761,7 +798,6 @@ class _PillButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PillButton({
-    super.key,
     required this.label,
     required this.active,
     required this.open,
@@ -812,193 +848,6 @@ class _PillButton extends StatelessWidget {
                   size: 14, color: textColor),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Floating dropdown overlay ─────────────────────────────────────────────────
-
-class _DropdownOverlay extends StatefulWidget {
-  final Offset anchorOffset;
-  final Size anchorSize;
-  final List<_FilterOption> options;
-  final _FilterOption? extraOption;
-  final String? selected;
-  final ValueChanged<String?> onSelect;
-  final VoidCallback onDismiss;
-
-  const _DropdownOverlay({
-    required this.anchorOffset,
-    required this.anchorSize,
-    required this.options,
-    this.extraOption,
-    required this.selected,
-    required this.onSelect,
-    required this.onDismiss,
-  });
-
-  @override
-  State<_DropdownOverlay> createState() => _DropdownOverlayState();
-}
-
-class _DropdownOverlayState extends State<_DropdownOverlay>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _fade;
-  late final Animation<Offset> _slide;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 150));
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _slide = Tween<Offset>(
-            begin: const Offset(0, -0.06), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _ctrl.forward();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  // Position panel: prefer below anchor, fallback above if near screen bottom
-  Offset _panelPosition(BuildContext context) {
-    final screenH = MediaQuery.of(context).size.height;
-    const gap = 6.0;
-    final panelH = (widget.options.length +
-                (widget.extraOption != null ? 1 : 0)) *
-            40.0 +
-        16.0;
-    final belowY = widget.anchorOffset.dy + widget.anchorSize.height + gap;
-    if (belowY + panelH > screenH - 40) {
-      // show above
-      return Offset(
-          widget.anchorOffset.dx, widget.anchorOffset.dy - panelH - gap);
-    }
-    return Offset(widget.anchorOffset.dx, belowY);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final pos = _panelPosition(context);
-    const minWidth = 140.0;
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Backdrop — Positioned.fill gives it an explicit size for hit testing
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onDismiss,
-          ),
-        ),
-        // Panel
-        Positioned(
-          left: pos.dx,
-          top: pos.dy,
-          child: FadeTransition(
-            opacity: _fade,
-            child: SlideTransition(
-              position: _slide,
-              child: GestureDetector(
-                onTap: () {}, // absorb taps so backdrop doesn't dismiss
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: minWidth),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: const Color(0xFFEEEEF3), width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ...widget.options.map((opt) => _DropdownItem(
-                                label: opt.label,
-                                selected: widget.selected == opt.value,
-                                onTap: () => widget.onSelect(opt.value),
-                              )),
-                          if (widget.extraOption != null) ...[
-                            Divider(height: 1, color: Colors.grey.shade100),
-                            _DropdownItem(
-                              label: widget.extraOption!.label,
-                              selected:
-                                  widget.selected == widget.extraOption!.value,
-                              onTap: () =>
-                                  widget.onSelect(widget.extraOption!.value),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Single dropdown item ──────────────────────────────────────────────────────
-
-class _DropdownItem extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _DropdownItem({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: selected
-            ? const BoxDecoration(
-                color: Color(0xFFF5F5FA),
-              )
-            : null,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight:
-                  selected ? FontWeight.w600 : FontWeight.normal,
-              color: selected
-                  ? const Color(0xFF1A1A2E)
-                  : const Color(0xFF444455),
-            ),
-          ),
         ),
       ),
     );

@@ -11,6 +11,20 @@ import '../../services/auth_service.dart';
 import '../../services/inventory_service.dart';
 import '../../services/api_service.dart';
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const _bg            = Color(0xFFF5F3F0);
+const _primary       = Color(0xFF1A1A2E);
+const _muted         = Color(0xFFB5B5C0);
+const _divider       = Color(0xFFF2F1EF);
+const _dangerText    = Color(0xFFC07078);
+const _buttonPrimary = Color(0xFF2C3E6B);
+
+const _cardDecoration = BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.all(Radius.circular(16)),
+  boxShadow: [BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 1))],
+);
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -27,47 +41,84 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('编辑个人信息'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                    labelText: '显示名称', border: OutlineInputBorder()),
-              ),
-              if (err != null) ...[
-                const SizedBox(height: 8),
-                Text(err!, style: const TextStyle(color: Colors.red)),
+        builder: (ctx, setS) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('编辑个人信息',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
+                const SizedBox(height: 20),
+                // Floating label input
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      style: const TextStyle(fontSize: 14, color: _primary),
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: Color(0xFFD5D3CF)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: Color(0xFFD5D3CF)),
+                        ),
+                        errorText: err,
+                      ),
+                    ),
+                    Positioned(
+                      left: 12, top: -9,
+                      child: Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: const Text('显示名称',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF8E8E9A))),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => ctx.pop(),
+                      child: const Text('取消', style: TextStyle(color: Color(0xFF6E6E80))),
+                    ),
+                    const SizedBox(width: 8),
+                    _PrimaryButton(
+                      label: '保存',
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) {
+                          setS(() => err = '名称不能为空');
+                          return;
+                        }
+                        try {
+                          final response = await ApiService.instance.dio
+                              .patch('/auth/profile', data: {'name': nameCtrl.text.trim()});
+                          ref.read(currentUserProvider.notifier).updateName(response.data['name']);
+                          if (ctx.mounted) ctx.pop();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('个人信息已更新')));
+                          }
+                        } on DioException catch (e) {
+                          final msg = e.response?.data?['message'];
+                          setS(() => err = msg is List ? msg.join(', ') : (msg ?? '更新失败'));
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ],
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
-            FilledButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty) {
-                  setS(() => err = '名称不能为空');
-                  return;
-                }
-                try {
-                  final response = await ApiService.instance.dio
-                      .patch('/auth/profile', data: {'name': nameCtrl.text.trim()});
-                  ref.read(currentUserProvider.notifier).updateName(response.data['name']);
-                  if (ctx.mounted) ctx.pop();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('个人信息已更新')));
-                  }
-                } on DioException catch (e) {
-                  final msg = e.response?.data?['message'];
-                  setS(() => err = msg is List ? msg.join(', ') : (msg ?? '更新失败'));
-                }
-              },
-              child: const Text('保存'),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -82,52 +133,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('修改密码'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: oldCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                    labelText: '原密码', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: newCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                    labelText: '新密码（至少6位）', border: OutlineInputBorder()),
-              ),
-              if (err != null) ...[
-                const SizedBox(height: 8),
-                Text(err!, style: const TextStyle(color: Colors.red)),
+        builder: (ctx, setS) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('修改密码',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
+                const SizedBox(height: 16),
+                _RoundedInput(controller: oldCtrl, hint: '原密码', obscure: true),
+                const SizedBox(height: 16),
+                _RoundedInput(controller: newCtrl, hint: '新密码（至少6位）', obscure: true),
+                if (err != null) ...[
+                  const SizedBox(height: 8),
+                  Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ],
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => ctx.pop(),
+                      child: const Text('取消', style: TextStyle(color: Color(0xFF6E6E80))),
+                    ),
+                    const SizedBox(width: 8),
+                    _PrimaryButton(
+                      label: '确认',
+                      onPressed: () async {
+                        try {
+                          await AuthService().changePassword(
+                            oldPassword: oldCtrl.text,
+                            newPassword: newCtrl.text,
+                          );
+                          if (ctx.mounted) ctx.pop();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('密码修改成功')));
+                          }
+                        } on DioException catch (e) {
+                          final msg = e.response?.data?['message'];
+                          setS(() => err = msg is List ? msg.join(', ') : (msg ?? '修改失败'));
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ],
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  await AuthService().changePassword(
-                    oldPassword: oldCtrl.text,
-                    newPassword: newCtrl.text,
-                  );
-                  if (ctx.mounted) ctx.pop();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('密码修改成功')));
-                  }
-                } on DioException catch (e) {
-                  final msg = e.response?.data?['message'];
-                  setS(() => err = msg is List ? msg.join(', ') : (msg ?? '修改失败'));
-                }
-              },
-              child: const Text('确认'),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -140,24 +196,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('正在生成 Excel，请稍候...')));
     try {
-      // Use in-memory token first (covers non-remember-me sessions),
-      // fall back to SharedPreferences for remember-me sessions after restart.
       String token = AuthTokenCache.token ?? '';
       if (token.isEmpty) {
         final prefs = await SharedPreferences.getInstance();
         token = prefs.getString(AppConstants.tokenKey) ?? '';
       }
       const url = '${AppConstants.baseUrl}/export/excel';
-
       final now = DateTime.now();
       final filename =
           'warehouse_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
-
       final xhr = web.XMLHttpRequest();
       xhr.open('GET', url);
       xhr.responseType = 'blob';
       xhr.setRequestHeader('Authorization', 'Bearer $token');
-
       final completer = Completer<void>();
       xhr.onLoad.listen((_) {
         if (xhr.status == 200) {
@@ -176,7 +227,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       xhr.onError.listen((_) => completer.completeError('网络错误'));
       xhr.send();
       await completer.future;
-
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -305,130 +355,359 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  // ── Build ───────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final avatarColor = _avatarColor(user?.role ?? 'staff');
+    final initial = (user?.name.isNotEmpty == true ? user!.name[0] : '?').toUpperCase();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
-      body: ListView(
-        children: [
-          // ── 用户信息 ─────────────────────────────────────────────────────
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: _roleColor(user?.role ?? 'staff').withOpacity(0.15),
-              child: Text(
-                (user?.name.isNotEmpty == true ? user!.name[0] : '?').toUpperCase(),
-                style: TextStyle(color: _roleColor(user?.role ?? 'staff'),
-                    fontWeight: FontWeight.bold),
+      backgroundColor: _bg,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 32, 20, 100),
+          children: [
+            // ── Title ──────────────────────────────────────────────────
+            const Text('设置',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _primary)),
+            const SizedBox(height: 22),
+
+            // ── User card ───────────────────────────────────────────────
+            Container(
+              decoration: _cardDecoration,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  // Avatar
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: avatarColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(initial,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: avatarColor)),
+                  ),
+                  const SizedBox(width: 14),
+                  // Name + subtitle
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(user?.name ?? '',
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _primary)),
+                        const SizedBox(height: 2),
+                        Text('@${user?.username ?? ''}  ·  ${user?.roleLabel ?? ''}',
+                            style: const TextStyle(fontSize: 12, color: _muted)),
+                      ],
+                    ),
+                  ),
+                  // Edit button
+                  GestureDetector(
+                    onTap: () => _showEditProfileDialog(user?.name ?? ''),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.edit_outlined, size: 16, color: _muted),
+                    ),
+                  ),
+                ],
               ),
             ),
-            title: Text(user?.name ?? ''),
-            subtitle: Text('@${user?.username ?? ''}  ·  ${user?.roleLabel ?? ''}'),
-            trailing: IconButton(
-              icon: const Icon(Icons.edit),
-              tooltip: '编辑个人信息',
-              onPressed: () => _showEditProfileDialog(user?.name ?? ''),
+            const SizedBox(height: 12),
+
+            // ── Account section ─────────────────────────────────────────
+            Container(
+              decoration: _cardDecoration,
+              child: Column(
+                children: [
+                  _CardItem(
+                    icon: Icons.lock_outline,
+                    label: '修改密码',
+                    onTap: _showChangePasswordDialog,
+                  ),
+                  const Divider(height: 1, color: _divider),
+                  _CardItemSub(
+                    icon: Icons.swap_horiz_outlined,
+                    label: '切换账号',
+                    subtitle: '退出当前账号并返回登录页',
+                    onTap: _switchAccount,
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(),
+            const SizedBox(height: 20),
 
-          // 修改密码
-          ListTile(
-            leading: const Icon(Icons.lock),
-            title: const Text('修改密码'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _showChangePasswordDialog,
-          ),
-
-          // 切换账号
-          ListTile(
-            leading: const Icon(Icons.switch_account),
-            title: const Text('切换账号'),
-            subtitle: const Text('退出当前账号并返回登录页'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _switchAccount,
-          ),
-
-          const Divider(),
-
-          // 用户管理（仅管理员）
-          if (user?.canManageUsers == true)
-            ListTile(
-              leading: const Icon(Icons.people),
-              title: const Text('用户管理'),
-              subtitle: const Text('创建账号 / 分配角色 / 停用账号'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _showUsersDialog,
+            // ── 管理 section ────────────────────────────────────────────
+            const _SectionLabel('管理'),
+            const SizedBox(height: 12),
+            Container(
+              decoration: _cardDecoration,
+              child: Column(
+                children: [
+                  if (user?.canManageUsers == true)
+                    _CardItemSub(
+                      icon: Icons.people_outline,
+                      label: '用户管理',
+                      subtitle: '创建账号 / 分配角色 / 停用账号',
+                      onTap: _showUsersDialog,
+                    ),
+                  if (user?.canManageUsers == true)
+                    const Divider(height: 1, color: _divider),
+                  _CardItemSub(
+                    icon: Icons.vpn_key_outlined,
+                    label: '密码重置申请',
+                    subtitle: '处理用户的忘记密码申请',
+                    onTap: () => context.push('/password-reset-requests'),
+                  ),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.lock_reset),
-              title: const Text('密码重置申请'),
-              subtitle: const Text('处理用户的忘记密码申请'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/password-reset-requests'),
-            ),
+            const SizedBox(height: 20),
 
-          // 数据导入（仅管理员）
-          if (user?.canImport == true)
-            ListTile(
-              leading: const Icon(Icons.upload_file),
-              title: const Text('数据导入'),
-              subtitle: const Text('SKU 主档 / 库位主档 / 库存明细'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/import'),
+            // ── 数据 section ────────────────────────────────────────────
+            const _SectionLabel('数据'),
+            const SizedBox(height: 12),
+            Container(
+              decoration: _cardDecoration,
+              child: Column(
+                children: [
+                  if (user?.canImport == true)
+                    _CardItemSub(
+                      icon: Icons.upload_file_outlined,
+                      label: '数据导入',
+                      subtitle: 'SKU 主档 / 库位主档 / 库存明细',
+                      onTap: () => context.push('/import'),
+                    ),
+                  if (user?.canImport == true)
+                    const Divider(height: 1, color: _divider),
+                  if (user?.canExport == true)
+                    _CardItemSub(
+                      icon: Icons.download_outlined,
+                      label: '导出 Excel',
+                      subtitle: '导出全部 SKU、库位、库存及流水记录',
+                      onTap: _exportExcel,
+                    ),
+                ],
+              ),
             ),
+            const SizedBox(height: 20),
 
-          // 导出 Excel（管理员 + 仓库主管）
-          if (user?.canExport == true)
-            ListTile(
-              leading: const Icon(Icons.download),
-              title: const Text('导出 Excel'),
-              subtitle: const Text('导出全部 SKU、库位、库存及流水记录'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _exportExcel,
-            ),
+            // ── 危险区域 section ────────────────────────────────────────
+            if (user?.canHighRisk == true) ...[
+              const _SectionLabel('危险区域', danger: true),
+              const SizedBox(height: 12),
+              Container(
+                decoration: _cardDecoration,
+                child: InkWell(
+                  onTap: _confirmClearAllData,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline, size: 16, color: _dangerText),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('清空所有业务数据',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _dangerText)),
+                              SizedBox(height: 2),
+                              Text('清空库存、SKU、库位、流水、日志及导入记录，仅保留用户账号',
+                                  style: TextStyle(fontSize: 11, color: _muted),
+                                  maxLines: 2),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
 
-          const Divider(),
-
-          // 危险区域（仅管理员）
-          if (user?.canHighRisk == true) ...[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text('危险区域',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: const Text('清空所有业务数据',
-                  style: TextStyle(color: Colors.red)),
-              subtitle: const Text('清空库存、SKU、库位、流水、日志及导入记录，仅保留用户账号'),
-              onTap: _confirmClearAllData,
+            // ── Logout button ───────────────────────────────────────────
+            Center(
+              child: TextButton.icon(
+                onPressed: () async {
+                  await ref.read(currentUserProvider.notifier).logout();
+                  if (mounted) context.go('/login');
+                },
+                icon: const Icon(Icons.logout, size: 16, color: _dangerText),
+                label: const Text('退出登录',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _dangerText)),
+              ),
             ),
           ],
-
-          const Divider(),
-
-          // 退出登录
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('退出登录', style: TextStyle(color: Colors.red)),
-            onTap: () async {
-              await ref.read(currentUserProvider.notifier).logout();
-              if (mounted) context.go('/login');
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Color _roleColor(String role) {
+  Color _avatarColor(String role) {
     switch (role) {
-      case 'admin':      return Colors.red.shade700;
-      case 'supervisor': return Colors.blue.shade700;
-      default:           return Colors.green.shade700;
+      case 'admin':      return const Color(0xFFE87040);
+      case 'supervisor': return const Color(0xFF4A6CF7);
+      default:           return const Color(0xFF4EBB6A);
     }
+  }
+}
+
+// ── Shared UI helpers ─────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final bool danger;
+  const _SectionLabel(this.text, {this.danger = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        fontSize: 10,
+        letterSpacing: 0.25,
+        color: danger ? const Color(0xB3D4736C) : _muted,
+      ),
+    );
+  }
+}
+
+class _CardItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  const _CardItem({required this.icon, required this.label, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 53,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Icon(icon, size: 17, color: _primary),
+              const SizedBox(width: 14),
+              Expanded(child: Text(label,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _primary))),
+              const Icon(Icons.chevron_right, size: 14, color: _muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CardItemSub extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback? onTap;
+  const _CardItemSub({required this.icon, required this.label, required this.subtitle, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 71,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Icon(icon, size: 17, color: _primary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _primary)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: const TextStyle(fontSize: 11, color: _muted)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 14, color: _muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundedInput extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final bool obscure;
+  const _RoundedInput({required this.controller, required this.hint, this.obscure = false});
+
+  @override
+  Widget build(BuildContext context) {
+    const inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(20)),
+      borderSide: BorderSide(color: Color(0xFFD5D3CF), width: 1.2),
+    );
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      style: const TextStyle(fontSize: 14, color: _primary),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: _muted, fontSize: 14),
+        contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+        border: inputBorder,
+        enabledBorder: inputBorder,
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(20)),
+          borderSide: BorderSide(color: Color(0xFF8090A8), width: 1.2),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  const _PrimaryButton({required this.label, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _buttonPrimary,
+          foregroundColor: Colors.white,
+          elevation: 2,
+          shadowColor: _buttonPrimary.withValues(alpha: 0.2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+        ),
+        child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      ),
+    );
   }
 }
 
@@ -676,6 +955,7 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
     final currentUser = ref.watch(currentUserProvider);
 
     return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: SizedBox(
         width: 480,
         child: Column(
@@ -684,24 +964,45 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
               child: Row(
                 children: [
                   const Text('用户管理',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
                   const Spacer(),
-                  IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.person_add, size: 16),
-                    label: const Text('创建账号'),
-                    onPressed: _showCreateDialog,
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 18, color: _muted),
+                    onPressed: _load,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => context.pop()),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    height: 35,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.person_add_outlined, size: 14),
+                      label: const Text('创建账号', style: TextStyle(fontSize: 13)),
+                      onPressed: _showCreateDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _buttonPrimary,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shadowColor: _buttonPrimary.withValues(alpha: 0.2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18, color: _muted),
+                    onPressed: () => context.pop(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
                 ],
               ),
             ),
-            const Divider(height: 1),
             // Body
             if (_loading)
               const Padding(
@@ -720,27 +1021,27 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: _users.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, __) => const Divider(height: 1, color: _divider),
                   itemBuilder: (_, i) {
                     final u = _users[i];
                     final uid = u['_id'] as String? ?? '';
                     final role = u['role'] as String? ?? 'staff';
                     final isActive = u['isActive'] != false;
                     final isSelf = uid == (currentUser?.id ?? '');
+                    final avatarColor = _avatarColor(role);
 
                     return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                       leading: CircleAvatar(
                         radius: 18,
-                        backgroundColor: isActive
-                            ? _roleColor(role).withOpacity(0.12)
-                            : Colors.grey.shade200,
+                        backgroundColor: isActive ? avatarColor : Colors.grey.shade400,
                         child: Text(
                           (u['name'] as String? ?? '?').isNotEmpty
                               ? (u['name'] as String)[0].toUpperCase()
                               : '?',
-                          style: TextStyle(
-                            color: isActive ? _roleColor(role) : Colors.grey,
-                            fontWeight: FontWeight.bold,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
                             fontSize: 13,
                           ),
                         ),
@@ -750,17 +1051,17 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                           Text(u['name'] as String? ?? '',
                               style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: isActive ? null : Colors.grey)),
+                                  color: isActive ? _primary : Colors.grey)),
                           if (isSelf) ...[
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                               decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
+                                color: const Color(0xFFEEF1FE),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text('我', style: TextStyle(
-                                  fontSize: 10, color: Colors.blue.shade700)),
+                              child: const Text('我',
+                                  style: TextStyle(fontSize: 10, color: Color(0xFF4A6CF7))),
                             ),
                           ],
                           if (!isActive) ...[
@@ -781,10 +1082,10 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                         '@${u['username'] ?? ''}  ·  ${_roleLabelOf(role)}',
                         style: TextStyle(
                             fontSize: 12,
-                            color: isActive ? Colors.grey.shade600 : Colors.grey.shade400),
+                            color: isActive ? _muted : Colors.grey.shade400),
                       ),
                       trailing: PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, size: 18),
+                        icon: const Icon(Icons.more_vert, size: 18, color: _muted),
                         itemBuilder: (_) => [
                           const PopupMenuItem(value: 'role',
                               child: ListTile(dense: true, leading: Icon(Icons.badge),
@@ -817,11 +1118,11 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
     );
   }
 
-  Color _roleColor(String role) {
+  Color _avatarColor(String role) {
     switch (role) {
-      case 'admin':      return Colors.red.shade700;
-      case 'supervisor': return Colors.blue.shade700;
-      default:           return Colors.green.shade700;
+      case 'admin':      return const Color(0xFFE87040);
+      case 'supervisor': return const Color(0xFF4A6CF7);
+      default:           return const Color(0xFF4EBB6A);
     }
   }
 

@@ -3,6 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import '../../services/password_reset_service.dart';
 
+const _bg      = Color(0xFFF5F3F0);
+const _primary = Color(0xFF1A1A2E);
+const _muted   = Color(0xFFB5B5C0);
+const _divider = Color(0xFFF0EFEC);
+
 class PasswordResetRequestsScreen extends StatefulWidget {
   const PasswordResetRequestsScreen({super.key});
 
@@ -51,13 +56,11 @@ class _PasswordResetRequestsScreenState
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // User info
                 _InfoRow('用户名', '@${req.username}'),
                 _InfoRow('申请时间', DateFormat('yyyy-MM-dd HH:mm').format(req.createdAt)),
                 if (req.userNote.isNotEmpty) _InfoRow('用户备注', req.userNote),
                 const Divider(height: 20),
 
-                // Action selector
                 const Text('操作', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
@@ -70,7 +73,6 @@ class _PasswordResetRequestsScreenState
                 ),
                 const SizedBox(height: 14),
 
-                // New password field (only when completing)
                 if (action == 'completed') ...[
                   TextField(
                     controller: pwdCtrl,
@@ -88,7 +90,6 @@ class _PasswordResetRequestsScreenState
                   const SizedBox(height: 10),
                 ],
 
-                // Admin note
                 TextField(
                   controller: noteCtrl,
                   decoration: InputDecoration(
@@ -169,161 +170,310 @@ class _PasswordResetRequestsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final pending = _requests.where((r) => r.status == 'pending').length;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
+      backgroundColor: _bg,
+      body: SafeArea(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('密码重置申请'),
-            if (pending > 0)
-              Text('$pending 条待处理',
-                  style: const TextStyle(fontSize: 12, color: Colors.orange)),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Center(
+                        child: Icon(Icons.arrow_back_ios, size: 18, color: _primary),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    '密码重置申请',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _primary,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _load,
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Center(
+                        child: Icon(Icons.refresh, size: 20, color: _primary),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Pill filter tabs
+            Center(
+              child: _PillFilterBar(
+                selected: _filterStatus,
+                onChanged: (v) {
+                  setState(() => _filterStatus = v);
+                  _load();
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // List
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _requests.isEmpty
+                      ? const Center(
+                          child: Text('暂无申请记录',
+                              style: TextStyle(color: _muted)))
+                      : ListView.separated(
+                          itemCount: _requests.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: _divider, indent: 20),
+                          itemBuilder: (_, i) => _RequestItem(
+                            req: _requests[i],
+                            onResolve: () => _showResolveDialog(_requests[i]),
+                            onDelete: () => _confirmDelete(_requests[i]),
+                          ),
+                        ),
+            ),
           ],
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Filter bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: SegmentedButton<String?>(
-              segments: const [
-                ButtonSegment(value: null, label: Text('全部')),
-                ButtonSegment(value: 'pending', label: Text('待处理')),
-                ButtonSegment(value: 'completed', label: Text('已完成')),
-                ButtonSegment(value: 'rejected', label: Text('已拒绝')),
-              ],
-              selected: {_filterStatus},
-              onSelectionChanged: (v) {
-                setState(() => _filterStatus = v.first);
-                _load();
-              },
-            ),
-          ),
-          const Divider(height: 1),
-
-          // List
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _requests.isEmpty
-                    ? Center(
-                        child: Text('暂无申请记录',
-                            style: TextStyle(color: Colors.grey.shade500)))
-                    : ListView.separated(
-                        itemCount: _requests.length,
-                        separatorBuilder: (_, __) =>
-                            const Divider(height: 1, indent: 16),
-                        itemBuilder: (_, i) => _RequestTile(
-                          req: _requests[i],
-                          onResolve: () => _showResolveDialog(_requests[i]),
-                          onDelete: () => _confirmDelete(_requests[i]),
-                        ),
-                      ),
-          ),
-        ],
       ),
     );
   }
 }
 
-class _RequestTile extends StatelessWidget {
+// ─── Pill filter bar ──────────────────────────────────────────────────────────
+
+class _PillFilterBar extends StatelessWidget {
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+  const _PillFilterBar({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    const tabs = [
+      (label: '全部', value: null as String?),
+      (label: '待处理', value: 'pending' as String?),
+      (label: '已完成', value: 'completed' as String?),
+      (label: '已拒绝', value: 'rejected' as String?),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(4, 4, 1.2, 1.2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFEEEDEA), width: 1.2),
+        borderRadius: BorderRadius.circular(40),
+        boxShadow: const [
+          BoxShadow(color: Color(0x08000000), blurRadius: 3, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: tabs.map((tab) {
+          final isActive = selected == tab.value;
+          return GestureDetector(
+            onTap: () => onChanged(tab.value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              height: 33,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: isActive ? _primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(40),
+                boxShadow: isActive
+                    ? const [
+                        BoxShadow(
+                          color: Color(0x1A000000),
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ]
+                    : null,
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isActive) ...[
+                    const Icon(Icons.check, size: 13, color: Colors.white),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    tab.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: isActive ? Colors.white : _muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── Request list item ────────────────────────────────────────────────────────
+
+class _RequestItem extends StatelessWidget {
   final PasswordResetRequest req;
   final VoidCallback onResolve;
   final VoidCallback onDelete;
 
-  const _RequestTile({
+  const _RequestItem({
     required this.req,
     required this.onResolve,
     required this.onDelete,
   });
+
+  Color get _statusColor => switch (req.status) {
+        'pending'   => Colors.orange,
+        'completed' => const Color(0xFF4EBB6A),
+        'rejected'  => const Color(0xFFC07078),
+        _           => Colors.grey,
+      };
+
+  IconData get _statusIcon => switch (req.status) {
+        'pending'   => Icons.hourglass_empty,
+        'completed' => Icons.check_circle_outline,
+        'rejected'  => Icons.cancel_outlined,
+        _           => Icons.help_outline,
+      };
 
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat('MM-dd HH:mm');
     final isPending = req.status == 'pending';
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: _statusColor(req.status).withValues(alpha: 0.15),
-        child: Icon(_statusIcon(req.status),
-            color: _statusColor(req.status), size: 20),
-      ),
-      title: Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(req.displayName,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(width: 6),
-          Text('@${req.username}',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: _statusColor(req.status).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+          Icon(_statusIcon, color: _statusColor, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      req.displayName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '@${req.username}',
+                      style: const TextStyle(fontSize: 12, color: _muted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '申请时间：${fmt.format(req.createdAt)}',
+                  style: const TextStyle(fontSize: 12, color: _muted),
+                ),
+                if (req.resolvedBy.isNotEmpty)
+                  Text(
+                    '处理人：${req.resolvedBy}  ${req.resolvedAt != null ? fmt.format(req.resolvedAt!) : ''}',
+                    style: const TextStyle(fontSize: 12, color: _muted),
+                  ),
+              ],
             ),
-            child: Text(req.statusLabel,
-                style: TextStyle(
-                    color: _statusColor(req.status),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
           ),
-        ],
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 2),
-          Text('申请时间：${fmt.format(req.createdAt)}',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-          if (req.userNote.isNotEmpty)
-            Text('用户备注：${req.userNote}',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-          if (req.adminNote.isNotEmpty)
-            Text('管理员备注：${req.adminNote}',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-          if (req.resolvedBy.isNotEmpty)
-            Text(
-                '处理人：${req.resolvedBy}  ${req.resolvedAt != null ? fmt.format(req.resolvedAt!) : ''}',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
-        ],
-      ),
-      isThreeLine: true,
-      trailing: isPending
-          ? FilledButton.tonal(
+          const SizedBox(width: 8),
+          if (isPending) ...[
+            _StatusBadge(status: req.status),
+            const SizedBox(width: 8),
+            FilledButton.tonal(
               onPressed: onResolve,
               style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 32),
+              ),
               child: const Text('处理'),
-            )
-          : IconButton(
-              icon: const Icon(Icons.delete_outline, size: 18),
-              color: Colors.grey.shade400,
-              onPressed: onDelete,
             ),
+          ] else ...[
+            _StatusBadge(status: req.status),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18),
+              color: const Color(0xFFD0D0D8),
+              onPressed: onDelete,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ],
+      ),
     );
   }
-
-  Color _statusColor(String s) => switch (s) {
-        'pending' => Colors.orange,
-        'completed' => Colors.green,
-        'rejected' => Colors.red,
-        _ => Colors.grey,
-      };
-
-  IconData _statusIcon(String s) => switch (s) {
-        'pending' => Icons.hourglass_empty,
-        'completed' => Icons.check_circle_outline,
-        'rejected' => Icons.cancel_outlined,
-        _ => Icons.help_outline,
-      };
 }
+
+// ─── Status badge ─────────────────────────────────────────────────────────────
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, borderColor, textColor) = switch (status) {
+      'completed' => (
+          '已完成',
+          const Color(0xFFC5E6D2),
+          const Color(0xFF4EBB6A),
+        ),
+      'rejected' => (
+          '已拒绝',
+          const Color(0xFFF5C5C8),
+          const Color(0xFFC07078),
+        ),
+      'pending' => (
+          '待处理',
+          const Color(0xFFFFDDA8),
+          const Color(0xFFE09030),
+        ),
+      _ => (
+          '未知',
+          const Color(0xFFD0D0D8),
+          const Color(0xFF9090A0),
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        border: Border.all(color: borderColor, width: 1.2),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 12, color: textColor)),
+    );
+  }
+}
+
+// ─── Info row (used in resolve dialog) ───────────────────────────────────────
 
 class _InfoRow extends StatelessWidget {
   final String label;

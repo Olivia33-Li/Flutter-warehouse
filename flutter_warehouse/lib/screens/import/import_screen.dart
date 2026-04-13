@@ -15,75 +15,125 @@ class ImportScreen extends StatelessWidget {
       label: 'SKU 主档导入',
       subtitle: '批量新增或更新 SKU 基础资料',
       icon: Icons.inventory_2_outlined,
-      color: Colors.blue,
+      avatarBg: Color(0xFFEEF1FE),
+      iconColor: Color(0xFF4A6CF7),
     ),
     _HubEntry(
       type: 'locations',
       label: '库位主档导入',
       subtitle: '批量新增或更新库位',
       icon: Icons.shelves,
-      color: Colors.teal,
+      avatarBg: Color(0xFFEEF6F0),
+      iconColor: Color(0xFF4EBB6A),
     ),
     _HubEntry(
       type: 'inventory',
       label: '库存明细导入',
       subtitle: '批量录入库存数量（SKU 和库位须已存在）',
       icon: Icons.table_chart_outlined,
-      color: Colors.indigo,
+      avatarBg: Color(0xFFFDF5E8),
+      iconColor: Color(0xFFE09030),
     ),
     _HubEntry(
       type: 'sku-barcode-update',
       label: 'SKU 条码批量更新',
       subtitle: '仅更新已有 SKU 的条形码字段',
       icon: Icons.qr_code_outlined,
-      color: Colors.orange,
+      avatarBg: Color(0xFFF3EEFC),
+      iconColor: Color(0xFF9A6CF7),
     ),
     _HubEntry(
       type: 'sku-carton-qty-update',
       label: 'SKU 箱规批量更新',
       subtitle: '仅更新已有 SKU 的默认箱规字段',
       icon: Icons.inventory_outlined,
-      color: Colors.deepOrange,
+      avatarBg: Color(0xFFFEF0E8),
+      iconColor: Color(0xFFE87040),
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('批量导入')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('选择导入类型',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600)),
-          const SizedBox(height: 8),
-          ..._entries.map((e) => _HubTile(entry: e)),
-          const SizedBox(height: 16),
-          Text('记录',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600)),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.grey.shade200,
-                child: Icon(Icons.history, color: Colors.grey.shade700),
-              ),
-              title: const Text('导入记录', style: TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text('查看历史导入日志',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const _ImportLogsScreen()),
+      backgroundColor: const Color(0xFFF5F3F0),
+      body: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Center(
+                        child: Icon(Icons.arrow_back_ios,
+                            size: 18, color: Color(0xFF1A1A2E)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    '批量导入',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 28),
+            const Padding(
+              padding: EdgeInsets.only(left: 24, bottom: 12),
+              child: Text(
+                '选择导入类型',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF8E8E9A),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: _entries.map((e) => _HubTile(entry: e)).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.only(left: 24, bottom: 12),
+              child: Text(
+                '记录',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF8E8E9A),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _ImportCard(
+                avatarBg: const Color(0xFFF5F4F2),
+                icon: Icons.history,
+                iconColor: const Color(0xFFB5B5C0),
+                label: '导入记录',
+                subtitle: '查看历史导入日志',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const _ImportLogsScreen()),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
@@ -94,13 +144,15 @@ class _HubEntry {
   final String label;
   final String subtitle;
   final IconData icon;
-  final MaterialColor color;
+  final Color avatarBg;
+  final Color iconColor;
   const _HubEntry({
     required this.type,
     required this.label,
     required this.subtitle,
     required this.icon,
-    required this.color,
+    required this.avatarBg,
+    required this.iconColor,
   });
 }
 
@@ -110,19 +162,94 @@ class _HubTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: entry.color.shade100,
-          child: Icon(entry.icon, color: entry.color.shade700, size: 22),
-        ),
-        title: Text(entry.label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-        subtitle: Text(entry.subtitle,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _ImportDetailScreen(type: entry.type)),
+    return _ImportCard(
+      avatarBg: entry.avatarBg,
+      icon: entry.icon,
+      iconColor: entry.iconColor,
+      label: entry.label,
+      subtitle: entry.subtitle,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => _ImportDetailScreen(type: entry.type)),
+      ),
+    );
+  }
+}
+
+class _ImportCard extends StatelessWidget {
+  final Color avatarBg;
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ImportCard({
+    required this.avatarBg,
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 76,
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: avatarBg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: iconColor, size: 18),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1A1A2E),
+                            )),
+                        const SizedBox(height: 2),
+                        Text(subtitle,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFB5B5C0),
+                            )),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 16, color: Color(0xFFB5B5C0)),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
