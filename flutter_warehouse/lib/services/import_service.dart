@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'dart:js_interop';
-import 'package:web/web.dart' as web;
+import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 import 'api_service.dart';
@@ -283,36 +285,18 @@ class ImportService {
     final filename = 'import_${record.importType}_${fmt.format(record.createdAt)}.xlsx';
     final url = '${AppConstants.baseUrl}/import/logs/${record.id}/export';
 
-    final xhr = web.XMLHttpRequest();
-    xhr.open('GET', url);
-    xhr.responseType = 'blob';
-    xhr.setRequestHeader('Authorization', 'Bearer $token');
-
-    final completer = Completer<void>();
-    xhr.onLoad.listen((_) {
-      if (xhr.status == 200) {
-        final blob = xhr.response as web.Blob;
-        final blobUrl = web.URL.createObjectURL(blob);
-        (web.document.createElement('a') as web.HTMLAnchorElement)
-          ..href = blobUrl
-          ..setAttribute('download', filename)
-          ..click();
-        web.URL.revokeObjectURL(blobUrl);
-        completer.complete();
-      } else {
-        completer.completeError('HTTP ${xhr.status}');
-      }
-    });
-    xhr.onError.listen((_) => completer.completeError('Network error'));
-    xhr.send();
-    return completer.future;
+    final dir = await getTemporaryDirectory();
+    final filePath = '${dir.path}/$filename';
+    await Dio().download(url, filePath,
+        options: Options(headers: {'Authorization': 'Bearer $token'}));
+    await Share.shareXFiles([XFile(filePath)]);
   }
 
   // ─── Templates ───────────────────────────────────────────────────────────
 
   /// Downloads a CSV template. barcode column is prefixed with tab to encourage
   /// Excel to treat it as text (reduces scientific-notation mangling).
-  void downloadTemplate(String type) {
+  Future<void> downloadTemplate(String type) async {
     late String content;
     late String filename;
 
@@ -360,15 +344,9 @@ class ImportService {
     }
 
     const bom = '\uFEFF';
-    final blob = web.Blob(
-      ['$bom$content'.toJS].toJS,
-      web.BlobPropertyBag(type: 'text/csv;charset=utf-8'),
-    );
-    final url = web.URL.createObjectURL(blob);
-    (web.document.createElement('a') as web.HTMLAnchorElement)
-      ..href = url
-      ..setAttribute('download', filename)
-      ..click();
-    web.URL.revokeObjectURL(url);
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/$filename');
+    await file.writeAsString('$bom$content', encoding: utf8);
+    await Share.shareXFiles([XFile(file.path)]);
   }
 }

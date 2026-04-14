@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:web/web.dart' as web;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
@@ -205,28 +206,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final now = DateTime.now();
       final filename =
           'warehouse_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
-      final xhr = web.XMLHttpRequest();
-      xhr.open('GET', url);
-      xhr.responseType = 'blob';
-      xhr.setRequestHeader('Authorization', 'Bearer $token');
-      final completer = Completer<void>();
-      xhr.onLoad.listen((_) {
-        if (xhr.status == 200) {
-          final blob = xhr.response as web.Blob;
-          final blobUrl = web.URL.createObjectURL(blob);
-          (web.document.createElement('a') as web.HTMLAnchorElement)
-            ..href = blobUrl
-            ..setAttribute('download', filename)
-            ..click();
-          web.URL.revokeObjectURL(blobUrl);
-          completer.complete();
-        } else {
-          completer.completeError('HTTP ${xhr.status}');
-        }
-      });
-      xhr.onError.listen((_) => completer.completeError('网络错误'));
-      xhr.send();
-      await completer.future;
+      final dir = await getTemporaryDirectory();
+      final filePath = '${dir.path}/$filename';
+      await Dio().download(url, filePath,
+          options: Options(headers: {'Authorization': 'Bearer $token'}));
+      await Share.shareXFiles([XFile(filePath)]);
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
