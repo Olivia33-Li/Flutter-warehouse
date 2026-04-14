@@ -403,10 +403,16 @@ export class InventoryService {
     });
     if (!record) throw new NotFoundException('库存记录不存在');
 
-    if (dto.configurations && dto.configurations.length > 0 && record.configurations?.length > 0) {
-      // 按箱规出库: validate each spec's boxes individually before subtracting
+    if (dto.configurations && dto.configurations.length > 0) {
+      // 按箱规出库: build the source configs (prefer record.configurations, fall back to record.boxes/unitsPerBox)
+      const sourceConfigs: { boxes: number; unitsPerBox: number }[] =
+        record.configurations?.length > 0
+          ? record.configurations
+          : (record.boxes > 0 ? [{ boxes: record.boxes, unitsPerBox: record.unitsPerBox ?? 1 }] : []);
+
+      // validate each spec before subtracting
       for (const toRemove of dto.configurations) {
-        const existing = record.configurations.find(c => c.unitsPerBox === toRemove.unitsPerBox);
+        const existing = sourceConfigs.find(c => c.unitsPerBox === toRemove.unitsPerBox);
         const available = existing?.boxes ?? 0;
         if (toRemove.boxes > available) {
           throw new BadRequestException(
@@ -414,8 +420,9 @@ export class InventoryService {
           );
         }
       }
-      // 按箱规出库: subtract each spec's boxes from matching configuration
-      const updated = record.configurations
+
+      // subtract
+      const updated = sourceConfigs
         .map(existing => {
           const toRemove = dto.configurations!.find(c => c.unitsPerBox === existing.unitsPerBox);
           return { boxes: existing.boxes - (toRemove?.boxes ?? 0), unitsPerBox: existing.unitsPerBox };

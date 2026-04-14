@@ -12,12 +12,14 @@ import '../../widgets/error_view.dart';
 import '../inventory/inventory_add_screen.dart';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
-const _bgColor    = Color(0xFFF5F3F0);
-const _primary    = Color(0xFF4A6CF7);
-const _titleColor = Color(0xFF1A1A2E);
-const _mutedColor = Color(0xFF8E8E9A);
-const _hintColor  = Color(0xFFC5C5CE);
-const _searchBg   = Color(0xFFE8E6E3);
+const _bgColor      = Color(0xFFF0EDE8);
+const _primary      = Color(0xFF4A6CF7);
+const _primaryDark  = Color(0xFF1E2D50);
+const _titleColor   = Color(0xFF1A1A2E);
+const _mutedColor   = Color(0xFF8E8E9A);
+const _hintColor    = Color(0xFFC5C5CE);
+const _searchBg     = Color(0xFFE8E5E1);
+const _borderColor  = Color(0xFFE0DDD9);
 
 class LocationsScreen extends ConsumerStatefulWidget {
   const LocationsScreen({super.key});
@@ -27,14 +29,14 @@ class LocationsScreen extends ConsumerStatefulWidget {
 }
 
 class _LocationsScreenState extends ConsumerState<LocationsScreen> {
-  final _searchCtrl = TextEditingController();
+  final _searchCtrl      = TextEditingController();
   final _locationService = LocationService();
 
   List<Location> _allLocations = [];
-  List<Location> _filtered = [];
-  bool _loading = true;
+  List<Location> _filtered     = [];
+  bool   _loading = true;
   String? _error;
-  String _query = '';
+  String _query   = '';
   Timer? _debounce;
 
   @override
@@ -93,52 +95,144 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   void _showAddDialog() {
     final codeCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('新增位置'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: codeCtrl,
-              decoration: const InputDecoration(
-                  labelText: '位置代码 *', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descCtrl,
-              decoration: const InputDecoration(
-                  labelText: '描述', border: OutlineInputBorder()),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
-          FilledButton(
-            onPressed: () async {
-              if (codeCtrl.text.trim().isEmpty) return;
-              try {
-                await _locationService.create(
-                  code: codeCtrl.text.trim(),
-                  description: descCtrl.text.trim(),
-                );
-                if (ctx.mounted) ctx.pop();
-                _load();
-              } on DioException catch (e) {
-                final msg = e.response?.data?['message'];
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text(msg ?? '创建失败')));
-                }
-              }
-            },
-            child: const Text('创建'),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
           ),
-        ],
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title row
+              Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.location_on_rounded,
+                        size: 16, color: _primary),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    '新增位置',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _titleColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // 位置代码 input
+              TextField(
+                controller: codeCtrl,
+                textCapitalization: TextCapitalization.characters,
+                style: const TextStyle(fontSize: 14, color: _titleColor),
+                decoration: _dialogInputDeco('位置代码 *'),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              // 描述 input
+              TextField(
+                controller: descCtrl,
+                style: const TextStyle(fontSize: 14, color: _titleColor),
+                decoration: _dialogInputDeco('描述（可选）'),
+              ),
+              const SizedBox(height: 24),
+              // Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => ctx.pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: _mutedColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                    child: const Text('取消',
+                        style: TextStyle(fontSize: 14)),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (codeCtrl.text.trim().isEmpty) return;
+                        try {
+                          await _locationService.create(
+                            code: codeCtrl.text.trim(),
+                            description: descCtrl.text.trim(),
+                          );
+                          if (ctx.mounted) ctx.pop();
+                          _load();
+                        } on DioException catch (e) {
+                          final msg = e.response?.data?['message'];
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text(msg ?? '创建失败')));
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryDark,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('创建',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  static InputDecoration _dialogInputDeco(String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: _hintColor, fontSize: 14),
+        filled: true,
+        fillColor: const Color(0xFFF7F5F2),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _primaryDark, width: 1.5),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -150,9 +244,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header: title + count ────────────────────────────────────
+            // ── Header ───────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
@@ -161,7 +255,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                     '位置管理',
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: _titleColor,
                       letterSpacing: -0.5,
                     ),
@@ -171,9 +265,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                     Text(
                       '${_allLocations.length} 个库位',
                       style: const TextStyle(
-                        fontSize: 13,
-                        color: _mutedColor,
-                      ),
+                          fontSize: 13, color: _mutedColor),
                     ),
                 ],
               ),
@@ -199,7 +291,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                       : _filtered.isEmpty
                           ? _emptyState()
                           : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              padding:
+                                  const EdgeInsets.fromLTRB(20, 0, 20, 100),
                               itemCount: _filtered.length,
                               itemBuilder: (_, i) => _LocationCard(
                                 location: _filtered[i],
@@ -213,53 +306,86 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           ],
         ),
       ),
+
+      // ── FAB area ─────────────────────────────────────────────────────────
       floatingActionButton: user?.canEdit == true
           ? Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Secondary: add inventory
+                // Secondary: 新增位置
+                GestureDetector(
+                  onTap: _showAddDialog,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.location_on_rounded,
+                            size: 16, color: _primary),
+                        SizedBox(width: 6),
+                        Text(
+                          '新增位置',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _titleColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Primary: 录入库存
                 GestureDetector(
                   onTap: () => Navigator.of(context)
                       .push(MaterialPageRoute(
                           builder: (_) => const InventoryAddScreen()))
                       .then((ok) { if (ok == true) _load(); }),
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
+                      color: _primaryDark,
+                      borderRadius: BorderRadius.circular(999),
                       boxShadow: [
                         BoxShadow(
-                          color: _primary.withValues(alpha: 0.2),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.add_box_outlined,
-                        size: 20, color: _primary),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Primary: add location
-                GestureDetector(
-                  onTap: _showAddDialog,
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: _primary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: _primary.withValues(alpha: 0.35),
+                          color: _primaryDark.withValues(alpha: 0.30),
                           blurRadius: 16,
                           offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.add, size: 24, color: Colors.white),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.inventory_2_rounded,
+                            size: 18, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          '录入库存',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -271,10 +397,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   Widget _emptyState() {
     if (_query.isEmpty) {
       return const Center(
-        child: Text(
-          '暂无位置',
-          style: TextStyle(color: _mutedColor, fontSize: 14),
-        ),
+        child: Text('暂无位置',
+            style: TextStyle(color: _mutedColor, fontSize: 14)),
       );
     }
     return Center(
@@ -283,15 +407,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         children: [
           const Icon(Icons.search_off, size: 48, color: _hintColor),
           const SizedBox(height: 12),
-          Text(
-            '未找到 "$_query"',
-            style: const TextStyle(color: _mutedColor, fontSize: 15),
-          ),
+          Text('未找到 "$_query"',
+              style: const TextStyle(color: _mutedColor, fontSize: 15)),
           const SizedBox(height: 4),
-          const Text(
-            '尝试缩短关键词，或忽略大小写搜索',
-            style: TextStyle(color: _hintColor, fontSize: 12),
-          ),
+          const Text('尝试缩短关键词，或忽略大小写搜索',
+              style: TextStyle(color: _hintColor, fontSize: 12)),
         ],
       ),
     );
@@ -326,7 +446,8 @@ class _SearchBar extends StatelessWidget {
               style: const TextStyle(fontSize: 14, color: _titleColor),
               decoration: InputDecoration(
                 hintText: '搜索位置码 / 备注...',
-                hintStyle: const TextStyle(fontSize: 14, color: _hintColor),
+                hintStyle:
+                    const TextStyle(fontSize: 14, color: _hintColor),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -375,7 +496,7 @@ class _LocationCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -386,16 +507,16 @@ class _LocationCard extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Top row: code + box count ──────────────────────────
+                // ── Top row: code + badge ─────────────────────────────
                 Row(
                   children: [
                     Expanded(
@@ -406,9 +527,7 @@ class _LocationCard extends StatelessWidget {
                           baseStyle: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
-                            color: isEmpty
-                                ? _hintColor
-                                : _titleColor,
+                            color: isEmpty ? _hintColor : _titleColor,
                           ),
                         ),
                       ),
@@ -423,7 +542,7 @@ class _LocationCard extends StatelessWidget {
                   ],
                 ),
 
-                // ── Description ────────────────────────────────────────
+                // ── Description ───────────────────────────────────────
                 if (location.description != null &&
                     location.description!.isNotEmpty) ...[
                   const SizedBox(height: 3),
@@ -432,14 +551,12 @@ class _LocationCard extends StatelessWidget {
                       location.description!,
                       query,
                       baseStyle: const TextStyle(
-                        color: _mutedColor,
-                        fontSize: 12,
-                      ),
+                          color: _mutedColor, fontSize: 12),
                     ),
                   ),
                 ],
 
-                // ── Stats row ──────────────────────────────────────────
+                // ── Stats row ─────────────────────────────────────────
                 if (!isEmpty) ...[
                   const SizedBox(height: 6),
                   Row(
@@ -453,7 +570,7 @@ class _LocationCard extends StatelessWidget {
                       ],
                       if (location.totalQty > 0) ...[
                         const SizedBox(width: 12),
-                        _statItem(Icons.numbers_outlined,
+                        _statItem(Icons.tag_rounded,
                             '${location.totalQty} 件'),
                       ],
                       if (location.checkedAt != null) ...[
@@ -477,28 +594,22 @@ class _LocationCard extends StatelessWidget {
 
   Widget _stockBadge(bool isEmpty) {
     if (isEmpty) {
-      return const Text(
-        '空位置',
-        style: TextStyle(color: _hintColor, fontSize: 12),
-      );
+      return const Text('空位置',
+          style: TextStyle(color: _hintColor, fontSize: 12));
     }
     if (location.totalBoxes > 0) {
       return Text(
         '${location.totalBoxes} 箱',
         style: const TextStyle(
-          color: _primary,
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-        ),
+            color: _primary, fontWeight: FontWeight.w600, fontSize: 14),
       );
     }
     return Text(
       '${location.totalQty} 件',
       style: const TextStyle(
-        color: Color(0xFF67C23A),
-        fontWeight: FontWeight.w600,
-        fontSize: 14,
-      ),
+          color: Color(0xFF67C23A),
+          fontWeight: FontWeight.w600,
+          fontSize: 14),
     );
   }
 

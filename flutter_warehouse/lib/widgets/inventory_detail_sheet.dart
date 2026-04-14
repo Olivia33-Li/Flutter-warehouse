@@ -525,11 +525,17 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
             ? [InventoryConfig(boxes: _boxes, unitsPerBox: _units)]
             : <InventoryConfig>[]);
 
-    final configCtrls =
-        List.generate(effectiveConfigs.length, (_) => TextEditingController(text: '0'));
+    // 'carton' | 'boxesOnly' | 'qty'
+    String stockOutMode = effectiveConfigs.isNotEmpty ? 'carton' : 'qty';
+
+    // 按箱规 controllers (one per config row)
+    final configCtrls = List.generate(
+        effectiveConfigs.length, (_) => TextEditingController(text: '0'));
+    // 仅箱数 controller
+    final boxesOnlyCtrl = TextEditingController(text: '0');
+    // 按总数量 controller
     final qtyCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    bool useConfigMode = effectiveConfigs.isNotEmpty;
     String? err;
     bool saving = false;
 
@@ -537,23 +543,75 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
+          // ── live calculations ──
           final configTotal = List.generate(effectiveConfigs.length, (i) {
             final b = int.tryParse(configCtrls[i].text) ?? 0;
             return b * effectiveConfigs[i].unitsPerBox;
           }).fold<int>(0, (a, b) => a + b);
-          final previewOut =
-              useConfigMode ? configTotal : (int.tryParse(qtyCtrl.text) ?? 0);
-          // 按箱规模式：用箱数做越界判断；按总数量模式：用件数
-          final totalOutBoxes = useConfigMode
+
+          final totalOutBoxes = stockOutMode == 'carton'
               ? List.generate(effectiveConfigs.length,
-                    (i) => int.tryParse(configCtrls[i].text) ?? 0)
+                      (i) => int.tryParse(configCtrls[i].text) ?? 0)
                   .fold<int>(0, (a, b) => a + b)
-              : 0;
+              : stockOutMode == 'boxesOnly'
+                  ? (int.tryParse(boxesOnlyCtrl.text) ?? 0)
+                  : 0;
           final totalAvailableBoxes =
               effectiveConfigs.fold<int>(0, (s, c) => s + c.boxes);
-          final isOverLimit = useConfigMode
+
+          final previewOut = stockOutMode == 'carton'
+              ? configTotal
+              : stockOutMode == 'boxesOnly'
+                  ? totalOutBoxes * (_units > 0 ? _units : 1)
+                  : (int.tryParse(qtyCtrl.text) ?? 0);
+
+          final isOverLimit = stockOutMode == 'carton'
               ? totalOutBoxes > totalAvailableBoxes
-              : (_qty > 0 && previewOut > _qty);
+              : stockOutMode == 'boxesOnly'
+                  ? totalOutBoxes > _boxes
+                  : (_qty > 0 && previewOut > _qty);
+
+          // ── preview bar ──
+          Widget previewBar() => Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    const Text('出库总量: ', style: TextStyle(fontSize: 13)),
+                    Text(
+                      stockOutMode == 'boxesOnly'
+                          ? '$totalOutBoxes 箱'
+                          : '$previewOut 件',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: isOverLimit
+                            ? Colors.red.shade700
+                            : previewOut > 0 || totalOutBoxes > 0
+                                ? Colors.orange.shade700
+                                : Colors.grey.shade500,
+                      ),
+                    ),
+                    if (!isOverLimit &&
+                        (previewOut > 0 || totalOutBoxes > 0)) ...[
+                      Text(
+                        stockOutMode == 'carton'
+                            ? '  →  剩余 ${totalAvailableBoxes - totalOutBoxes} 箱'
+                            : stockOutMode == 'boxesOnly'
+                                ? '  →  剩余 ${_boxes - totalOutBoxes} 箱'
+                                : '  →  剩余 ${_qty - previewOut} 件',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade500),
+                      ),
+                    ],
+                  ],
+                ),
+              );
 
           return AlertDialog(
             title: const Text('出库'),
@@ -561,196 +619,190 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               width: 340,
               child: SingleChildScrollView(
                 child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${widget.skuCode}  @  ${widget.locationCode}',
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text('当前库存: $_qtyLabel',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.red.shade700)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Mode toggle
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                          value: false,
-                          label: Text('按总数量'),
-                          icon: Icon(Icons.numbers, size: 16)),
-                      ButtonSegment(
-                          value: true,
-                          label: Text('按箱规'),
-                          icon: Icon(Icons.view_list, size: 16)),
-                    ],
-                    selected: {useConfigMode},
-                    onSelectionChanged: (v) => setS(() { useConfigMode = v.first; err = null; }),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Total qty mode
-                  if (!useConfigMode) ...[
-                    TextField(
-                      controller: qtyCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '出库件数 *',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        suffixText: '件',
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      onChanged: (_) => setS(() {}),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${widget.skuCode}  @  ${widget.locationCode}',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text('当前库存: $_qtyLabel',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.red.shade700)),
+                        ],
+                      ),
                     ),
-                  ],
+                    const SizedBox(height: 12),
 
-                  // Config mode
-                  if (useConfigMode) ...[
-                    if (effectiveConfigs.isEmpty)
-                      Text('当前无箱规数据，请使用按总数量模式',
-                          style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 13))
-                    else ...[
-                      const Text('选择出库箱数:',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      ...List.generate(effectiveConfigs.length, (i) {
-                        final cfg = effectiveConfigs[i];
-                        final outBoxes =
-                            int.tryParse(configCtrls[i].text) ?? 0;
-                        final outQty = outBoxes * cfg.unitsPerBox;
-                        final overLimit = outBoxes > cfg.boxes;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 72,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text('${cfg.unitsPerBox}件/箱',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600)),
-                                    Text('共${cfg.boxes}箱',
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey.shade500)),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextField(
-                                  controller: configCtrls[i],
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    labelText: '出库 (最多${cfg.boxes}箱)',
-                                    border: const OutlineInputBorder(),
-                                    isDense: true,
-                                    suffixText: '箱',
-                                    errorText:
-                                        overLimit ? '超出可用${cfg.boxes}箱' : null,
+                    // Mode toggle — 3 options
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                            value: 'carton',
+                            label: Text('按箱规'),
+                            icon: Icon(Icons.view_list, size: 16)),
+                        ButtonSegment(
+                            value: 'boxesOnly',
+                            label: Text('仅箱数'),
+                            icon: Icon(Icons.inventory_2_outlined, size: 16)),
+                        ButtonSegment(
+                            value: 'qty',
+                            label: Text('按总数量'),
+                            icon: Icon(Icons.numbers, size: 16)),
+                      ],
+                      selected: {stockOutMode},
+                      onSelectionChanged: (v) =>
+                          setS(() { stockOutMode = v.first; err = null; }),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── 按箱规 mode ──
+                    if (stockOutMode == 'carton') ...[
+                      if (effectiveConfigs.isEmpty)
+                        Text('当前无箱规数据，请使用其他模式',
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 13))
+                      else ...[
+                        const Text('选择出库箱数:',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        ...List.generate(effectiveConfigs.length, (i) {
+                          final cfg = effectiveConfigs[i];
+                          final outBoxes =
+                              int.tryParse(configCtrls[i].text) ?? 0;
+                          final outQty = outBoxes * cfg.unitsPerBox;
+                          final overLimit = outBoxes > cfg.boxes;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 72,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
-                                  onChanged: (_) => setS(() {}),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Text('${cfg.unitsPerBox}件/箱',
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600)),
+                                      Text('共${cfg.boxes}箱',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey.shade500)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text('= $outQty件',
-                                  style: TextStyle(
-                                      color: overLimit
-                                          ? Colors.red
-                                          : Colors.grey.shade600,
-                                      fontSize: 12)),
-                            ],
-                          ),
-                        );
-                      }),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: configCtrls[i],
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: '出库 (最多${cfg.boxes}箱)',
+                                      border: const OutlineInputBorder(),
+                                      isDense: true,
+                                      suffixText: '箱',
+                                      errorText: overLimit
+                                          ? '超出可用${cfg.boxes}箱'
+                                          : null,
+                                    ),
+                                    onChanged: (_) => setS(() {}),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text('= $outQty件',
+                                    style: TextStyle(
+                                        color: overLimit
+                                            ? Colors.red
+                                            : Colors.grey.shade600,
+                                        fontSize: 12)),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+
+                    // ── 仅箱数 mode ──
+                    if (stockOutMode == 'boxesOnly') ...[
+                      TextField(
+                        controller: boxesOnlyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: '出库箱数 * (最多 $_boxes 箱)',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                          suffixText: '箱',
+                        ),
+                        onChanged: (_) => setS(() {}),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('适用：箱规不确定，仅按箱数出库。',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600)),
+                    ],
+
+                    // ── 按总数量 mode ──
+                    if (stockOutMode == 'qty') ...[
+                      TextField(
+                        controller: qtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '出库件数 *',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          suffixText: '件',
+                        ),
+                        onChanged: (_) => setS(() {}),
+                      ),
+                    ],
+
+                    // Preview
+                    const SizedBox(height: 8),
+                    previewBar(),
+                    const SizedBox(height: 10),
+                    _noteField(noteCtrl),
+
+                    if (err != null) ...[
+                      const SizedBox(height: 8),
+                      Text(err!,
+                          style: const TextStyle(
+                              color: Colors.red, fontSize: 13)),
                     ],
                   ],
-
-                  // Preview
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text('出库总量: ',
-                            style: TextStyle(fontSize: 13)),
-                        Text('$previewOut 件',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: isOverLimit
-                                  ? Colors.red.shade700
-                                  : previewOut > 0
-                                      ? Colors.orange.shade700
-                                      : Colors.grey.shade500,
-                            )),
-                        if (previewOut > 0 && !isOverLimit) ...[
-                          Text(
-                              useConfigMode
-                                  ? '  →  剩余 ${totalAvailableBoxes - totalOutBoxes} 箱'
-                                  : '  →  剩余 ${_qty - previewOut} 件',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade500)),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-                  _noteField(noteCtrl),
-
-                  if (err != null) ...[
-                    const SizedBox(height: 8),
-                    Text(err!,
-                        style: const TextStyle(
-                            color: Colors.red, fontSize: 13)),
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
-          actions: [
+            actions: [
               TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
               FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                style:
+                    FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: saving
                     ? null
                     : () async {
-                        int qty;
-                        if (useConfigMode) {
-                          // Per-config validation
+                        int qty = 0;
+                        List<Map<String, int>>? removalConfigs;
+
+                        if (stockOutMode == 'carton') {
                           for (int i = 0; i < effectiveConfigs.length; i++) {
                             final outBoxes =
                                 int.tryParse(configCtrls[i].text) ?? 0;
@@ -760,7 +812,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             }
                             if (outBoxes > effectiveConfigs[i].boxes) {
                               setS(() => err =
-                                  '${effectiveConfigs[i].unitsPerBox}件/箱：出库箱数超过可用箱数 (${effectiveConfigs[i].boxes} 箱)');
+                                  '${effectiveConfigs[i].unitsPerBox}件/箱：超过可用箱数 (${effectiveConfigs[i].boxes} 箱)');
                               return;
                             }
                           }
@@ -769,50 +821,63 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             setS(() => err = '请至少输入一种箱规的出库数量');
                             return;
                           }
+                          if (totalOutBoxes > totalAvailableBoxes) {
+                            setS(() => err =
+                                '出库数量不能超过当前库存（$totalAvailableBoxes 箱）');
+                            return;
+                          }
+                          removalConfigs = List.generate(
+                                  effectiveConfigs.length, (i) {
+                                final outBoxes =
+                                    int.tryParse(configCtrls[i].text) ?? 0;
+                                return {
+                                  'boxes': outBoxes,
+                                  'unitsPerBox':
+                                      effectiveConfigs[i].unitsPerBox,
+                                };
+                              })
+                              .where((c) => c['boxes']! > 0)
+                              .toList();
+                        } else if (stockOutMode == 'boxesOnly') {
+                          final outBoxes =
+                              int.tryParse(boxesOnlyCtrl.text) ?? 0;
+                          if (outBoxes <= 0) {
+                            setS(() => err = '请输入有效箱数');
+                            return;
+                          }
+                          if (outBoxes > _boxes) {
+                            setS(() => err =
+                                '出库数量不能超过当前库存（$_boxes 箱）');
+                            return;
+                          }
+                          // send as configurations so backend handles boxes correctly
+                          removalConfigs = [
+                            {'boxes': outBoxes, 'unitsPerBox': _units > 0 ? _units : 1}
+                          ];
+                          qty = outBoxes * (_units > 0 ? _units : 1);
                         } else {
                           qty = int.tryParse(qtyCtrl.text) ?? 0;
                           if (qty <= 0) {
                             setS(() => err = '请输入有效件数');
                             return;
                           }
-                        }
-                        if (useConfigMode) {
-                          if (totalOutBoxes > totalAvailableBoxes) {
-                            setS(() => err =
-                                '出库数量不能超过当前库存（$totalAvailableBoxes 箱）');
-                            return;
-                          }
-                        } else {
                           if (_qty > 0 && qty > _qty) {
                             setS(() => err =
                                 '出库数量不能超过当前库存（$_qty 件）');
                             return;
                           }
                         }
-                        // Build per-spec removal list for 按箱规 mode so backend
-                        // can accurately subtract from each configuration entry.
-                        final removalConfigs = useConfigMode
-                            ? List.generate(effectiveConfigs.length, (i) {
-                                final outBoxes =
-                                    int.tryParse(configCtrls[i].text) ?? 0;
-                                return {
-                                  'boxes': outBoxes,
-                                  'unitsPerBox': effectiveConfigs[i].unitsPerBox,
-                                };
-                              }).where((c) => c['boxes']! > 0).toList()
-                            : null;
-                        setS(() {
-                          saving = true;
-                          err = null;
-                        });
+
+                        setS(() { saving = true; err = null; });
                         try {
                           await _invService.stockOut(
                             skuCode: widget.skuCode,
                             locationId: widget.locationId,
                             quantity: qty,
-                            configurations: removalConfigs?.isNotEmpty == true
-                                ? removalConfigs
-                                : null,
+                            configurations:
+                                removalConfigs?.isNotEmpty == true
+                                    ? removalConfigs
+                                    : null,
                             note: noteCtrl.text.trim(),
                           );
                           if (ctx.mounted) ctx.pop();
@@ -836,6 +901,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     for (final ctrl in configCtrls) {
       ctrl.dispose();
     }
+    boxesOnlyCtrl.dispose();
     qtyCtrl.dispose();
     noteCtrl.dispose();
   }

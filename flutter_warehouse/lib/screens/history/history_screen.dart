@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/history_service.dart';
+import '../../services/api_service.dart';
 import '../../models/change_record.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/audit_log_detail_sheet.dart';
@@ -28,6 +29,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   DateTime? _customEnd;
   String? _filterUserName;
   bool _userFilterInitialized = false;
+  List<_FilterOption> _userOptions = const [_FilterOption(label: '全部用户', value: null)];
   int _page = 1;
   int _total = 0;
   static const _limit = 50;
@@ -44,9 +46,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     if (!_userFilterInitialized) {
       _userFilterInitialized = true;
       final user = ref.read(currentUserProvider);
-      if (user != null && !user.isAdmin) {
+      if (user != null && !user.canViewAllHistory) {
         _filterUserName = user.username;
       }
+      if (user?.canManageUsers == true) _loadUsers();
       _load();
     }
   }
@@ -55,6 +58,25 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   void dispose() {
     _keywordCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUsers() async {
+    try {
+      final resp = await ApiService.instance.dio.get('/users');
+      final list = resp.data as List;
+      if (!mounted) return;
+      setState(() {
+        _userOptions = [
+          const _FilterOption(label: '全部用户', value: null),
+          ...list.map((u) {
+            final name = (u['name'] as String? ?? '').isNotEmpty
+                ? u['name'] as String
+                : u['username'] as String;
+            return _FilterOption(label: name, value: u['username'] as String);
+          }),
+        ];
+      });
+    } catch (_) {}
   }
 
   (String?, String?) _dateRange() {
@@ -333,6 +355,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
   }
 
+  String get _userLabel {
+    if (_filterUserName == null) return '用户';
+    final match = _userOptions.where((o) => o.value == _filterUserName).firstOrNull;
+    return match?.label ?? _filterUserName!;
+  }
+
   // ── User tabs ───────────────────────────────────────────────────────────────
 
   Widget _buildUserTabs() {
@@ -430,7 +458,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin == true;
+    final currentUser = ref.watch(currentUserProvider);
+    final canViewAll   = currentUser?.canViewAllHistory == true;
+    final canPickUser  = currentUser?.canManageUsers == true;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -441,7 +471,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        actions: isAdmin
+        actions: canViewAll
             ? [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
@@ -504,6 +534,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       },
                     ),
                     const SizedBox(width: 8),
+                    // 用户 dropdown (admin only)
+                    if (canPickUser) ...[
+                      _FilterDropdown(
+                        label: _userLabel,
+                        active: _filterUserName != null &&
+                            _filterUserName != ref.read(currentUserProvider)?.username,
+                        options: _userOptions,
+                        selected: _filterUserName,
+                        onSelect: (v) {
+                          setState(() => _filterUserName = v);
+                          _load();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     // 时间 dropdown
                     _DateFilterDropdown(
                       label: _dateLabel,
