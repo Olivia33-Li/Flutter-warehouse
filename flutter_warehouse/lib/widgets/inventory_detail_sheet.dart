@@ -117,6 +117,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
       // Critical: load current inventory state
@@ -140,7 +141,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
         if (mounted) setState(() => _recentRecords = []);
       }
     } catch (e) {
-      _error = e.toString();
+      if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -542,6 +543,17 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
           }).fold<int>(0, (a, b) => a + b);
           final previewOut =
               useConfigMode ? configTotal : (int.tryParse(qtyCtrl.text) ?? 0);
+          // 按箱规模式：用箱数做越界判断；按总数量模式：用件数
+          final totalOutBoxes = useConfigMode
+              ? List.generate(effectiveConfigs.length,
+                    (i) => int.tryParse(configCtrls[i].text) ?? 0)
+                  .fold<int>(0, (a, b) => a + b)
+              : 0;
+          final totalAvailableBoxes =
+              effectiveConfigs.fold<int>(0, (s, c) => s + c.boxes);
+          final isOverLimit = useConfigMode
+              ? totalOutBoxes > totalAvailableBoxes
+              : (_qty > 0 && previewOut > _qty);
 
           return AlertDialog(
             title: const Text('出库'),
@@ -587,7 +599,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           icon: Icon(Icons.view_list, size: 16)),
                     ],
                     selected: {useConfigMode},
-                    onSelectionChanged: (v) => setS(() => useConfigMode = v.first),
+                    onSelectionChanged: (v) => setS(() { useConfigMode = v.first; err = null; }),
                   ),
                   const SizedBox(height: 14),
 
@@ -697,15 +709,17 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: previewOut > _qty
+                              color: isOverLimit
                                   ? Colors.red.shade700
                                   : previewOut > 0
                                       ? Colors.orange.shade700
                                       : Colors.grey.shade500,
                             )),
-                        if (previewOut > 0 && previewOut <= _qty) ...[
+                        if (previewOut > 0 && !isOverLimit) ...[
                           Text(
-                              '  →  剩余 ${_qty - previewOut} 件',
+                              useConfigMode
+                                  ? '  →  剩余 ${totalAvailableBoxes - totalOutBoxes} 箱'
+                                  : '  →  剩余 ${_qty - previewOut} 件',
                               style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade500)),
@@ -762,10 +776,18 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             return;
                           }
                         }
-                        if (qty > _qty) {
-                          setS(() => err =
-                              '出库数量不能超过当前库存 ($_qty 件)');
-                          return;
+                        if (useConfigMode) {
+                          if (totalOutBoxes > totalAvailableBoxes) {
+                            setS(() => err =
+                                '出库数量不能超过当前库存（$totalAvailableBoxes 箱）');
+                            return;
+                          }
+                        } else {
+                          if (_qty > 0 && qty > _qty) {
+                            setS(() => err =
+                                '出库数量不能超过当前库存（$_qty 件）');
+                            return;
+                          }
                         }
                         // Build per-spec removal list for 按箱规 mode so backend
                         // can accurately subtract from each configuration entry.

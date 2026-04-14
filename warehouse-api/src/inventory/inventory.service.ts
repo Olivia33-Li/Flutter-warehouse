@@ -403,11 +403,17 @@ export class InventoryService {
     });
     if (!record) throw new NotFoundException('库存记录不存在');
 
-    if (record.quantity < dto.quantity) {
-      throw new BadRequestException(`库存不足：当前 ${record.quantity} 件，出库 ${dto.quantity} 件`);
-    }
-
     if (dto.configurations && dto.configurations.length > 0 && record.configurations?.length > 0) {
+      // 按箱规出库: validate each spec's boxes individually before subtracting
+      for (const toRemove of dto.configurations) {
+        const existing = record.configurations.find(c => c.unitsPerBox === toRemove.unitsPerBox);
+        const available = existing?.boxes ?? 0;
+        if (toRemove.boxes > available) {
+          throw new BadRequestException(
+            `库存不足：${toRemove.unitsPerBox}件/箱 当前 ${available} 箱，出库 ${toRemove.boxes} 箱`
+          );
+        }
+      }
       // 按箱规出库: subtract each spec's boxes from matching configuration
       const updated = record.configurations
         .map(existing => {
@@ -420,7 +426,10 @@ export class InventoryService {
       record.boxes = updated.reduce((s, c) => s + c.boxes, 0);
       record.quantity = this.computeQuantity(record);
     } else {
-      // 按总数量出库: clear configurations and use flat arithmetic
+      // 按总数量出库: validate against total quantity first
+      if (record.quantity < dto.quantity) {
+        throw new BadRequestException(`库存不足：当前 ${record.quantity} 件，出库 ${dto.quantity} 件`);
+      }
       const newQty = Math.max(0, record.quantity - dto.quantity);
       const newBoxes = record.unitsPerBox > 0 ? Math.floor(newQty / record.unitsPerBox) : 0;
       record.configurations = [];
