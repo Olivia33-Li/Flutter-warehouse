@@ -14,6 +14,7 @@ import '../../models/change_record.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/inventory_detail_sheet.dart';
 import '../../widgets/audit_log_detail_sheet.dart';
+import '../history/history_screen.dart';
 
 class LocationDetailScreen extends ConsumerStatefulWidget {
   final String id;
@@ -747,8 +748,8 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
           _summaryInfoRow(
             '上次变更',
             _latestOp == null ? '无变更记录' : _formatDate(_latestOp!.createdAt.toIso8601String()),
-            tappable: _latestOp != null,
-            onTap: _latestOp != null ? () => _traceRowTap(_latestOp!) : null,
+            tappable: _data?['code'] != null,
+            onTap: _data?['code'] != null ? _showLocationHistorySheet : null,
           ),
         ],
       ),
@@ -757,6 +758,215 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
 
   void _traceRowTap(ChangeRecord record) {
     AuditLogDetailSheet.show(context, record);
+  }
+
+  void _showLocationHistorySheet() {
+    final locationCode = _data?['code'] as String?;
+    if (locationCode == null) return;
+
+    final future = _historyService.getAll(
+      locationCode: locationCode,
+      inventoryChangingOnly: true,
+      page: 1,
+      limit: 10,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return FutureBuilder<Map<String, dynamic>>(
+          future: future,
+          builder: (_, snap) {
+            final records = snap.hasData
+                ? (snap.data!['records'] as List<ChangeRecord>)
+                : <ChangeRecord>[];
+            final total = snap.hasData ? (snap.data!['total'] as int) : 0;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // handle bar
+                    Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // title
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history, size: 18, color: Color(0xFF5C6BC0)),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$locationCode 变更记录',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(height: 1),
+                    // content
+                    if (snap.connectionState == ConnectionState.waiting)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: CircularProgressIndicator(),
+                      )
+                    else if (snap.hasError)
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text('加载失败: ${snap.error}',
+                            style: const TextStyle(color: Colors.red)),
+                      )
+                    else if (records.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Text('暂无变更记录',
+                            style: TextStyle(color: Color(0xFF9E9E9E))),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.of(sheetCtx).size.height * 0.55,
+                        ),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: records.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 1, indent: 56, endIndent: 16),
+                          itemBuilder: (_, i) {
+                            final r = records[i];
+                            final style = AuditLogDetailSheet.badgeStyle(r);
+                            final label = AuditLogDetailSheet.badgeLabel(r);
+                            final (fg, bg, icon) = style;
+                            return InkWell(
+                              onTap: () {
+                                AuditLogDetailSheet.show(sheetCtx, r);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // badge icon
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: bg,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(icon, color: fg, size: 16),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: bg,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(label,
+                                                    style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: fg,
+                                                        fontWeight:
+                                                            FontWeight.w600)),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(r.userName,
+                                                  style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Color(0xFF616161))),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            r.description,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF424242)),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _formatDate(r.createdAt
+                                                .toIso8601String()),
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFF9E9E9E)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(Icons.chevron_right,
+                                        size: 14, color: Color(0xFFBDBDBD)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    // "查看全部" button
+                    if (snap.hasData && total > 0) ...[
+                      const Divider(height: 1),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(sheetCtx).pop();
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => HistoryScreen(
+                                    initialLocationCode: locationCode),
+                              ));
+                            }
+                          });
+                        },
+                        child: Text(
+                          total > 10 ? '查看全部 $total 条记录' : '在操作记录页查看',
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF5C6BC0)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _statTile(String label, IconData icon, String value) {

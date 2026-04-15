@@ -9,7 +9,8 @@ import '../../widgets/error_view.dart';
 import '../../widgets/audit_log_detail_sheet.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
-  const HistoryScreen({super.key});
+  final String? initialLocationCode;
+  const HistoryScreen({super.key, this.initialLocationCode});
 
   @override
   ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
@@ -17,6 +18,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final _historyService = HistoryService();
+  String? _filterLocationCode;
   final _keywordCtrl = TextEditingController();
   List<ChangeRecord> _records = [];
   bool _loading = true;
@@ -45,6 +47,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     super.didChangeDependencies();
     if (!_userFilterInitialized) {
       _userFilterInitialized = true;
+      _filterLocationCode = widget.initialLocationCode;
       final user = ref.read(currentUserProvider);
       if (user != null && !user.canViewAllHistory) {
         _filterUserName = user.username;
@@ -281,6 +284,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         startDate: startDate,
         endDate: endDate,
         userName: isCheckFilter ? null : _filterUserName,
+        locationCode: _filterLocationCode,
         page: _page,
         limit: _limit,
       );
