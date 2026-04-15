@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../utils/web_download_stub.dart'
+    if (dart.library.js_interop) '../../utils/web_download_web.dart';
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
@@ -206,11 +209,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final now = DateTime.now();
       final filename =
           'warehouse_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
-      final dir = await getTemporaryDirectory();
-      final filePath = '${dir.path}/$filename';
-      await Dio().download(url, filePath,
-          options: Options(headers: {'Authorization': 'Bearer $token'}));
-      await Share.shareXFiles([XFile(filePath)]);
+
+      if (kIsWeb) {
+        // Web: 下载为字节流，通过浏览器触发另存为
+        final response = await Dio().get<List<int>>(
+          url,
+          options: Options(
+            responseType: ResponseType.bytes,
+            headers: {'Authorization': 'Bearer $token'},
+          ),
+        );
+        downloadBytesOnWeb(response.data!, filename);
+      } else {
+        // 移动端：保存到临时目录后用系统分享
+        final dir = await getTemporaryDirectory();
+        final filePath = '${dir.path}/$filename';
+        await Dio().download(url, filePath,
+            options: Options(headers: {'Authorization': 'Bearer $token'}));
+        await Share.shareXFiles([XFile(filePath)]);
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(

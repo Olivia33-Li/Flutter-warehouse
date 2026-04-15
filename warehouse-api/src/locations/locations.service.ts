@@ -200,15 +200,45 @@ export class LocationsService {
       filter.skuCode = { $in: dto.skuCodes };
     }
 
-    const sourceInv = await this.inventoryModel.find(filter).lean();
-    let moved = 0, skipped = 0;
+    // Populate SKU name so it can be stored in the audit log detail
+    const sourceInv = await this.inventoryModel
+      .find(filter)
+      .populate('skuId', 'sku name')
+      .lean();
+
     const conflictResolution = dto.conflictResolution ?? 'skip';
+    const batchId = new Types.ObjectId().toHexString();
+
+    type ItemDetail = {
+      skuCode: string;
+      skuName?: string;
+      qty: number;
+      boxes: number;
+      unitsPerBox: number;
+      configurations: { boxes: number; unitsPerBox: number }[];
+    };
+
+    // primary = moved (transfer) or copied (copy) — no pre-existing target record
+    const primaryItems: ItemDetail[] = [];
+    const mergedItems: ItemDetail[] = [];
+    const overwrittenItems: ItemDetail[] = [];
+    const skippedItems: ItemDetail[] = [];
 
     for (const inv of sourceInv) {
       const existing = await this.inventoryModel.findOne({
         skuId: inv.skuId,
         locationId: new Types.ObjectId(dto.targetLocationId),
       });
+
+      const skuRef = inv.skuId as any;
+      const item: ItemDetail = {
+        skuCode: inv.skuCode,
+        skuName: skuRef?.name ?? undefined,
+        qty: inv.quantity ?? 0,
+        boxes: inv.boxes ?? 0,
+        unitsPerBox: inv.unitsPerBox ?? 1,
+        configurations: (inv.configurations ?? []) as { boxes: number; unitsPerBox: number }[],
+      };
 
       if (existing) {
         if (conflictResolution === 'overwrite') {
@@ -218,14 +248,14 @@ export class LocationsService {
           existing.quantity = inv.quantity;
           existing.stockStatus = inv.stockStatus;
           await existing.save();
-          moved++;
+          overwrittenItems.push(item);
         } else if (conflictResolution === 'merge') {
           existing.boxes = (existing.boxes ?? 0) + (inv.boxes ?? 0);
           existing.quantity = (existing.quantity ?? 0) + (inv.quantity ?? 0);
           await existing.save();
-          moved++;
+          mergedItems.push(item);
         } else {
-          skipped++;
+          skippedItems.push(item);
           continue;
         }
       } else {
@@ -234,7 +264,7 @@ export class LocationsService {
           _id: undefined,
           locationId: new Types.ObjectId(dto.targetLocationId),
         });
-        moved++;
+        primaryItems.push(item);
       }
 
       if (deleteSource) {
@@ -242,17 +272,75 @@ export class LocationsService {
       }
     }
 
-    const action = deleteSource ? '批量转移' : '批量复制';
+    const changedItems = [...primaryItems, ...mergedItems, ...overwrittenItems];
+    const total = changedItems.length;
+
+    // Format per-item summary for description (first 3 SKUs)
+    const formatItem = (i: ItemDetail): string => {
+      if (i.configurations.length > 0) {
+        const cfgStr = i.configurations.map(c => `${c.boxes}箱×${c.unitsPerBox}件`).join('+');
+        return `${i.skuCode}(${cfgStr})`;
+      }
+      if (i.boxes > 0 && i.unitsPerBox > 1) return `${i.skuCode}(${i.boxes}箱·${i.qty}件)`;
+      return `${i.skuCode}(${i.qty || i.boxes}件)`;
+    };
+    const preview = changedItems.slice(0, 3).map(formatItem).join('、');
+    const routePrefix = `[${source.code}→${target.code}]`;
+    const totalHint = total > 3 ? `等${total}种` : `共${total}种`;
+    const itemDesc = total > 0 ? `${preview}${total > 3 ? '…' : ''}${total > 3 ? totalHint : ''}` : '无实际变更';
+
+    const sourceAction = deleteSource ? '批量转移' : '批量复制';
+    const targetAction = deleteSource ? '批量转入' : '批量复制进入';
+
+    const commonDetails = {
+      batchId,
+      sourceCode: source.code,
+      targetCode: target.code,
+      total,
+      skippedCount: skippedItems.length,
+      overwrittenDetails: overwrittenItems,
+      ...(deleteSource
+        ? { movedDetails: primaryItems, mergedDetails: mergedItems }
+        : { copiedDetails: primaryItems, stackedDetails: mergedItems }),
+    };
+
+    // ── Source location record ──
     await this.historyService.log({
       userId: user._id.toString(),
       userName: user.name,
       action: 'edit',
-      entity: 'location',
-      businessAction: action,
-      description: `${action}: ${source.code} → ${target.code}，${moved} 条成功，${skipped} 条跳过`,
+      entity: 'inventory',
+      businessAction: sourceAction,
+      description: `${routePrefix} ${sourceAction}：${itemDesc}`,
+      locationCode: source.code,
+      details: { ...commonDetails, role: 'source' },
     });
 
-    return { moved, skipped };
+    // ── Target location record ──
+    await this.historyService.log({
+      userId: user._id.toString(),
+      userName: user.name,
+      action: 'edit',
+      entity: 'inventory',
+      businessAction: targetAction,
+      description: `${routePrefix} ${targetAction}：${itemDesc}`,
+      locationCode: target.code,
+      details: { ...commonDetails, role: 'target' },
+    });
+
+    return deleteSource
+      ? {
+          moved: primaryItems.map(i => i.skuCode),
+          merged: mergedItems.map(i => i.skuCode),
+          overwritten: overwrittenItems.map(i => i.skuCode),
+          skipped: skippedItems.map(i => i.skuCode),
+        }
+      : {
+          copied: primaryItems.map(i => i.skuCode),
+          stacked: mergedItems.map(i => i.skuCode),
+          overwritten: overwrittenItems.map(i => i.skuCode),
+          skipped: skippedItems.map(i => i.skuCode),
+        };
   }
 
   async remove(id: string, user: any) {

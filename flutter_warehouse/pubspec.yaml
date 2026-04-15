@@ -35,6 +35,9 @@ dependencies:
   path_provider: ^2.1.4
   share_plus: ^9.0.0
 
+  # Web platform utilities
+  web: ^0.5.1
+
   # UI utilities
   intl: ^0.19.0
   flutter_slidable: ^3.1.0

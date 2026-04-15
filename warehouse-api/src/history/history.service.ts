@@ -13,6 +13,8 @@ export interface LogParams {
   businessAction?: string;
   details?: Record<string, any>;
   changes?: Record<string, any>;
+  /** Strict per-location tag used by copy/transfer records for exact filtering. */
+  locationCode?: string;
 }
 
 @Injectable()
@@ -84,7 +86,14 @@ export class HistoryService {
     } else if (skuCode) {
       andConditions.push({ description: { $regex: this.escapeRegex(skuCode), $options: 'i' } });
     } else if (locationCode) {
-      andConditions.push({ description: { $regex: this.escapeRegex(locationCode), $options: 'i' } });
+      // Prefer strict locationCode field (set on copy/transfer records for exact per-location
+      // filtering). Fall back to description regex for old records that lack the field.
+      andConditions.push({
+        $or: [
+          { locationCode: locationCode },
+          { locationCode: { $exists: false }, description: { $regex: this.escapeRegex(locationCode), $options: 'i' } },
+        ],
+      });
     }
 
     if (andConditions.length > 0) filter.$and = andConditions;

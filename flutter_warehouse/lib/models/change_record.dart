@@ -6,7 +6,7 @@ class ChangeRecord {
   final String entity;          // SKU | 库位 | 库存
   final String? entityId;
   final String description;
-  final String? businessAction; // 入库|出库|调整|录入|删除库存|结构修改|批量转移|批量复制|新建库位|编辑库位|删除库位|标记已检查|取消已检查|新建SKU|编辑SKU|删除SKU
+  final String? businessAction; // 入库|出库|调整|录入|删除库存|结构修改|批量转移|批量转入|批量复制|批量复制进入|新建库位|编辑库位|删除库位|标记已检查|取消已检查|新建SKU|编辑SKU|删除SKU
   final Map<String, dynamic>? details;
   final Map<String, dynamic>? changes;
   final DateTime createdAt;

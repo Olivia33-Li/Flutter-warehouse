@@ -31,8 +31,10 @@ class AuditLogDetailSheet extends StatelessWidget {
       case '结构修改':
         return (Colors.purple.shade600, Colors.purple.shade50, Icons.construction_outlined);
       case '批量转移':
+      case '批量转入':
         return (Colors.indigo.shade600, Colors.indigo.shade50, Icons.swap_horiz);
       case '批量复制':
+      case '批量复制进入':
         return (Colors.amber.shade700, Colors.amber.shade50, Icons.copy_outlined);
       case '新建库位':
         return (Colors.teal.shade600, Colors.teal.shade50, Icons.add_location_alt_outlined);
@@ -298,8 +300,10 @@ class AuditLogDetailSheet extends StatelessWidget {
       case '结构修改':
         return _buildStructureDetail(d, fg, bg);
       case '批量转移':
+      case '批量转入':
         return _buildBatchTransferDetail(d, fg, bg);
       case '批量复制':
+      case '批量复制进入':
         return _buildBatchCopyDetail(d, fg, bg);
       case '标记已检查':
       case '取消已检查':

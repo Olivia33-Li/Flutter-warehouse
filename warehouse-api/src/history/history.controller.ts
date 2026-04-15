@@ -15,7 +15,7 @@ export class HistoryController {
     IN:       ['入库', '录入', '暂存'],
     OUT:      ['出库'],
     ADJUST:   ['调整', '结构修改', 'SKU更正', 'SKU更正并合并', '暂存转正式', '暂存拆分'],
-    TRANSFER: ['批量转移', '批量复制'],
+    TRANSFER: ['批量转移', '批量复制', '批量转入', '批量复制进入'],
   };
 
   @Get()
