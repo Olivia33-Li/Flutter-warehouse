@@ -66,7 +66,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.registerFailed);
       });
     } catch (e) {
-      setState(() => _error = '注册失败: $e');
+      setState(() => _error = AppLocalizations.of(context)!.registerFailed);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

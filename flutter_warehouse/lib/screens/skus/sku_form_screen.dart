@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/sku_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class SkuFormScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? initial;
@@ -46,7 +47,7 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
   Future<void> _save() async {
     final isAdmin = ref.read(currentUserProvider)?.isAdmin ?? false;
     if (_skuCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'SKU 编号不能为空');
+      setState(() => _error = AppLocalizations.of(context)!.skuFormSkuEmpty);
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -74,7 +75,7 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
       if (mounted) context.pop();
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
-      setState(() { _error = msg is List ? msg.join(', ') : (msg ?? '保存失败'); });
+      setState(() { _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.saveFailed); });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -98,25 +99,26 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
 
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? '编辑 SKU' : '新增 SKU')),
+      appBar: AppBar(title: Text(_isEdit ? l10n.skuFormEditTitle : l10n.skuFormNewTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           TextField(
             controller: _skuCtrl,
             enabled: !_isEdit,
-            decoration: const InputDecoration(
-              labelText: 'SKU 编号 *',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.skuFormSkuCodeLabel,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _nameCtrl,
-            decoration: const InputDecoration(
-              labelText: '产品名称',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.skuFormProductName,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
@@ -126,9 +128,9 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
             controller: _barcodeCtrl,
             enabled: isAdmin,
             decoration: InputDecoration(
-              labelText: '条码',
+              labelText: l10n.skuFormBarcodeLabel,
               border: const OutlineInputBorder(),
-              helperText: isAdmin ? null : '仅管理员可修改条码',
+              helperText: isAdmin ? null : l10n.skuFormBarcodeAdminOnly,
               helperStyle: TextStyle(fontSize: 11, color: Colors.grey.shade500),
               suffixIcon: (!isAdmin && _barcodeCtrl.text.isNotEmpty)
                   ? const Icon(Icons.lock_outline, size: 16)
@@ -140,7 +142,7 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
               alignment: Alignment.centerRight,
               child: TextButton.icon(
                 icon: const Icon(Icons.history, size: 16),
-                label: const Text('查看条码历史', style: TextStyle(fontSize: 12)),
+                label: Text(l10n.skuFormViewBarcodeHistory, style: const TextStyle(fontSize: 12)),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -154,9 +156,9 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
           TextField(
             controller: _cartonQtyCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: '每箱个数',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.skuFormCartonQtyLabel,
+              border: const OutlineInputBorder(),
             ),
           ),
           if (_error != null) ...[
@@ -171,7 +173,7 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
                     height: 20, width: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
-                : Text(_isEdit ? '保存' : '创建'),
+                : Text(_isEdit ? l10n.skuFormSaveButton : l10n.skuFormCreateButton),
           ),
         ],
       ),
@@ -211,6 +213,7 @@ class _BarcodeHistorySheetState extends State<_BarcodeHistorySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final fmt = DateFormat('yyyy-MM-dd HH:mm');
     final history = (_data?['history'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final currentBarcode = _data?['currentBarcode'] as String?;
@@ -237,8 +240,8 @@ class _BarcodeHistorySheetState extends State<_BarcodeHistorySheet> {
               children: [
                 const Icon(Icons.history, size: 20),
                 const SizedBox(width: 8),
-                const Text('条码变更历史',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(l10n.barcodeHistoryTitle,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const Spacer(),
                 if (currentBarcode != null)
                   Container(
@@ -248,7 +251,7 @@ class _BarcodeHistorySheetState extends State<_BarcodeHistorySheet> {
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: Colors.blue.shade200),
                     ),
-                    child: Text('当前: $currentBarcode',
+                    child: Text(l10n.barcodeHistoryCurrent(currentBarcode),
                         style: TextStyle(fontSize: 12, color: Colors.blue.shade700)),
                   ),
               ],
@@ -264,7 +267,7 @@ class _BarcodeHistorySheetState extends State<_BarcodeHistorySheet> {
                             style: const TextStyle(color: Colors.red)))
                     : history.isEmpty
                         ? Center(
-                            child: Text('暂无条码变更记录',
+                            child: Text(l10n.barcodeHistoryEmpty,
                                 style: TextStyle(color: Colors.grey.shade500)))
                         : ListView.builder(
                             controller: controller,
@@ -281,8 +284,8 @@ class _BarcodeHistorySheetState extends State<_BarcodeHistorySheet> {
                               final isCurrent = barcode == currentBarcode && i == 0;
 
                               final sourceLabel = switch (source) {
-                                'manual' => '手动编辑',
-                                'import' => '批量导入',
+                                'manual' => l10n.barcodeSourceManual,
+                                'import' => l10n.barcodeSourceImport,
                                 _ => source,
                               };
 
@@ -314,7 +317,7 @@ class _BarcodeHistorySheetState extends State<_BarcodeHistorySheet> {
                                                     borderRadius:
                                                         BorderRadius.circular(4),
                                                   ),
-                                                  child: Text('当前',
+                                                  child: Text(l10n.barcodeCurrentLabel,
                                                       style: TextStyle(
                                                           fontSize: 10,
                                                           color:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/change_record.dart';
+import '../l10n/app_localizations.dart';
 
 class AuditLogDetailSheet extends StatelessWidget {
   final ChangeRecord record;
@@ -63,19 +64,44 @@ class AuditLogDetailSheet extends StatelessWidget {
     }
   }
 
-  static String badgeLabel(ChangeRecord r) {
-    if (r.businessAction != null) return r.businessAction!;
+  static String translateAction(String? ba, AppLocalizations l10n) {
+    if (ba == null) return '';
+    switch (ba) {
+      case '入库': return l10n.auditBusinessActionStockIn;
+      case '出库': return l10n.auditBusinessActionStockOut;
+      case '调整': return l10n.auditBusinessActionAdjust;
+      case '录入': return l10n.auditBusinessActionEntry;
+      case '删除库存': return l10n.auditBusinessActionDeleteStock;
+      case '结构修改': return l10n.auditBusinessActionStructure;
+      case '批量转移': return l10n.auditBusinessActionTransfer;
+      case '批量转入': return l10n.auditBusinessActionTransferIn;
+      case '批量复制': return l10n.auditBusinessActionCopy;
+      case '批量复制进入': return l10n.auditBusinessActionCopyIn;
+      case '新建库位': return l10n.auditBusinessActionNewLocation;
+      case '编辑库位': return l10n.auditBusinessActionEditLocation;
+      case '删除库位': return l10n.auditBusinessActionDeleteLocation;
+      case '标记已检查': return l10n.auditBusinessActionMarkChecked;
+      case '取消已检查': return l10n.auditBusinessActionUnmarkChecked;
+      case '新建SKU': return l10n.auditBusinessActionNewSku;
+      case '编辑SKU': return l10n.auditBusinessActionEditSku;
+      case '删除SKU': return l10n.auditBusinessActionDeleteSku;
+      default: return ba;
+    }
+  }
+
+  static String badgeLabel(ChangeRecord r, AppLocalizations l10n) {
+    if (r.businessAction != null) return translateAction(r.businessAction, l10n);
     switch (r.action) {
-      case 'create': return '新增';
-      case 'update': return '编辑';
-      case 'delete': return '删除';
+      case 'create': return l10n.badgeActionCreate;
+      case 'update': return l10n.badgeActionUpdate;
+      case 'delete': return l10n.badgeActionDelete;
       default: return r.action;
     }
   }
 
   static void show(BuildContext context, ChangeRecord record) {
     final style = badgeStyle(record);
-    final label = badgeLabel(record);
+    final label = badgeLabel(record, AppLocalizations.of(context)!);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -97,6 +123,7 @@ class AuditLogDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (fg, bg, icon) = style;
+    final l10n = AppLocalizations.of(context)!;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -191,7 +218,7 @@ class AuditLogDetailSheet extends StatelessWidget {
             child: ListView(
               controller: ctrl,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              children: _buildBody(fg, bg),
+              children: _buildBody(fg, bg, l10n),
             ),
           ),
         ],
@@ -199,26 +226,26 @@ class AuditLogDetailSheet extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildBody(Color fg, Color bg) {
+  List<Widget> _buildBody(Color fg, Color bg, AppLocalizations l10n) {
     final d = record.details;
     final ba = record.businessAction;
     final widgets = <Widget>[];
 
     widgets.add(_sectionCard(
-      title: '基础信息',
+      title: l10n.auditBasicInfo,
       icon: Icons.info_outline,
       children: [
-        _row('操作类型', label),
-        _row('操作对象', record.entity),
-        if (record.entityId != null) _row('对象 ID', record.entityId!),
-        _row('操作人', record.userName),
-        _row('操作时间', _formatFull(record.createdAt)),
+        _row(l10n.auditActionType, label),
+        _row(l10n.auditEntity, record.entity),
+        if (record.entityId != null) _row(l10n.auditEntityId, record.entityId!),
+        _row(l10n.auditOperator, record.userName),
+        _row(l10n.auditTime, _formatFull(record.createdAt)),
       ],
     ));
     widgets.add(const SizedBox(height: 12));
 
     widgets.add(_sectionCard(
-      title: '操作说明',
+      title: l10n.auditDescription,
       icon: Icons.description_outlined,
       children: [
         Text(record.description,
@@ -228,7 +255,7 @@ class AuditLogDetailSheet extends StatelessWidget {
     widgets.add(const SizedBox(height: 12));
 
     if (d != null && ba != null) {
-      final typeWidgets = _buildTypeDetail(d, ba, fg, bg);
+      final typeWidgets = _buildTypeDetail(d, ba, fg, bg, l10n);
       if (typeWidgets.isNotEmpty) {
         widgets.addAll(typeWidgets);
         widgets.add(const SizedBox(height: 12));
@@ -237,11 +264,11 @@ class AuditLogDetailSheet extends StatelessWidget {
 
     if (record.changes != null && record.changes!.isNotEmpty) {
       widgets.add(_sectionCard(
-        title: '字段变更',
+        title: l10n.auditFieldChanges,
         icon: Icons.compare_arrows,
         children: record.changes!.entries.map((e) {
-          final before = e.value['before']?.toString() ?? '无';
-          final after = e.value['after']?.toString() ?? '无';
+          final before = e.value['before']?.toString() ?? l10n.auditNone;
+          final after = e.value['after']?.toString() ?? l10n.auditNone;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(
@@ -285,33 +312,33 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── Type-specific sections ──────────────────────────────────────────────────
   List<Widget> _buildTypeDetail(
-      Map<String, dynamic> d, String ba, Color fg, Color bg) {
+      Map<String, dynamic> d, String ba, Color fg, Color bg, AppLocalizations l10n) {
     switch (ba) {
       case '入库':
-        return _buildStockInDetail(d, fg, bg);
+        return _buildStockInDetail(d, fg, bg, l10n);
       case '出库':
-        return _buildStockOutDetail(d, fg, bg);
+        return _buildStockOutDetail(d, fg, bg, l10n);
       case '调整':
-        return _buildAdjustDetail(d, fg, bg);
+        return _buildAdjustDetail(d, fg, bg, l10n);
       case '录入':
-        return _buildCreateDetail(d, fg, bg);
+        return _buildCreateDetail(d, fg, bg, l10n);
       case '删除库存':
-        return _buildDeleteInventoryDetail(d);
+        return _buildDeleteInventoryDetail(d, l10n);
       case '结构修改':
-        return _buildStructureDetail(d, fg, bg);
+        return _buildStructureDetail(d, fg, bg, l10n);
       case '批量转移':
       case '批量转入':
-        return _buildBatchTransferDetail(d, fg, bg);
+        return _buildBatchTransferDetail(d, fg, bg, l10n);
       case '批量复制':
       case '批量复制进入':
-        return _buildBatchCopyDetail(d, fg, bg);
+        return _buildBatchCopyDetail(d, fg, bg, l10n);
       case '标记已检查':
       case '取消已检查':
-        return _buildCheckDetail(d, ba, fg, bg);
+        return _buildCheckDetail(d, ba, fg, bg, l10n);
       case '新建库位':
       case '编辑库位':
       case '删除库位':
-        return _buildLocationDetail(d, ba);
+        return _buildLocationDetail(d, ba, l10n);
       default:
         return [];
     }
@@ -319,7 +346,7 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 入库 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildStockInDetail(
-      Map<String, dynamic> d, Color fg, Color bg) {
+      Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final boxes = (d['boxes'] ?? 0) as num;
     final upb = (d['unitsPerBox'] ?? 1) as num;
     final addedQty = (d['addedQty'] ?? boxes * upb) as num;
@@ -328,28 +355,30 @@ class AuditLogDetailSheet extends StatelessWidget {
 
     return [
       _sectionCard(
-        title: '入库内容',
+        title: l10n.auditStockInTitle,
         icon: Icons.add_box_outlined,
         children: [
           _row('SKU', d['skuCode']),
-          _row('库位', d['locationCode']),
+          _row(l10n.auditLocation, d['locationCode']),
           const SizedBox(height: 8),
           _configsBlock(
             [{'boxes': boxes, 'unitsPerBox': upb}],
             highlightColor: Colors.green.shade600,
+            l10n: l10n,
           ),
         ],
       ),
       const SizedBox(height: 12),
       _sectionCard(
-        title: '前后变化',
+        title: l10n.auditBeforeAfterChange,
         icon: Icons.show_chart,
         children: [
           _inventoryChangeWidget(
-            beforeLabel: '$beforeQty件',
-            changeLabel: '+$addedQty件',
-            afterLabel: '$afterQty件',
+            beforeLabel: l10n.auditQtyPcs(beforeQty.toInt()),
+            changeLabel: l10n.auditQtyAdded(addedQty.toInt()),
+            afterLabel: l10n.auditQtyPcs(afterQty.toInt()),
             changeColor: Colors.green.shade600,
+            l10n: l10n,
           ),
         ],
       ),
@@ -358,32 +387,33 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 出库 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildStockOutDetail(
-      Map<String, dynamic> d, Color fg, Color bg) {
+      Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final reduced = (d['reducedQty'] ?? 0) as num;
     final remaining = (d['remainingQty'] as num?) ?? 0;
     final beforeQty = reduced + remaining;
 
     return [
       _sectionCard(
-        title: '出库内容',
+        title: l10n.auditStockOutTitle,
         icon: Icons.outbox_outlined,
         children: [
           _row('SKU', d['skuCode']),
-          _row('库位', d['locationCode']),
+          _row(l10n.auditLocation, d['locationCode']),
           const SizedBox(height: 8),
-          _qtyHighlight('-$reduced件', Colors.orange.shade700),
+          _qtyHighlight(l10n.auditQtyReduced(reduced.toInt()), Colors.orange.shade700),
         ],
       ),
       const SizedBox(height: 12),
       _sectionCard(
-        title: '前后变化',
+        title: l10n.auditBeforeAfterChange,
         icon: Icons.show_chart,
         children: [
           _inventoryChangeWidget(
-            beforeLabel: '$beforeQty件',
-            changeLabel: '-$reduced件',
-            afterLabel: '$remaining件',
+            beforeLabel: l10n.auditQtyPcs(beforeQty.toInt()),
+            changeLabel: l10n.auditQtyReduced(reduced.toInt()),
+            afterLabel: l10n.auditQtyPcs(remaining.toInt()),
             changeColor: Colors.orange.shade700,
+            l10n: l10n,
           ),
         ],
       ),
@@ -392,30 +422,34 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 调整 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildAdjustDetail(
-      Map<String, dynamic> d, Color fg, Color bg) {
+      Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final beforeQty = d['beforeQty'] as num?;
     final afterQty = d['afterQty'] as num?;
-    final mode = d['mode'] == 'config' ? '按箱规调整' : '按总数量调整';
+    final mode = d['mode'] == 'config' ? l10n.auditAdjustModeConfig : l10n.auditAdjustModeQty;
     final note = d['note']?.toString();
 
     return [
       _sectionCard(
-        title: '调整内容',
+        title: l10n.auditAdjustTitle,
         icon: Icons.tune,
         children: [
           _row('SKU', d['skuCode']),
-          _row('库位', d['locationCode']),
-          _row('调整方式', mode),
-          if (note != null && note.isNotEmpty) _row('备注', note),
+          _row(l10n.auditLocation, d['locationCode']),
+          _row(l10n.auditAdjustMode, mode),
+          if (note != null && note.isNotEmpty) _row(l10n.auditNote, note),
         ],
       ),
       if (beforeQty != null && afterQty != null) ...[
         const SizedBox(height: 12),
         _sectionCard(
-          title: '前后变化',
+          title: l10n.auditBeforeAfterChange,
           icon: Icons.show_chart,
           children: [
-            _beforeAfterWidget('$beforeQty件', '$afterQty件'),
+            _beforeAfterWidget(
+              l10n.auditQtyPcs(beforeQty.toInt()),
+              l10n.auditQtyPcs(afterQty.toInt()),
+              l10n,
+            ),
           ],
         ),
       ],
@@ -424,22 +458,23 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 录入 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildCreateDetail(
-      Map<String, dynamic> d, Color fg, Color bg) {
+      Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final boxes = (d['boxes'] ?? 0) as num;
     final upb = (d['unitsPerBox'] ?? 1) as num;
     final quantity = (d['quantity'] ?? boxes * upb) as num;
 
     return [
       _sectionCard(
-        title: '录入内容',
+        title: l10n.auditEntryTitle,
         icon: Icons.edit_note,
         children: [
           _row('SKU', d['skuCode']),
-          _row('库位', d['locationCode']),
+          _row(l10n.auditLocation, d['locationCode']),
           const SizedBox(height: 8),
           _configsBlock(
             [{'boxes': boxes, 'unitsPerBox': upb}],
             highlightColor: Colors.teal.shade600,
+            l10n: l10n,
           ),
           const SizedBox(height: 6),
           Container(
@@ -450,7 +485,7 @@ class AuditLogDetailSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              '首次录入 · 共$quantity件',
+              l10n.auditFirstEntry(quantity.toInt()),
               style: TextStyle(
                   fontSize: 12,
                   color: Colors.teal.shade700,
@@ -463,22 +498,22 @@ class AuditLogDetailSheet extends StatelessWidget {
   }
 
   // ── 删除库存 ─────────────────────────────────────────────────────────────────
-  List<Widget> _buildDeleteInventoryDetail(Map<String, dynamic> d) {
+  List<Widget> _buildDeleteInventoryDetail(Map<String, dynamic> d, AppLocalizations l10n) {
     final quantity = (d['quantity'] ?? 0) as num;
     final configs = _toMapList(d['configurations']);
 
     return [
       _sectionCard(
-        title: '删除内容',
+        title: l10n.auditDeleteStockTitle,
         icon: Icons.delete_outline,
         children: [
           _row('SKU', d['skuCode']),
-          _row('库位', d['locationCode']),
+          _row(l10n.auditLocation, d['locationCode']),
           const SizedBox(height: 8),
           if (configs.isNotEmpty)
-            _configsBlock(configs, highlightColor: Colors.red.shade600)
+            _configsBlock(configs, highlightColor: Colors.red.shade600, l10n: l10n)
           else
-            _qtyHighlight('$quantity件', Colors.red.shade600),
+            _qtyHighlight(l10n.auditQtyPcs(quantity.toInt()), Colors.red.shade600),
           const SizedBox(height: 8),
           Container(
             padding:
@@ -488,15 +523,15 @@ class AuditLogDetailSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: Colors.red.shade200),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.warning_amber_outlined,
+                const Icon(Icons.warning_amber_outlined,
                     size: 14, color: Colors.red),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '该 SKU 在此库位的所有库存数据已删除，此操作不可恢复。',
-                    style: TextStyle(fontSize: 12, color: Colors.red),
+                    l10n.auditDeletedNotice,
+                    style: const TextStyle(fontSize: 12, color: Colors.red),
                   ),
                 ),
               ],
@@ -509,7 +544,7 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 结构修改 ─────────────────────────────────────────────────────────────────
   List<Widget> _buildStructureDetail(
-      Map<String, dynamic> d, Color fg, Color bg) {
+      Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final beforeBoxes = d['beforeBoxes'] as num?;
     final beforeUpb = d['beforeUnitsPerBox'] as num?;
     final afterBoxes = d['afterBoxes'] as num?;
@@ -536,28 +571,34 @@ class AuditLogDetailSheet extends StatelessWidget {
 
     return [
       _sectionCard(
-        title: '修改内容',
+        title: l10n.auditStructureTitle,
         icon: Icons.construction_outlined,
         children: [
           _row('SKU', d['skuCode']),
-          _row('库位', d['locationCode']),
+          _row(l10n.auditLocation, d['locationCode']),
         ],
       ),
       if (effectiveBefore.isNotEmpty || effectiveAfter.isNotEmpty) ...[
         const SizedBox(height: 12),
         _sectionCard(
-          title: '前后变化',
+          title: l10n.auditBeforeAfterChange,
           icon: Icons.show_chart,
           children: [
-            _configsBeforeAfterWidget(effectiveBefore, effectiveAfter),
+            _configsBeforeAfterWidget(effectiveBefore, effectiveAfter, l10n),
           ],
         ),
       ] else if (beforeQty != null && afterQty != null) ...[
         const SizedBox(height: 12),
         _sectionCard(
-          title: '前后变化',
+          title: l10n.auditBeforeAfterChange,
           icon: Icons.show_chart,
-          children: [_beforeAfterWidget('$beforeQty件', '$afterQty件')],
+          children: [
+            _beforeAfterWidget(
+              l10n.auditQtyPcs(beforeQty.toInt()),
+              l10n.auditQtyPcs(afterQty.toInt()),
+              l10n,
+            ),
+          ],
         ),
       ],
     ];
@@ -565,7 +606,7 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 批量转移 ─────────────────────────────────────────────────────────────────
   List<Widget> _buildBatchTransferDetail(
-      Map<String, dynamic> d, Color fg, Color bg) {
+      Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final movedRaw = _toMapList(d['movedDetails']);
     final mergedRaw = _toMapList(d['mergedDetails']);
     final overwrittenRaw = _toMapList(d['overwrittenDetails']);
@@ -583,42 +624,42 @@ class AuditLogDetailSheet extends StatelessWidget {
 
     return [
       _sectionCard(
-        title: '转移路径',
+        title: l10n.auditTransferTitle,
         icon: Icons.swap_horiz,
         children: [
           _routeBanner(d['sourceCode'] ?? '', d['targetCode'] ?? '',
               total, fg, bg,
-              isTransfer: true),
+              isTransfer: true, l10n: l10n),
           const SizedBox(height: 8),
-          _row('来源库位', d['sourceCode']),
-          _row('目标库位', d['targetCode']),
-          _row('SKU 总数', '$total种'),
+          _row(l10n.auditSourceLocation, d['sourceCode']),
+          _row(l10n.auditTargetLocation, d['targetCode']),
+          _row(l10n.auditSkuTotal(total.toInt()), ''),
         ],
       ),
       const SizedBox(height: 12),
       _sectionCard(
-        title: '涉及明细',
+        title: l10n.auditAffectedDetails,
         icon: Icons.list_alt_outlined,
         children: [
           if (moved.isNotEmpty) ...[
-            _skuDetailGroup('直接转移', moved, Colors.green.shade700,
-                '目标库位原无此 SKU，直接写入'),
+            _skuDetailGroup(l10n.auditDirectTransfer, moved, Colors.green.shade700,
+                l10n.auditDirectTransferDesc, l10n),
             if (merged.isNotEmpty || overwritten.isNotEmpty)
               const SizedBox(height: 12),
           ],
           if (merged.isNotEmpty) ...[
-            _skuDetailGroup('合并', merged, Colors.blue.shade700,
-                '与目标库位已有库存合并，按箱规叠加'),
+            _skuDetailGroup(l10n.auditMerged, merged, Colors.blue.shade700,
+                l10n.auditMergedDesc, l10n),
             if (overwritten.isNotEmpty) const SizedBox(height: 12),
           ],
           if (overwritten.isNotEmpty)
-            _skuDetailGroup('覆盖', overwritten, Colors.red.shade700,
-                '用来源库存替换了目标库位的原有库存'),
+            _skuDetailGroup(l10n.auditOverwritten, overwritten, Colors.red.shade700,
+                l10n.auditOverwrittenDesc, l10n),
         ],
       ),
       const SizedBox(height: 12),
       _sectionCard(
-        title: '影响结果',
+        title: l10n.auditImpactResult,
         icon: Icons.info_outline,
         children: [
           Container(
@@ -628,16 +669,16 @@ class AuditLogDetailSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.amber.shade300),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.warning_amber_outlined,
+                const Icon(Icons.warning_amber_outlined,
                     size: 15, color: Colors.amber),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '转移完成后，来源库位中对应的 SKU 库存数据已被删除。\n目标库位已新增或更新上述 SKU 的库存。',
-                    style: TextStyle(fontSize: 12, height: 1.5),
+                    l10n.auditTransferDeleteNotice,
+                    style: const TextStyle(fontSize: 12, height: 1.5),
                   ),
                 ),
               ],
@@ -650,7 +691,7 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 批量复制 ─────────────────────────────────────────────────────────────────
   List<Widget> _buildBatchCopyDetail(
-      Map<String, dynamic> d, Color fg, Color bg) {
+      Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final copiedRaw = _toMapList(d['copiedDetails']);
     final stackedRaw = _toMapList(d['stackedDetails']);
     final overwrittenRaw = _toMapList(d['overwrittenDetails']);
@@ -668,38 +709,38 @@ class AuditLogDetailSheet extends StatelessWidget {
 
     return [
       _sectionCard(
-        title: '复制路径',
+        title: l10n.auditCopyTitle,
         icon: Icons.copy_outlined,
         children: [
           _routeBanner(d['sourceCode'] ?? '', d['targetCode'] ?? '',
               total, fg, bg,
-              isTransfer: false),
+              isTransfer: false, l10n: l10n),
           const SizedBox(height: 8),
-          _row('来源库位', d['sourceCode']),
-          _row('目标库位', d['targetCode']),
-          _row('SKU 总数', '$total种'),
-          _row('来源库位', '无变化（复制操作不删除来源数据）'),
+          _row(l10n.auditSourceLocation, d['sourceCode']),
+          _row(l10n.auditTargetLocation, d['targetCode']),
+          _row(l10n.auditSkuTotal(total.toInt()), ''),
+          _row(l10n.auditSourceLocation, l10n.auditCopySourceUnchanged),
         ],
       ),
       const SizedBox(height: 12),
       _sectionCard(
-        title: '涉及明细',
+        title: l10n.auditAffectedDetails,
         icon: Icons.list_alt_outlined,
         children: [
           if (copied.isNotEmpty) ...[
-            _skuDetailGroup('直接复制', copied, Colors.green.shade700,
-                '目标库位原无此 SKU，直接写入'),
+            _skuDetailGroup(l10n.auditDirectCopy, copied, Colors.green.shade700,
+                l10n.auditDirectCopyDesc, l10n),
             if (stacked.isNotEmpty || overwritten.isNotEmpty)
               const SizedBox(height: 12),
           ],
           if (stacked.isNotEmpty) ...[
-            _skuDetailGroup('叠加', stacked, Colors.blue.shade700,
-                '与目标库位已有库存叠加，按箱规合并'),
+            _skuDetailGroup(l10n.auditStacked, stacked, Colors.blue.shade700,
+                l10n.auditStackedDesc, l10n),
             if (overwritten.isNotEmpty) const SizedBox(height: 12),
           ],
           if (overwritten.isNotEmpty)
-            _skuDetailGroup('覆盖', overwritten, Colors.red.shade700,
-                '用来源库存替换了目标库位的原有库存'),
+            _skuDetailGroup(l10n.auditOverwritten, overwritten, Colors.red.shade700,
+                l10n.auditOverwrittenDesc, l10n),
         ],
       ),
     ];
@@ -707,19 +748,19 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── 检查状态 ─────────────────────────────────────────────────────────────────
   List<Widget> _buildCheckDetail(
-      Map<String, dynamic> d, String ba, Color fg, Color bg) {
+      Map<String, dynamic> d, String ba, Color fg, Color bg, AppLocalizations l10n) {
     return [
       _sectionCard(
-        title: '检查状态',
+        title: l10n.auditCheckTitle,
         icon: Icons.check_circle_outline,
         children: [
-          _row('库位', d['locationCode']),
-          _row('状态变化',
-              ba == '标记已检查' ? '未检查  →  已检查' : '已检查  →  未检查'),
-          if (d['checkedBy'] != null) _row('检查人', d['checkedBy']),
+          _row(l10n.auditLocation, d['locationCode']),
+          _row(l10n.auditCheckedChange,
+              ba == '标记已检查' ? l10n.auditMarkChecked : l10n.auditUnmarkChecked),
+          if (d['checkedBy'] != null) _row(l10n.auditCheckedBy, d['checkedBy']),
           if (d['checkedAt'] != null)
             _row(
-                '检查时间',
+                l10n.auditCheckedAt,
                 DateFormat('yyyy-MM-dd HH:mm').format(
                     DateTime.parse(d['checkedAt']).toLocal())),
         ],
@@ -728,7 +769,7 @@ class AuditLogDetailSheet extends StatelessWidget {
   }
 
   // ── 库位操作 ─────────────────────────────────────────────────────────────────
-  List<Widget> _buildLocationDetail(Map<String, dynamic> d, String ba) {
+  List<Widget> _buildLocationDetail(Map<String, dynamic> d, String ba, AppLocalizations l10n) {
     final iconData = ba == '新建库位'
         ? Icons.add_location_alt_outlined
         : ba == '编辑库位'
@@ -736,13 +777,13 @@ class AuditLogDetailSheet extends StatelessWidget {
             : Icons.wrong_location_outlined;
     return [
       _sectionCard(
-        title: '库位信息',
+        title: l10n.auditLocationOpTitle,
         icon: iconData,
         children: [
-          _row('库位编码', d['locationCode']),
+          _row(l10n.auditLocationCode, d['locationCode']),
           if (d['description'] != null &&
               d['description'].toString().isNotEmpty)
-            _row('描述', d['description']),
+            _row(l10n.auditDescription2, d['description']),
         ],
       ),
     ];
@@ -820,9 +861,9 @@ class AuditLogDetailSheet extends StatelessWidget {
       );
 
   // ── Carton structure block: [N箱] × [M件/箱] = [X件] ───────────────────────
-  Widget _configsBlock(List<dynamic> configs, {Color? highlightColor}) {
+  Widget _configsBlock(List<dynamic> configs, {Color? highlightColor, required AppLocalizations l10n}) {
     if (configs.isEmpty) {
-      return Text('无库存',
+      return Text(l10n.auditNoStock,
           style: TextStyle(color: Colors.grey.shade400, fontSize: 12));
     }
     final color = highlightColor ?? Colors.blue.shade700;
@@ -838,19 +879,19 @@ class AuditLogDetailSheet extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 4,
             children: [
-              _pill('$boxes 箱', Colors.grey.shade600),
+              _pill(l10n.auditQtyBoxes(boxes.toInt()), Colors.grey.shade600),
               Text('×',
                   style: TextStyle(
                       color: Colors.grey.shade500,
                       fontSize: 14,
                       fontWeight: FontWeight.w300)),
-              _pill('$upb 件/箱', Colors.grey.shade600),
+              _pill(l10n.auditQtyPcsPerBox(upb.toInt()), Colors.grey.shade600),
               Text('=',
                   style: TextStyle(
                       color: Colors.grey.shade500,
                       fontSize: 14,
                       fontWeight: FontWeight.w300)),
-              _pill('$total 件', color, bold: true),
+              _pill(l10n.auditQtyPcs(total.toInt()), color, bold: true),
             ],
           ),
         );
@@ -877,7 +918,7 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── Before/after with carton configs ───────────────────────────────────────
   Widget _configsBeforeAfterWidget(
-      List<dynamic> before, List<dynamic> after) =>
+      List<dynamic> before, List<dynamic> after, AppLocalizations l10n) =>
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -892,12 +933,12 @@ class AuditLogDetailSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('操作前',
+                  Text(l10n.auditBeforeLabel,
                       style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade500)),
                   const SizedBox(height: 8),
-                  _configsBlock(before),
+                  _configsBlock(before, l10n: l10n),
                 ],
               ),
             ),
@@ -908,7 +949,7 @@ class AuditLogDetailSheet extends StatelessWidget {
                 children: [
                   Icon(Icons.arrow_forward,
                       color: Colors.grey.shade400, size: 20),
-                  Text('变化',
+                  Text(l10n.auditChangeLabel,
                       style: TextStyle(
                           fontSize: 10,
                           color: Colors.grey.shade400)),
@@ -919,13 +960,13 @@ class AuditLogDetailSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('操作后',
+                  Text(l10n.auditAfterLabel,
                       style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade500)),
                   const SizedBox(height: 8),
                   _configsBlock(after,
-                      highlightColor: Colors.blue.shade700),
+                      highlightColor: Colors.blue.shade700, l10n: l10n),
                 ],
               ),
             ),
@@ -939,6 +980,7 @@ class AuditLogDetailSheet extends StatelessWidget {
     required String changeLabel,
     required String afterLabel,
     required Color changeColor,
+    required AppLocalizations l10n,
   }) =>
       Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -953,7 +995,7 @@ class AuditLogDetailSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text('操作前',
+                  Text(l10n.auditBeforeLabel,
                       style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade500)),
@@ -991,7 +1033,7 @@ class AuditLogDetailSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text('操作后',
+                  Text(l10n.auditAfterLabel,
                       style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade500)),
@@ -1009,7 +1051,7 @@ class AuditLogDetailSheet extends StatelessWidget {
       );
 
   // ── Simple before/after (plain text) ────────────────────────────────────────
-  Widget _beforeAfterWidget(String before, String after) =>
+  Widget _beforeAfterWidget(String before, String after, AppLocalizations l10n) =>
       Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
@@ -1022,7 +1064,7 @@ class AuditLogDetailSheet extends StatelessWidget {
             Expanded(
               child: Column(
                 children: [
-                  Text('操作前',
+                  Text(l10n.auditBeforeLabel,
                       style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade500)),
@@ -1039,7 +1081,7 @@ class AuditLogDetailSheet extends StatelessWidget {
                 Icon(Icons.arrow_forward,
                     color: Colors.grey.shade400, size: 22),
                 const SizedBox(height: 2),
-                Text('变化',
+                Text(l10n.auditChangeLabel,
                     style: TextStyle(
                         fontSize: 10,
                         color: Colors.grey.shade400)),
@@ -1048,7 +1090,7 @@ class AuditLogDetailSheet extends StatelessWidget {
             Expanded(
               child: Column(
                 children: [
-                  Text('操作后',
+                  Text(l10n.auditAfterLabel,
                       style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade500)),
@@ -1073,6 +1115,7 @@ class AuditLogDetailSheet extends StatelessWidget {
     Color fg,
     Color bg, {
     required bool isTransfer,
+    required AppLocalizations l10n,
   }) =>
       Container(
         padding:
@@ -1109,7 +1152,7 @@ class AuditLogDetailSheet extends StatelessWidget {
                 color: fg.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text('共$total种',
+              child: Text(l10n.auditSkuTotal(total.toInt()),
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1121,7 +1164,7 @@ class AuditLogDetailSheet extends StatelessWidget {
 
   // ── SKU detail group: handles both Map (rich) and String (legacy) items ─────
   Widget _skuDetailGroup(
-      String title, List<dynamic> items, Color color, String desc) {
+      String title, List<dynamic> items, Color color, String desc, AppLocalizations l10n) {
     if (items.isEmpty) return const SizedBox.shrink();
     final isRich = items.first is Map;
     return Column(
@@ -1138,7 +1181,7 @@ class AuditLogDetailSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(width: 6),
-            Text('$title（${items.length}种）',
+            Text(l10n.auditGroupTitle(title, items.length),
                 style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -1156,7 +1199,7 @@ class AuditLogDetailSheet extends StatelessWidget {
         const SizedBox(height: 8),
         if (isRich)
           ...items.map((item) =>
-              _skuDetailCard(item as Map<String, dynamic>, color))
+              _skuDetailCard(item as Map<String, dynamic>, color, l10n))
         else
           Wrap(
             spacing: 6,
@@ -1184,7 +1227,7 @@ class AuditLogDetailSheet extends StatelessWidget {
   }
 
   // ── Individual SKU detail card for batch ops ────────────────────────────────
-  Widget _skuDetailCard(Map<String, dynamic> item, Color color) {
+  Widget _skuDetailCard(Map<String, dynamic> item, Color color, AppLocalizations l10n) {
     final skuCode = item['skuCode']?.toString() ?? '';
     final qty = (item['qty'] as num?) ?? 0;
     final configs = _toMapList(item['configs']);
@@ -1215,26 +1258,28 @@ class AuditLogDetailSheet extends StatelessWidget {
                         fontSize: 13,
                         color: color)),
               ),
-              _pill('$qty 件', color, bold: true),
+              _pill(l10n.auditQtyPcs(qty.toInt()), color, bold: true),
             ],
           ),
           if (configs.isNotEmpty) ...[
             const SizedBox(height: 8),
-            _configsBlock(configs, highlightColor: color),
+            _configsBlock(configs, highlightColor: color, l10n: l10n),
           ],
           if (beforeTargetQty != null && afterTargetQty != null) ...[
             const Divider(height: 16),
-            Text('目标库位变化',
+            Text(l10n.auditTargetLocationChange,
                 style: TextStyle(
                     fontSize: 11, color: Colors.grey.shade500)),
             const SizedBox(height: 6),
             if (beforeTargetConfigs.isNotEmpty &&
                 afterTargetConfigs.isNotEmpty)
               _configsBeforeAfterWidget(
-                  beforeTargetConfigs, afterTargetConfigs)
+                  beforeTargetConfigs, afterTargetConfigs, l10n)
             else
               _beforeAfterWidget(
-                  '$beforeTargetQty件', '$afterTargetQty件'),
+                  l10n.auditQtyPcs(beforeTargetQty.toInt()),
+                  l10n.auditQtyPcs(afterTargetQty.toInt()),
+                  l10n),
           ],
         ],
       ),

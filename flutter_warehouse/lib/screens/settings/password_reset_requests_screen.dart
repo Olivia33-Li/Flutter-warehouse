@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import '../../services/password_reset_service.dart';
+import '../../l10n/app_localizations.dart';
 
 const _bg      = Color(0xFFF5F3F0);
 const _primary = Color(0xFF1A1A2E);
@@ -46,27 +47,28 @@ class _PasswordResetRequestsScreenState
     String action = 'completed';
     String? err;
 
+    final l10n = AppLocalizations.of(context)!;
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: Text('处理申请 — ${req.displayName}'),
+          title: Text(l10n.pwdResetHandleTitle(req.displayName)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoRow('用户名', '@${req.username}'),
-                _InfoRow('申请时间', DateFormat('yyyy-MM-dd HH:mm').format(req.createdAt)),
-                if (req.userNote.isNotEmpty) _InfoRow('用户备注', req.userNote),
+                _InfoRow(l10n.pwdResetInfoUsername, '@${req.username}'),
+                _InfoRow(l10n.pwdResetInfoTime, DateFormat('yyyy-MM-dd HH:mm').format(req.createdAt)),
+                if (req.userNote.isNotEmpty) _InfoRow(l10n.pwdResetInfoNote, req.userNote),
                 const Divider(height: 20),
 
-                const Text('操作', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(l10n.pwdResetAction, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'completed', label: Text('重置密码')),
-                    ButtonSegment(value: 'rejected', label: Text('拒绝申请')),
+                  segments: [
+                    ButtonSegment(value: 'completed', label: Text(l10n.pwdResetActionComplete)),
+                    ButtonSegment(value: 'rejected', label: Text(l10n.pwdResetActionReject)),
                   ],
                   selected: {action},
                   onSelectionChanged: (v) => setS(() => action = v.first),
@@ -76,15 +78,15 @@ class _PasswordResetRequestsScreenState
                 if (action == 'completed') ...[
                   TextField(
                     controller: pwdCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '临时密码 *（至少 6 位）',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.pwdResetTempPassword,
+                      border: const OutlineInputBorder(),
                     ),
                     onChanged: (_) => setS(() => err = null),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    '用户下次登录时将被强制修改此密码。',
+                    l10n.pwdResetForceChangeNotice,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 10),
@@ -93,8 +95,8 @@ class _PasswordResetRequestsScreenState
                 TextField(
                   controller: noteCtrl,
                   decoration: InputDecoration(
-                    labelText: action == 'rejected' ? '拒绝原因（可选）' : '备注（可选）',
-                    hintText: action == 'completed' ? '例如：已通知用户' : '',
+                    labelText: action == 'rejected' ? l10n.pwdResetRejectReason : l10n.pwdResetNoteOptional,
+                    hintText: action == 'completed' ? l10n.pwdResetNoteHint : '',
                     border: const OutlineInputBorder(),
                   ),
                   maxLines: 2,
@@ -108,7 +110,7 @@ class _PasswordResetRequestsScreenState
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.cancel)),
             FilledButton(
               style: action == 'rejected'
                   ? FilledButton.styleFrom(backgroundColor: Colors.red)
@@ -116,7 +118,7 @@ class _PasswordResetRequestsScreenState
               onPressed: () async {
                 if (action == 'completed') {
                   if (pwdCtrl.text.length < 6) {
-                    setS(() => err = '密码至少需要 6 位');
+                    setS(() => err = l10n.pwdResetPasswordTooShort);
                     return;
                   }
                 }
@@ -135,10 +137,10 @@ class _PasswordResetRequestsScreenState
                   }
                 } on DioException catch (e) {
                   final m = e.response?.data?['message'];
-                  setS(() => err = m is List ? m.join(', ') : (m ?? '操作失败'));
+                  setS(() => err = m is List ? m.join(', ') : (m ?? l10n.pwdResetOperationFailed));
                 }
               },
-              child: Text(action == 'completed' ? '确认重置' : '确认拒绝'),
+              child: Text(action == 'completed' ? l10n.pwdResetConfirmComplete : l10n.pwdResetConfirmReject),
             ),
           ],
         ),
@@ -147,17 +149,18 @@ class _PasswordResetRequestsScreenState
   }
 
   Future<void> _confirmDelete(PasswordResetRequest req) async {
+    final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除记录'),
-        content: Text('确认删除 @${req.username} 的申请记录？'),
+        title: Text(l10n.pwdResetDeleteTitle),
+        content: Text(l10n.pwdResetDeleteContent(req.username)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l10n.pwdResetDelete),
           ),
         ],
       ),
@@ -192,9 +195,9 @@ class _PasswordResetRequestsScreenState
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    '密码重置申请',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context)!.pwdResetTitle,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: _primary,
@@ -233,9 +236,9 @@ class _PasswordResetRequestsScreenState
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _requests.isEmpty
-                      ? const Center(
-                          child: Text('暂无申请记录',
-                              style: TextStyle(color: _muted)))
+                      ? Center(
+                          child: Text(AppLocalizations.of(context)!.pwdResetEmpty,
+                              style: const TextStyle(color: _muted)))
                       : ListView.separated(
                           itemCount: _requests.length,
                           separatorBuilder: (_, __) => const Divider(
@@ -263,11 +266,12 @@ class _PillFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const tabs = [
-      (label: '全部', value: null as String?),
-      (label: '待处理', value: 'pending' as String?),
-      (label: '已完成', value: 'completed' as String?),
-      (label: '已拒绝', value: 'rejected' as String?),
+    final l10n = AppLocalizations.of(context)!;
+    final tabs = [
+      (label: l10n.pwdResetStatusAll, value: null as String?),
+      (label: l10n.pwdResetStatusPending, value: 'pending' as String?),
+      (label: l10n.pwdResetStatusCompleted, value: 'completed' as String?),
+      (label: l10n.pwdResetStatusRejected, value: 'rejected' as String?),
     ];
 
     return Container(
@@ -391,12 +395,12 @@ class _RequestItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '申请时间：${fmt.format(req.createdAt)}',
+                  AppLocalizations.of(context)!.pwdResetRequestTime(fmt.format(req.createdAt)),
                   style: const TextStyle(fontSize: 12, color: _muted),
                 ),
                 if (req.resolvedBy.isNotEmpty)
                   Text(
-                    '处理人：${req.resolvedBy}  ${req.resolvedAt != null ? fmt.format(req.resolvedAt!) : ''}',
+                    AppLocalizations.of(context)!.pwdResetResolver('${req.resolvedBy}  ${req.resolvedAt != null ? fmt.format(req.resolvedAt!) : ''}'),
                     style: const TextStyle(fontSize: 12, color: _muted),
                   ),
               ],
@@ -412,7 +416,7 @@ class _RequestItem extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 minimumSize: const Size(0, 32),
               ),
-              child: const Text('处理'),
+              child: Text(AppLocalizations.of(context)!.pwdResetHandle),
             ),
           ] else ...[
             _StatusBadge(status: req.status),
@@ -439,24 +443,25 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final (label, borderColor, textColor) = switch (status) {
       'completed' => (
-          '已完成',
+          l10n.pwdResetStatusCompleted,
           const Color(0xFFC5E6D2),
           const Color(0xFF4EBB6A),
         ),
       'rejected' => (
-          '已拒绝',
+          l10n.pwdResetStatusRejected,
           const Color(0xFFF5C5C8),
           const Color(0xFFC07078),
         ),
       'pending' => (
-          '待处理',
+          l10n.pwdResetStatusPending,
           const Color(0xFFFFDDA8),
           const Color(0xFFE09030),
         ),
       _ => (
-          '未知',
+          l10n.pwdResetStatusUnknown,
           const Color(0xFFD0D0D8),
           const Color(0xFF9090A0),
         ),

@@ -95,16 +95,42 @@
     }
   },
 
-  "locationScreenTitle": "Location Search",
-  "locationSearchHint": "Search location code or description...",
+  "locationScreenTitle": "Location Management",
+  "locationSearchHint": "Search location code / note...",
   "locationEmpty": "No locations",
-  "locationNoResult": "No matching locations",
-  "locationNewButton": "New Location",
-  "locationNoStock": "No stock",
-  "locationTotalQty": "{qty} pcs total",
-  "@locationTotalQty": {
+  "locationNoResult": "No results for \"{query}\"",
+  "@locationNoResult": {
     "placeholders": {
-      "qty": { "type": "int" }
+      "query": { "type": "String" }
+    }
+  },
+  "locationSearchTip": "Try a shorter keyword or ignore case",
+  "locationCount": "{count} locations",
+  "@locationCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "locationNewButton": "Add Location",
+  "locationAddInventory": "Record Inventory",
+  "locationNewTitle": "Add Location",
+  "locationCode": "Location Code *",
+  "locationDescription": "Description (optional)",
+  "locationCreate": "Create",
+  "locationCreateFailed": "Create failed",
+  "locationEmpty2": "Empty",
+  "locationChecked": "Checked {date}",
+  "@locationChecked": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "dateToday": "Today",
+  "dateYesterday": "Yesterday",
+  "dateDaysAgo": "{days}d ago",
+  "@dateDaysAgo": {
+    "placeholders": {
+      "days": { "type": "int" }
     }
   },
 
@@ -234,6 +260,1218 @@
   "@operationFailed": {
     "placeholders": {
       "error": { "type": "String" }
+    }
+  },
+
+  "saveFailed": "Save failed",
+  "skuFormEditTitle": "Edit SKU",
+  "skuFormNewTitle": "New SKU",
+  "skuFormSkuCodeLabel": "SKU Code *",
+  "skuFormProductName": "Product Name",
+  "skuFormBarcodeLabel": "Barcode",
+  "skuFormBarcodeAdminOnly": "Only admin can edit barcode",
+  "skuFormViewBarcodeHistory": "View barcode history",
+  "skuFormCartonQtyLabel": "Pcs per box",
+  "skuFormCreateButton": "Create",
+  "skuFormSaveButton": "Save",
+  "barcodeHistoryTitle": "Barcode Change History",
+  "barcodeHistoryCurrent": "Current: {barcode}",
+  "@barcodeHistoryCurrent": {
+    "placeholders": {
+      "barcode": { "type": "String" }
+    }
+  },
+  "barcodeHistoryEmpty": "No barcode change history",
+  "barcodeSourceManual": "Manual edit",
+  "barcodeSourceImport": "Bulk import",
+  "barcodeCurrentLabel": "Current",
+
+  "pwdResetTitle": "Password Reset Requests",
+  "pwdResetHandleTitle": "Handle Request — {name}",
+  "@pwdResetHandleTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pwdResetInfoUsername": "Username",
+  "pwdResetInfoTime": "Request time",
+  "pwdResetInfoNote": "User note",
+  "pwdResetAction": "Action",
+  "pwdResetActionComplete": "Reset Password",
+  "pwdResetActionReject": "Reject",
+  "pwdResetTempPassword": "Temporary Password * (min. 6 chars)",
+  "pwdResetForceChangeNotice": "User will be forced to change this password on next login.",
+  "pwdResetRejectReason": "Rejection reason (optional)",
+  "pwdResetNoteOptional": "Note (optional)",
+  "pwdResetNoteHint": "e.g. User has been notified",
+  "pwdResetPasswordTooShort": "Password must be at least 6 characters",
+  "pwdResetOperationFailed": "Operation failed",
+  "pwdResetConfirmComplete": "Confirm Reset",
+  "pwdResetConfirmReject": "Confirm Reject",
+  "pwdResetDeleteTitle": "Delete Record",
+  "pwdResetDeleteContent": "Confirm delete request from @{username}?",
+  "@pwdResetDeleteContent": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "pwdResetDelete": "Delete",
+  "pwdResetEmpty": "No requests",
+  "pwdResetHandle": "Handle",
+  "pwdResetRequestTime": "Requested: {time}",
+  "@pwdResetRequestTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "pwdResetResolver": "Handler: {resolver}",
+  "@pwdResetResolver": {
+    "placeholders": {
+      "resolver": { "type": "String" }
+    }
+  },
+  "pwdResetStatusAll": "All",
+  "pwdResetStatusPending": "Pending",
+  "pwdResetStatusCompleted": "Completed",
+  "pwdResetStatusRejected": "Rejected",
+  "pwdResetStatusUnknown": "Unknown",
+
+  "historyAllTime": "All Time",
+  "historyLast7Days": "Last 7 Days",
+  "historyLast30Days": "Last 30 Days",
+  "historyCustomRange": "Custom",
+  "historyCustomRangeTitle": "Custom Date Range",
+  "historyStartDate": "Start Date",
+  "historyEndDate": "End Date",
+  "historyPleaseSelect": "Select",
+  "historyClear": "Clear",
+  "historyApply": "Apply",
+  "historySearchHint": "Search records...",
+  "historyTotalRecords": "{total} records",
+  "@historyTotalRecords": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "historyNoRecords": "No records",
+  "historyActionTypeLabel": "Action",
+  "historyEntityLabel": "Entity",
+  "historyEntityLocation": "Location",
+  "historyEntityInventory": "Inventory",
+  "historyUserLabel": "User",
+  "historyTimeLabel": "Time",
+  "historyAllUsersTab": "All Users",
+  "historyMyRecords": "My Records",
+  "historyFilterAll": "All",
+  "historyFilterImport": "Import",
+  "historyFilterNew": "New",
+  "historyFilterEntry": "Entry",
+  "historyFilterAdjust": "Adjust",
+  "historyFilterTransfer": "Transfer",
+  "historyFilterCopy": "Copy",
+  "historyFilterCheck": "Check",
+  "historyFilterIn": "Stock In",
+  "historyFilterOut": "Stock Out",
+  "historyEntitySku": "SKU",
+  "historyEntityLocationLabel": "Location",
+  "historyEntityInventoryLabel": "Inventory",
+  "historyPieceSuffix": "pcs",
+
+  "inventoryAddManualTitle": "Manual Inventory Entry",
+  "inventorySkuSection": "SKU",
+  "inventoryLocationSection": "Location",
+  "inventoryInitialStockSection": "Initial Stock",
+  "inventoryNewSkuLabel": "New SKU",
+  "inventorySearchExisting": "Search existing",
+  "inventorySearchSkuHint": "Search SKU code / name / barcode",
+  "inventoryNewSkuTitle": "New \"{name}\"",
+  "@inventoryNewSkuTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "inventorySkuNotFound": "Not found, ",
+  "inventoryCreateNewSku": "Click to create SKU",
+  "inventorySkuCodeLabel": "SKU Code *",
+  "inventoryProductNameLabel": "Product Name",
+  "inventoryBarcodeLabel": "Barcode (optional)",
+  "inventoryNewLocationLabel": "New Location",
+  "inventorySearchLocationHint": "Search location code",
+  "inventoryNewLocationTitle": "New \"{name}\"",
+  "@inventoryNewLocationTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "inventoryLocationNotFound": "Not found, ",
+  "inventoryCreateNewLocation": "Click to create location",
+  "inventoryLocationCodeLabel": "Location Code *",
+  "inventoryLocationDescLabel": "Description (optional)",
+  "inventoryPendingTitle": "Pending / To Count",
+  "inventoryPendingSubtitle": "Goods arrived, quantity not yet confirmed",
+  "inventoryModeCarton": "By carton",
+  "inventoryModeBoxOnly": "Boxes only",
+  "inventoryModeQty": "By total qty",
+  "inventoryBoxesLabel": "Boxes *",
+  "inventoryBoxesSuffix": "box(es)",
+  "inventoryUnitsLabel": "Pcs/box *",
+  "inventoryTotalQtyLabel": "Total qty *",
+  "inventoryTotalQtySuffix": "pcs",
+  "inventoryNoteLabel": "Note (optional)",
+  "inventoryAddNoteHint": "Add note",
+  "inventoryConfirmPending": "Confirm Pending",
+  "inventorySaveStock": "Save Stock",
+  "inventoryStockSaved": "Stock saved",
+  "inventorySelectOrCreate": "Please select or create a SKU",
+  "inventorySkuCodeEmpty": "SKU code cannot be empty",
+  "inventorySelectLocation": "Please select a location",
+  "inventoryLocationCodeEmpty": "Location code cannot be empty",
+  "inventoryValidBoxCount": "Please enter a valid box count",
+  "inventoryValidUnits": "Please enter pcs per box",
+  "inventoryValidQty": "Please enter a valid quantity",
+  "inventoryTotal": "Total",
+  "inventoryBoxesTotal": "{boxes} box(es) · carton qty TBD",
+  "@inventoryBoxesTotal": {
+    "placeholders": {
+      "boxes": { "type": "int" }
+    }
+  },
+  "inventoryQtyTotal": "Total {qty} pcs",
+  "@inventoryQtyTotal": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "inventoryPendingNote": "Will be marked as \"Pending\", quantity excluded from official totals.",
+
+  "skuDetailNewLocation": "Add Location",
+  "skuDetailLocationSection": "Location",
+  "skuDetailNewLocationButton": "+ New Location",
+  "skuDetailSearchLocationHint": "Search location code",
+  "skuDetailNewLocationTitle": "New \"{name}\"",
+  "@skuDetailNewLocationTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "skuDetailLocationNotFound": "Not found, click to create",
+  "skuDetailLocationCodeHint": "Location Code *",
+  "skuDetailLocationDescHint": "Description (optional)",
+  "skuDetailInitialStock": "Initial Stock",
+  "skuDetailPendingTitle": "Pending / To Count",
+  "skuDetailPendingSubtitle": "Goods arrived, quantity not yet confirmed",
+  "skuDetailModeCarton": "By carton",
+  "skuDetailModeBoxOnly": "Boxes only",
+  "skuDetailModeQty": "By total qty",
+  "skuDetailBoxesLabel": "Boxes",
+  "skuDetailBoxesSuffix": "box(es)",
+  "skuDetailUnitsLabel": "Pcs/box",
+  "skuDetailUnitsSuffix": "pcs/box",
+  "skuDetailBoxesOnlyHelp": "Record boxes only, pcs/box can be filled in later",
+  "skuDetailTotalLabel": "Total pcs",
+  "skuDetailTotalSuffix": "pcs",
+  "skuDetailNoteLabel": "Note (optional)",
+  "skuDetailCancel": "Cancel",
+  "skuDetailCreate": "Create",
+  "skuDetailSelectSku": "Please select a SKU",
+  "skuDetailValidBoxes": "Please enter valid boxes and pcs/box",
+  "skuDetailValidBoxesOnly": "Please enter valid box count",
+  "skuDetailValidQty": "Please enter a valid quantity",
+  "skuDetailConfirmPending": "Confirm Pending",
+  "skuDetailSave": "Save",
+  "skuDetailDeleteConfirmTitle": "Confirm Delete",
+  "skuDetailDeleteConfirmContent": "Delete {sku} stock at {location}?\nThis cannot be undone.",
+  "@skuDetailDeleteConfirmContent": {
+    "placeholders": {
+      "location": { "type": "String" },
+      "sku": { "type": "String" }
+    }
+  },
+  "skuDetailDelete": "Delete",
+  "skuDetailDeleteFailed": "Delete failed: {error}",
+  "@skuDetailDeleteFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailArchiveWithStockContent": "{skuCode} has {count} inventory records.\n\nAfter archiving, no new stock in is allowed, but existing stock can still be viewed and shipped.\n\nConfirm archive?",
+  "@skuDetailArchiveWithStockContent": {
+    "placeholders": {
+      "skuCode": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailArchiveContent": "Archive SKU {skuCode}? No new stock in allowed after archiving.",
+  "@skuDetailArchiveContent": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailArchiveTitle": "Confirm Archive",
+  "skuDetailConfirmArchive": "Confirm Archive",
+  "skuDetailArchived": "{skuCode} archived",
+  "@skuDetailArchived": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailOperationFailed": "Operation failed: {error}",
+  "@skuDetailOperationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailRestoreTitle": "Restore SKU",
+  "skuDetailRestoreContent": "Restore {skuCode} to active status?",
+  "@skuDetailRestoreContent": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailConfirmRestore": "Confirm Restore",
+  "skuDetailRestored": "{skuCode} restored to active",
+  "@skuDetailRestored": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailArchivedNotice": "This SKU is archived. No new stock in allowed. Existing stock can still be viewed and shipped.",
+  "skuDetailTotalStock": "Total Stock",
+  "skuDetailTotalBoxes": "{boxes} box(es)",
+  "@skuDetailTotalBoxes": {
+    "placeholders": {
+      "boxes": { "type": "int" }
+    }
+  },
+  "skuDetailTotalQtyPieces": "{qty} pcs",
+  "@skuDetailTotalQtyPieces": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailLocationCol": "Location",
+  "skuDetailBoxesCol": "Boxes",
+  "skuDetailDefaultCarton": "Default Carton",
+  "skuDetailCartonQtyDisplay": "{qty} pcs/box",
+  "@skuDetailCartonQtyDisplay": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailStockLocations": "Stock Locations",
+  "skuDetailAddLocation": "Add Location",
+  "skuDetailBadgePending": "To Count",
+  "skuDetailBadgeBoxOnly": "Boxes Only",
+  "skuDetailBadgeCarton": "By Carton",
+  "skuDetailUnknownLocation": "Unknown Location",
+  "skuDetailStockDelete": "Delete",
+  "skuDetailSkuStock": "Stock SKUs ({total})",
+  "@skuDetailSkuStock": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailSkuStockShown": "Stock SKUs ({shown} / {total})",
+  "@skuDetailSkuStockShown": {
+    "placeholders": {
+      "shown": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailTransferLabel": "Transfer",
+  "skuDetailCopyLabel": "Copy",
+  "skuDetailNoMatchingSku": "No matching SKUs",
+  "skuDetailClearFilter": "Clear filter",
+  "skuDetailFilterStock": "Stock:",
+  "skuDetailFilterBusiness": "Status:",
+  "skuDetailFilterAll": "All",
+  "skuDetailFilterHasStock": "Has stock",
+  "skuDetailFilterZeroStock": "Zero stock",
+  "skuDetailFilterNormal": "Normal",
+  "skuDetailFilterPending": "Pending",
+  "skuDetailChecked": "Checked",
+  "skuDetailLastCheck": "Last check",
+  "skuDetailNoCheckRecord": "No check record",
+  "skuDetailLastChange": "Last change",
+  "skuDetailNoChangeRecord": "No change record",
+  "skuDetailTotalBoxesLabel": "Total Boxes",
+  "skuDetailTotalPiecesLabel": "Total Pcs",
+  "skuDetailChangeRecords": "{locationCode} Change Records",
+  "@skuDetailChangeRecords": {
+    "placeholders": {
+      "locationCode": { "type": "String" }
+    }
+  },
+  "skuDetailLoadFailed": "Load failed: {error}",
+  "@skuDetailLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailNoChangeRecords": "No change records",
+  "skuDetailViewAllRecords": "View all {total} records",
+  "@skuDetailViewAllRecords": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailViewHistoryPage": "View in history page",
+  "skuDetailNoSkuHere": "No SKUs at this location",
+  "skuDetailCheckInventory": "Check if {code} has inventory recorded,\nor contact admin to verify data",
+  "@skuDetailCheckInventory": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "skuDetailCreateSkuError": "Please enter a SKU code",
+  "skuDetailCreateFailed": "Create failed: {error}",
+  "@skuDetailCreateFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailPendingMarkTitle": "Mark as Pending / To Count",
+  "skuDetailPendingMarkSubtitle1": "This record will be in pending category, actual qty can be filled in",
+  "skuDetailPendingMarkSubtitle2": "After checking, record goes to pending, qty still entered normally",
+  "skuDetailNewSkuCode": "SKU Code *",
+  "skuDetailNewSkuName": "SKU Name (optional)",
+  "skuDetailEmptyFilterMsg": "No SKUs under filter \"{parts}\"",
+  "@skuDetailEmptyFilterMsg": {
+    "placeholders": {
+      "parts": { "type": "String" }
+    }
+  },
+  "skuDetailNoInventory": "No inventory SKUs",
+  "skuDetailQtyLinePending": "Qty to be filled in",
+  "skuDetailQtyLineBoxes": "{boxes} box(es) · carton qty TBD",
+  "@skuDetailQtyLineBoxes": {
+    "placeholders": {
+      "boxes": { "type": "int" }
+    }
+  },
+  "skuDetailQtyLineCarton": "{boxes} box(es) · {qty} pcs",
+  "@skuDetailQtyLineCarton": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailSelectedSkus": "{count} SKUs selected, choose target location",
+  "@skuDetailSelectedSkus": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailTargetLocationHint": "Enter location code...",
+  "skuDetailEnterCodeToSearch": "Enter location code to search",
+  "skuDetailLoadTargetFailed": "Failed to load target location",
+  "skuDetailCreateLocationFailed": "Create location failed: {error}",
+  "@skuDetailCreateLocationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailNewAndTransfer": "Create \"{code}\" and {action} here",
+  "@skuDetailNewAndTransfer": {
+    "placeholders": {
+      "code": { "type": "String" },
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailSelectedSkuCount": "{count} SKUs",
+  "@skuDetailSelectedSkuCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailConflictMsg": "Target location has {count} conflicting SKUs, choose how to handle:",
+  "@skuDetailConflictMsg": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailMerge": "Merge",
+  "skuDetailMergeDesc": "Merge source stock into existing target stock",
+  "skuDetailOverwrite": "Overwrite",
+  "skuDetailOverwriteDesc": "Replace target stock with source stock",
+  "skuDetailStack": "Stack",
+  "skuDetailStackDesc": "Add source stock on top of existing target stock",
+  "skuDetailNoConflict": "No conflict SKUs ({count}, will be {action} directly):",
+  "@skuDetailNoConflict": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailTransferDeleteNotice": "After transfer, source location's corresponding SKU stock will be deleted.",
+  "skuDetailTransferFailed": "{action} failed: {error}",
+  "@skuDetailTransferFailed": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailBulkTitle": "Bulk {action} Stock",
+  "@skuDetailBulkTitle": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailBulkSelectHint": "Select SKUs to {action} (from: {code})",
+  "@skuDetailBulkSelectHint": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "code": { "type": "String" }
+    }
+  },
+  "skuDetailSkuCountSuffix": "{count} SKUs · ",
+  "@skuDetailSkuCountSuffix": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailSelectedCount": "{count} selected",
+  "@skuDetailSelectedCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailDeselectAll": "Deselect All",
+  "skuDetailSelectAll": "Select All",
+  "skuDetailReturn": "Back",
+  "skuDetailConfirmActionCount": "Confirm {action} {count}",
+  "@skuDetailConfirmActionCount": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailNextStep": "Next",
+  "skuDetailNextStepWithCount": "Next ({count} selected)",
+  "@skuDetailNextStepWithCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailConfirmAction": "Confirm {action}",
+  "@skuDetailConfirmAction": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailRouteLabel": "{src} → {dst}, {total} SKUs",
+  "@skuDetailRouteLabel": {
+    "placeholders": {
+      "src": { "type": "String" },
+      "dst": { "type": "String" },
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailDirectAction": "Direct {action}",
+  "@skuDetailDirectAction": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailResultSection": "{title} ({count})",
+  "@skuDetailResultSection": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailTransferDone": "{action} Complete",
+  "@skuDetailTransferDone": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+
+  "importTitle": "Bulk Import",
+  "importSelectType": "Select Import Type",
+  "importRecordsTab": "Records",
+  "importHistoryTab": "Import History",
+  "importHistoryTitle": "Import History",
+  "importSkuMasterLabel": "SKU Master Import",
+  "importSkuMasterSubtitle": "Bulk add or update SKU master data",
+  "importLocationMasterLabel": "Location Master Import",
+  "importLocationMasterSubtitle": "Bulk add or update locations",
+  "importInventoryLabel": "Inventory Import",
+  "importInventorySubtitle": "Bulk record inventory (SKU and location must exist)",
+  "importSkuBarcodeLabel": "SKU Barcode Bulk Update",
+  "importSkuBarcodeSubtitle": "Update barcode field for existing SKUs only",
+  "importSkuCartonLabel": "SKU Carton Qty Bulk Update",
+  "importSkuCartonSubtitle": "Update default carton qty for existing SKUs only",
+  "importTemplateColumns": "Template columns:",
+  "importReselect": "Reselect",
+  "importConfirm": "Confirm Import ({count} rows)",
+  "@importConfirm": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importNoData": "No data to import",
+  "importReimport": "Re-import",
+  "importDownloadTemplate": "Download Template",
+  "importValidating": "Validating…",
+  "importImporting": "Importing…",
+  "importSelectFile": "Select File",
+  "importColName": "Column",
+  "importColRequired": "Required",
+  "importColDesc": "Description",
+  "importReqRequired": "Required",
+  "importReqEitherA": "Either A",
+  "importReqEitherB": "Either B",
+  "importReqOptional": "Optional",
+  "importValidationOkWithErrors": "Validation done (some errors)",
+  "importValidationAllErrors": "Validation done (all rows have errors)",
+  "importValidationPassed": "Validation passed, ready to import",
+  "importFilename": "File: {filename}",
+  "@importFilename": {
+    "placeholders": {
+      "filename": { "type": "String" }
+    }
+  },
+  "importStatTotal": "Total",
+  "importStatCreate": "To Create",
+  "importStatUpdate": "To Update",
+  "importStatSkip": "Skip",
+  "importStatError": "Error",
+  "importErrorDetails": "Error details:",
+  "importRowLabel": "Row {row}  ",
+  "@importRowLabel": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "importMoreErrors": "… {count} more errors (fix file and reselect)",
+  "@importMoreErrors": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importPreviewData": "Data preview:",
+  "importMoreRows": "… {count} more rows (all will be written on confirm)",
+  "@importMoreRows": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importCreate": "Create",
+  "importUpdate": "Update",
+  "importDoneTitle": "Import Complete",
+  "importDoneWithErrors": "Import Complete (with some issues)",
+  "importResultTotal": "Total",
+  "importResultCreate": "Created",
+  "importResultUpdate": "Updated",
+  "importResultSkip": "Skipped",
+  "importResultError": "Errors",
+  "importRowErrorDetails": "Row error details:",
+  "importMoreRowErrors": "… {count} more errors",
+  "@importMoreRowErrors": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importValidationFailed": "Validation failed, please check file format",
+  "importValidationError": "Validation failed: {error}",
+  "@importValidationError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "importFailed": "Import failed, please check file format",
+  "importError": "Import failed: {error}",
+  "@importError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "importHistoryTotal": "{count} records",
+  "@importHistoryTotal": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importHistoryEmpty": "No import history",
+  "importHistoryLoadMore": "Load more",
+  "importExportFailed": "Export failed: {error}",
+  "@importExportFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "importStatusSuccess": "Success",
+  "importStatusPartial": "Partial success",
+  "importStatusAllFailed": "All failed",
+  "importStatusSkipped": "Done (with skips)",
+  "importHistoryStatTotal": "Total",
+  "importHistoryStatCreate": "Created",
+  "importHistoryStatUpdate": "Updated",
+  "importHistoryStatSkip": "Skipped",
+  "importHistoryStatError": "Errors",
+  "importHistoryRowErrors": "Row error details:",
+  "importHistoryMoreErrors": "… {count} more errors",
+  "@importHistoryMoreErrors": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importExporting": "Exporting…",
+  "importExportDetail": "Export Excel Detail",
+  "importFilterAll": "All",
+  "importFilterSku": "SKU Master",
+  "importFilterLocation": "Location Master",
+  "importFilterInventory": "Inventory",
+  "importFilterBarcodeUpdate": "Barcode Update",
+  "importFilterCartonUpdate": "Carton Qty Update",
+  "importRefresh": "Refresh",
+
+  "historyBulkSkuCount": "{total} SKU types",
+  "@historyBulkSkuCount": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "badgeActionCreate": "New",
+  "badgeActionUpdate": "Edit",
+  "badgeActionDelete": "Delete",
+
+  "auditBasicInfo": "Basic Info",
+  "auditActionType": "Action Type",
+  "auditEntity": "Entity",
+  "auditEntityId": "Entity ID",
+  "auditOperator": "Operator",
+  "auditTime": "Time",
+  "auditDescription": "Description",
+  "auditFieldChanges": "Field Changes",
+  "auditBefore": "Before",
+  "auditAfter": "After",
+  "auditNone": "None",
+  "auditStockInTitle": "Stock In Details",
+  "auditStockOutTitle": "Stock Out Details",
+  "auditAdjustTitle": "Adjust Details",
+  "auditEntryTitle": "Entry Details",
+  "auditDeleteStockTitle": "Delete Stock Details",
+  "auditStructureTitle": "Structure Change Details",
+  "auditTransferTitle": "Transfer Path",
+  "auditCopyTitle": "Copy Path",
+  "auditCheckTitle": "Check Status",
+  "auditLocationOpTitle": "Location Info",
+  "auditLocation": "Location",
+  "auditSku": "SKU",
+  "auditQtyAdded": "+{qty} pcs",
+  "@auditQtyAdded": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditQtyReduced": "-{qty} pcs",
+  "@auditQtyReduced": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditQtyPcs": "{qty} pcs",
+  "@auditQtyPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditQtyBoxes": "{boxes} box(es)",
+  "@auditQtyBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "auditQtyPcsPerBox": "{qty} pcs/box",
+  "@auditQtyPcsPerBox": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditBeforeAfterChange": "Before / After",
+  "auditChangeLabel": "Change",
+  "auditBeforeLabel": "Before",
+  "auditAfterLabel": "After",
+  "auditNoStock": "No stock",
+  "auditNote": "Note",
+  "auditDeletedNotice": "All inventory for this SKU at this location has been deleted. This cannot be undone.",
+  "auditAdjustMode": "Adjust mode",
+  "auditAdjustModeConfig": "By carton",
+  "auditAdjustModeQty": "By total qty",
+  "auditFirstEntry": "First entry · {qty} pcs total",
+  "@auditFirstEntry": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditSourceLocation": "Source Location",
+  "auditTargetLocation": "Target Location",
+  "auditSkuTotal": "{total} SKU types",
+  "@auditSkuTotal": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+  "auditAffectedDetails": "Affected Details",
+  "auditDirectTransfer": "Direct transfer",
+  "auditDirectTransferDesc": "SKU not in target, written directly",
+  "auditMerged": "Merged",
+  "auditMergedDesc": "Merged with existing stock at target, stacked by carton",
+  "auditOverwritten": "Overwritten",
+  "auditOverwrittenDesc": "Replaced existing stock at target with source stock",
+  "auditImpactResult": "Result",
+  "auditTransferDeleteNotice": "After transfer, source location's SKU stock was deleted.\nTarget location has new or updated SKU stock.",
+  "auditDirectCopy": "Direct copy",
+  "auditDirectCopyDesc": "SKU not in target, written directly",
+  "auditStacked": "Stacked",
+  "auditStackedDesc": "Stacked on top of existing stock at target",
+  "auditCopySourceUnchanged": "Source unchanged (copy does not delete source data)",
+  "auditCheckedChange": "Status Change",
+  "auditMarkChecked": "Unchecked → Checked",
+  "auditUnmarkChecked": "Checked → Unchecked",
+  "auditCheckedBy": "Checked by",
+  "auditCheckedAt": "Checked at",
+  "auditLocationCode": "Location Code",
+  "auditDescription2": "Description",
+  "auditTotalSkuCount": "{total} SKUs",
+  "@auditTotalSkuCount": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+  "auditTargetLocationChange": "Target Location Change",
+  "auditSkuTypeCount": "{count} SKU types",
+  "@auditSkuTypeCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "auditGroupTitle": "{title} ({count} types)",
+  "@auditGroupTitle": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "auditQtyPcsBold": "{qty} pcs",
+  "@auditQtyPcsBold": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditBusinessActionStockIn": "Stock In",
+  "auditBusinessActionStockOut": "Stock Out",
+  "auditBusinessActionAdjust": "Adjust",
+  "auditBusinessActionEntry": "Entry",
+  "auditBusinessActionDeleteStock": "Delete Stock",
+  "auditBusinessActionStructure": "Structure Change",
+  "auditBusinessActionTransfer": "Bulk Transfer",
+  "auditBusinessActionTransferIn": "Transfer In",
+  "auditBusinessActionCopy": "Bulk Copy",
+  "auditBusinessActionCopyIn": "Copy In",
+  "auditBusinessActionNewLocation": "New Location",
+  "auditBusinessActionEditLocation": "Edit Location",
+  "auditBusinessActionDeleteLocation": "Delete Location",
+  "auditBusinessActionMarkChecked": "Mark Checked",
+  "auditBusinessActionUnmarkChecked": "Unmark Checked",
+  "auditBusinessActionNewSku": "New SKU",
+  "auditBusinessActionEditSku": "Edit SKU",
+  "auditBusinessActionDeleteSku": "Delete SKU",
+
+  "skuDetailInitialPreviewCarton": "Initial: {boxes} box × {units} pcs/box = {qty} pcs",
+  "@skuDetailInitialPreviewCarton": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "units": { "type": "int" },
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailInitialPreviewBoxOnly": "Initial: {qty} box(es) (pcs/box TBD)",
+  "@skuDetailInitialPreviewBoxOnly": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailInitialPreviewQty": "Initial: {qty} pcs",
+  "@skuDetailInitialPreviewQty": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+
+  "locDetailAddSkuTitle": "Add SKU",
+  "locDetailEditStock": "Edit Inventory",
+  "locDetailReselectSku": "Reselect",
+  "locDetailSearchSkuHint": "Search code / name / barcode",
+  "locDetailNewSkuButton": "+ New SKU",
+  "locDetailOperationFailedRetry": "Operation failed, please retry",
+  "locDetailParamError": "Invalid parameters, please check your input",
+  "locDetailTotalPcs": "Total {qty} pcs",
+  "@locDetailTotalPcs": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "locDetailConfigCarton": "{boxes} box × {units} pcs/box",
+  "@locDetailConfigCarton": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "units": { "type": "int" }
+    }
+  },
+
+  "errPermissionDenied": "Permission denied",
+  "errSessionExpired": "Session expired, please log in again",
+  "errResourceNotFound": "Resource not found, please refresh and retry",
+  "errRequestFailed": "Request failed ({code}), please retry",
+  "@errRequestFailed": {
+    "placeholders": { "code": { "type": "int" } }
+  },
+  "errCannotConnectServer": "Cannot connect to server, please check your network",
+  "errNetworkFailed": "Network request failed, please retry",
+  "errOperationFailed": "Operation failed, please retry",
+
+  "invDetailQtyUnknown": "Qty not filled",
+  "invDetailBoxesSuffix": "box(es)",
+  "invDetailPieceSuffix": "pcs",
+  "invDetailUnitsPerBoxSuffix": "pcs/box",
+
+  "invDetailCurrentStatusPending": "Current status: To Count",
+  "invDetailCurrentStock": "Current stock: {label}",
+  "@invDetailCurrentStock": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+
+  "invDetailModeByCarton": "By carton",
+  "invDetailModeBoxesOnly": "Boxes only",
+  "invDetailModeByQty": "By total qty",
+
+  "invDetailBoxesLabel": "Boxes *",
+  "invDetailPendingBoxes": "Pending boxes: ",
+  "invDetailStockInBoxes": "Stock in boxes: ",
+  "invDetailBoxesValue": "{boxes} box(es)",
+  "@invDetailBoxesValue": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailCartonTBD": "  · Carton qty TBD",
+
+  "invDetailStockInTotal": "Stock in total: ",
+  "invDetailAddQty": "+ {qty} pcs",
+  "@invDetailAddQty": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailNewTotal": "  →  {total} pcs",
+  "@invDetailNewTotal": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+
+  "invDetailStockInQtyLabel": "Stock in qty *",
+
+  "invDetailPendingMarkNote": "Will mark this inventory as \"To Count\". Current qty unchanged. Update qty later via \"Adjust\".",
+
+  "invDetailErrInvalidBoxes": "Please enter a valid box count",
+  "invDetailErrInvalidBoxesAndUnits": "Please enter valid boxes and pcs/box",
+  "invDetailErrInvalidQty": "Please enter a valid qty",
+
+  "invDetailConfirmPendingBtn": "Confirm Pending",
+  "invDetailConfirmStockIn": "Confirm Stock In",
+
+  "invDetailStockInTitle": "Stock In",
+  "invDetailStockOutTitle": "Stock Out",
+
+  "invDetailOutTotal": "Stock out total: ",
+  "invDetailOutBoxesValue": "{boxes} box(es)",
+  "@invDetailOutBoxesValue": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailOutPcsValue": "{qty} pcs",
+  "@invDetailOutPcsValue": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailRemainCartonBoxes": "  →  {boxes} box(es) remaining",
+  "@invDetailRemainCartonBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailRemainBoxes": "  →  {boxes} box(es) remaining",
+  "@invDetailRemainBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailRemainPcs": "  →  {qty} pcs remaining",
+  "@invDetailRemainPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+
+  "invDetailNoCartonData": "No carton data, please use another mode",
+  "invDetailSelectOutBoxes": "Select qty to ship:",
+  "invDetailUnitsPerBoxDisplay": "{units} pcs/box",
+  "@invDetailUnitsPerBoxDisplay": {
+    "placeholders": { "units": { "type": "int" } }
+  },
+  "invDetailTotalBoxesDisplay": "{boxes} boxes total",
+  "@invDetailTotalBoxesDisplay": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailOutMaxBoxes": "Out (max {boxes} boxes)",
+  "@invDetailOutMaxBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailExceedBoxes": "Exceeds available {boxes} boxes",
+  "@invDetailExceedBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailEqPcs": "= {qty} pcs",
+  "@invDetailEqPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+
+  "invDetailOutBoxesLabel": "Out boxes * (max {boxes})",
+  "@invDetailOutBoxesLabel": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailBoxesOnlyHelp": "Suitable when carton qty is unknown — ship by boxes only.",
+  "invDetailOutQtyLabel": "Stock out qty *",
+
+  "invDetailErrNegativeBoxes": "Out box count cannot be negative",
+  "invDetailErrExceedCartonBoxes": "{units} pcs/box: exceeds available ({boxes} boxes)",
+  "@invDetailErrExceedCartonBoxes": {
+    "placeholders": {
+      "units": { "type": "int" },
+      "boxes": { "type": "int" }
+    }
+  },
+  "invDetailErrAtLeastOneCarton": "Please enter at least one carton qty",
+  "invDetailErrExceedStockBoxes": "Out qty cannot exceed current stock ({boxes} boxes)",
+  "@invDetailErrExceedStockBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailErrExceedStockPcs": "Out qty cannot exceed current stock ({qty} pcs)",
+  "@invDetailErrExceedStockPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailConfirmStockOut": "Confirm Stock Out",
+
+  "invDetailAdjustTitle": "Adjust Inventory",
+  "invDetailAdjustedTotalLabel": "Adjusted total qty *",
+  "invDetailAdjustQtyHelp": "Suitable for: inventory variance, loss, etc. Directly correct total qty.",
+  "invDetailBoxesOnlyPanelHelp": "Keep pcs/box unchanged, only edit box count for each spec:",
+  "invDetailSubtotalPcs": "={qty} pcs",
+  "@invDetailSubtotalPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailCartonGroupsLabel": "Carton groups (max 3):",
+  "invDetailAddCarton": "Add carton",
+  "invDetailAddFirstCarton": "Add first carton group",
+  "invDetailUnitsPerBoxLabel": "Pcs/box",
+  "invDetailBoxesAdjustLabel": "Boxes",
+
+  "invDetailSkuCorrectCurrent": "Current:",
+  "invDetailSkuCorrectSelectHint": "(select below)",
+  "invDetailSkuCorrectSearch": "Search new SKU code or name",
+  "invDetailQtyRetained": "Inventory qty {label} will remain unchanged",
+  "@invDetailQtyRetained": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+
+  "invDetailAdjustModeQty": "By qty",
+  "invDetailAdjustModeBoxesOnly": "Boxes only",
+  "invDetailAdjustModeCarton": "By carton",
+  "invDetailAdjustModeSkuCorrect": "SKU Correct",
+
+  "invDetailReasonSkuCorrect": "Correction reason * (required)",
+  "invDetailReasonAdjust": "Adjust reason * (required)",
+  "invDetailReasonSkuCorrectHint": "e.g. Wrong SKU entered, pending → official SKU",
+  "invDetailReasonAdjustHint": "e.g. Inventory variance, loss, return restocking",
+
+  "invDetailErrReasonRequired": "Reason is required (required)",
+  "invDetailErrSelectNewSku": "Please select a new SKU from the dropdown",
+  "invDetailErrSameSkuNotAllowed": "New and old SKU cannot be the same",
+  "invDetailErrNoInventoryId": "Cannot get inventory record ID, please close and retry",
+  "invDetailErrAtLeastOneBoxesGroup": "Please enter at least one box count (> 0)",
+  "invDetailErrAtLeastOneCartonGroup": "At least one carton group is required",
+  "invDetailErrValidCartonGroup": "Please enter valid boxes and pcs/box (both > 0)",
+  "invDetailErrValidQtyGte0": "Please enter a valid qty (≥ 0)",
+
+  "invDetailConfirmSkuCorrect": "Confirm Correction",
+  "invDetailConfirmBoxesAdjust": "Confirm Boxes Adjust",
+  "invDetailConfirmAdjust": "Confirm Adjust",
+
+  "invDetailAdjustedTotalRow": "Adjusted total stock: ",
+  "invDetailBoxesLabelStar": "Boxes *",
+  "invDetailUnitsLabelStar": "Pcs/box *",
+  "invDetailNoteOptional": "Note (optional)",
+
+  "invDetailQtyUnknownHeader": "Qty to be filled",
+  "invDetailBoxesOnlyHeader": "{boxes} boxes · carton qty TBD",
+  "@invDetailBoxesOnlyHeader": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailBoxesAndPcs": "{boxes} boxes · {qty} pcs",
+  "@invDetailBoxesAndPcs": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "qty": { "type": "int" }
+    }
+  },
+
+  "invDetailStockIn": "Stock In",
+  "invDetailStockOut": "Stock Out",
+  "invDetailAdjust": "Adjust",
+  "invDetailConfirmPendingLabel": "Confirm Official",
+  "invDetailSplitPendingLabel": "Split to Official SKUs",
+
+  "invDetailSkuDetail": "SKU Details",
+  "invDetailLocDetail": "Location Details",
+
+  "invDetailRecentOps": "Recent Operations",
+  "invDetailViewAll": "View all records",
+  "invDetailLoadFailed": "Load failed, tap to retry",
+  "invDetailNoRecords": "No operations yet",
+
+  "invDetailConfirmOfficialTitle": "Confirm as Official Stock",
+  "invDetailPendingToOfficial": "Pending → Official Stock",
+  "invDetailCorrectSkuCode": "Also correct SKU code",
+  "invDetailSearchNewSku": "Search new SKU code or name",
+  "invDetailConfirmReasonLabel": "Reason *",
+  "invDetailConfirmReasonHint": "Please explain the reason",
+  "invDetailErrReasonEmpty": "Please fill in reason",
+  "invDetailErrSelectNewSkuCode": "Please select a new SKU code from dropdown",
+  "invDetailConfirmedOfficial": "Confirmed as official stock",
+  "invDetailConfirmToOfficial": "Confirm to Official",
+
+  "invDetailSplitTitle": "Split to Official SKUs",
+  "invDetailSplitSource": "Source pending: {sku}",
+  "@invDetailSplitSource": {
+    "placeholders": { "sku": { "type": "String" } }
+  },
+  "invDetailSplitSourceInfo": "{locationCode}  ·  Entry mode: {sourceLabel}",
+  "@invDetailSplitSourceInfo": {
+    "placeholders": {
+      "locationCode": { "type": "String" },
+      "sourceLabel": { "type": "String" }
+    }
+  },
+  "invDetailSplitTotalConserve": "Total {amount} {unit}  ·  Conserve by {unit}",
+  "@invDetailSplitTotalConserve": {
+    "placeholders": {
+      "amount": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "invDetailSplitBalanced": "✓ Balanced",
+  "invDetailSplitProgress": "{total} / {original} allocated",
+  "@invDetailSplitProgress": {
+    "placeholders": {
+      "total": { "type": "int" },
+      "original": { "type": "int" }
+    }
+  },
+  "invDetailSplitNoSku": "No SKU selected",
+  "invDetailSplitModeByCarton": "By carton",
+  "invDetailSplitModeBoxesOnly": "Boxes only",
+  "invDetailSplitModeByQty": "By total qty",
+  "invDetailSplitSearchSku": "Search SKU",
+  "invDetailSplitBoxesLabel": "Boxes",
+  "invDetailSplitBoxesSuffix": "box(es)",
+  "invDetailSplitUnitsLabel": "Pcs/box",
+  "invDetailSplitUnitsSuffix": "pcs/box",
+  "invDetailSplitCartonTBD": "· Carton qty TBD",
+  "invDetailSplitTotalQtyLabel": "Total qty",
+  "invDetailSplitTotalQtySuffix": "pcs",
+  "invDetailSplitCalcPcs": "= {qty} pcs",
+  "@invDetailSplitCalcPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailAddSplitTarget": "Add split target",
+  "invDetailSplitReasonLabel": "Split reason *",
+  "invDetailSplitReasonHint": "Please explain the reason for splitting",
+  "invDetailErrSplitReasonEmpty": "Please fill in split reason",
+  "invDetailErrSplitSelectSku": "Entry {index}: please select SKU from dropdown",
+  "@invDetailErrSplitSelectSku": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitBoxesMustBePositive": "Entry {index}: boxes must be > 0",
+  "@invDetailErrSplitBoxesMustBePositive": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitUnitsMustBePositive": "Entry {index}: pcs/box must be > 0",
+  "@invDetailErrSplitUnitsMustBePositive": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitTotalQtyMustBePositive": "Entry {index}: total qty must be > 0",
+  "@invDetailErrSplitTotalQtyMustBePositive": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitUnbalanced": "Split total {total} {unit} ≠ source {original} {unit}, please adjust",
+  "@invDetailErrSplitUnbalanced": {
+    "placeholders": {
+      "total": { "type": "int" },
+      "original": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "invDetailSplitSuccess": "Split successful, official SKUs created",
+  "invDetailConfirmSplit": "Confirm Split",
+
+  "invDetailSourceModeBoxesOnly": "Boxes only",
+  "invDetailSourceModeQty": "By total qty",
+  "invDetailSourceModeCarton": "By carton",
+
+  "invDetailMergeConfirmTitle": "Target SKU has existing stock",
+  "invDetailMergeConfirm": "Confirm Merge",
+
+  "invDetailSkuSearchHint": "Enter code or name to search",
+  "invDetailSkuNotFound": "No matching SKUs found",
+  "invDetailSkuArchived": "Archived",
+  "invDetailDefaultAction": "Action",
+
+  "invHistoryTitle": "Stock In/Out Records",
+  "invHistoryEmpty": "No stock records",
+  "invHistoryEmptyFiltered": "No matching records",
+  "invHistoryViewAll": "View all types",
+  "invHistorySplitSrc": "Source",
+  "invHistorySplitTargets": "Split Targets",
+  "invHistorySplitCleared": "Source cleared (split complete)",
+  "invHistoryReason": "Reason",
+
+  "errApiNotFound": "API not found, contact admin",
+  "errPermission": "No permission to view",
+  "errLoadRetry": "Load failed, please retry",
+
+  "userMgmtTitle": "User Management",
+  "userMgmtCreateBtn": "Create Account",
+  "userMgmtCreateTitle": "Create Account",
+  "userMgmtUsernameLabel": "Username",
+  "userMgmtDisplayNameLabel": "Display Name",
+  "userMgmtInitPasswordLabel": "Initial Password (min. 6 chars)",
+  "userMgmtRoleLabel": "Role",
+  "userMgmtRoleAdmin": "Admin",
+  "userMgmtRoleSupervisor": "Supervisor",
+  "userMgmtRoleStaff": "Staff",
+  "userMgmtCreateValidation": "Please fill all fields, password min. 6 chars",
+  "userMgmtCreateFailed": "Create failed",
+  "userMgmtEditRoleTitle": "Change Role",
+  "userMgmtLoadFailed": "Load failed: {error}",
+  "@userMgmtLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "userMgmtMe": "Me",
+  "userMgmtDisabled": "Disabled",
+  "userMgmtToggleTitle": "Confirm {action}",
+  "@userMgmtToggleTitle": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "userMgmtToggleContent": "Are you sure to {action} this account?{notice}",
+  "@userMgmtToggleContent": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "notice": { "type": "String" }
+    }
+  },
+  "userMgmtDisableNotice": " After disabling, this user cannot log in.",
+  "userMgmtEnable": "enable",
+  "userMgmtDisable": "disable",
+  "userMgmtResetPasswordTitle": "Reset Password",
+  "userMgmtNewPasswordLabel": "New Password (min. 6 chars)",
+  "userMgmtPasswordTooShort": "Password must be at least 6 chars",
+  "userMgmtPasswordReset": "Password reset",
+  "userMgmtResetFailed": "Reset failed",
+  "userMgmtResetBtn": "Reset",
+  "userMgmtOperationFailed": "Operation failed",
+  "clearDoneMsg": "Cleared: inventory {inv}, SKU {sku}, location {loc}, transactions {tx}, logs {log}, imports {imp}",
+  "@clearDoneMsg": {
+    "placeholders": {
+      "inv": { "type": "Object" },
+      "sku": { "type": "Object" },
+      "loc": { "type": "Object" },
+      "tx": { "type": "Object" },
+      "log": { "type": "Object" },
+      "imp": { "type": "Object" }
     }
   }
 }

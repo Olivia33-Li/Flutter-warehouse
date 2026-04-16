@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../models/change_record.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/audit_log_detail_sheet.dart';
+import '../../l10n/app_localizations.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   final String? initialLocationCode;
@@ -31,7 +32,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   DateTime? _customEnd;
   String? _filterUserName;
   bool _userFilterInitialized = false;
-  List<_FilterOption> _userOptions = const [_FilterOption(label: '全部用户', value: null)];
+  List<_FilterOption> _userOptions = const [_FilterOption(label: '', value: null)];
   int _page = 1;
   int _total = 0;
   static const _limit = 50;
@@ -68,9 +69,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       final resp = await ApiService.instance.dio.get('/users');
       final list = resp.data as List;
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       setState(() {
         _userOptions = [
-          const _FilterOption(label: '全部用户', value: null),
+          _FilterOption(label: l10n.historyAllUsersTab, value: null),
           ...list.map((u) {
             final name = (u['name'] as String? ?? '').isNotEmpty
                 ? u['name'] as String
@@ -112,6 +114,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
+          final l10n = AppLocalizations.of(ctx)!;
           final calendarInitial =
               editingStart ? (start ?? now) : (end ?? now);
           final calendarFirst =
@@ -145,7 +148,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               color: active ? primary : Colors.grey.shade500)),
                       const SizedBox(height: 2),
                       Text(
-                        val != null ? _fmtDate(val) : '请选择',
+                        val != null ? _fmtDate(val) : l10n.historyPleaseSelect,
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight:
@@ -173,8 +176,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
                   child: Row(
                     children: [
-                      const Text('自定义时间范围',
-                          style: TextStyle(
+                      Text(l10n.historyCustomRangeTitle,
+                          style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
                       const Spacer(),
                       IconButton(
@@ -188,13 +191,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: Row(
                     children: [
-                      fieldBtn('开始日期', start, true),
+                      fieldBtn(l10n.historyStartDate, start, true),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8),
                         child: Text('→',
                             style: TextStyle(color: Colors.grey)),
                       ),
-                      fieldBtn('结束日期', end, false),
+                      fieldBtn(l10n.historyEndDate, end, false),
                     ],
                   ),
                 ),
@@ -230,14 +233,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           Navigator.of(ctx).pop();
                           _load();
                         },
-                        child: Text('清空',
+                        child: Text(l10n.historyClear,
                             style:
                                 TextStyle(color: Colors.grey.shade500)),
                       ),
                       const Spacer(),
                       TextButton(
                           onPressed: () => Navigator.of(ctx).pop(),
-                          child: const Text('取消')),
+                          child: Text(l10n.cancel)),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: start != null && end != null
@@ -251,7 +254,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                 _load();
                               }
                             : null,
-                        child: const Text('应用'),
+                        child: Text(l10n.historyApply),
                       ),
                     ],
                   ),
@@ -297,25 +300,26 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
   }
 
-  static String listSummary(ChangeRecord r) {
+  static String listSummary(ChangeRecord r, AppLocalizations l10n) {
     final d = r.details;
     final ba = r.businessAction;
     if (d == null || ba == null) return r.description;
+    final pcs = l10n.unitPiece;
     switch (ba) {
       case '入库':
-        return '${d['skuCode']} @ ${d['locationCode']} · +${d['addedQty'] ?? 0}件';
+        return '${d['skuCode']} @ ${d['locationCode']} · +${d['addedQty'] ?? 0}$pcs';
       case '出库':
-        return '${d['skuCode']} @ ${d['locationCode']} · -${d['reducedQty'] ?? 0}件';
+        return '${d['skuCode']} @ ${d['locationCode']} · -${d['reducedQty'] ?? 0}$pcs';
       case '调整':
-        return '${d['skuCode']} @ ${d['locationCode']} · ${d['beforeQty'] ?? 0}→${d['afterQty'] ?? 0}件';
+        return '${d['skuCode']} @ ${d['locationCode']} · ${d['beforeQty'] ?? 0}→${d['afterQty'] ?? 0}$pcs';
       case '录入':
-        return '${d['skuCode']} @ ${d['locationCode']} · ${d['quantity'] ?? 0}件';
+        return '${d['skuCode']} @ ${d['locationCode']} · ${d['quantity'] ?? 0}$pcs';
       case '删除库存':
       case '结构修改':
         return '${d['skuCode']} @ ${d['locationCode']}';
       case '批量转移':
       case '批量复制':
-        return '${d['sourceCode']} → ${d['targetCode']} · ${d['total'] ?? 0}种SKU';
+        return '${d['sourceCode']} → ${d['targetCode']} · ${l10n.historyBulkSkuCount(d['total'] ?? 0)}';
       case '标记已检查':
       case '取消已检查':
       case '新建库位':
@@ -332,35 +336,35 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ── Label helpers ───────────────────────────────────────────────────────────
 
-  String get _actionLabel => _filterBusinessAction ?? '操作类型';
+  String _actionLabel(AppLocalizations l10n) => _filterBusinessAction ?? l10n.historyActionTypeLabel;
 
-  String get _entityLabel => switch (_filterEntity) {
+  String _entityLabel(AppLocalizations l10n) => switch (_filterEntity) {
     'sku'       => 'SKU',
-    'location'  => '库位',
-    'inventory' => '库存',
-    _           => '对象',
+    'location'  => l10n.historyEntityLocation,
+    'inventory' => l10n.historyEntityInventory,
+    _           => l10n.historyEntityLabel,
   };
 
-  String get _dateLabel {
+  String _dateLabel(AppLocalizations l10n) {
     switch (_filterDateRange) {
       case 'today':
-        return '今天';
+        return l10n.historyToday;
       case '7d':
-        return '近7天';
+        return l10n.historyLast7Days;
       case '30d':
-        return '近30天';
+        return l10n.historyLast30Days;
       case 'custom':
         if (_customStart != null && _customEnd != null) {
           return '${_fmtDate(_customStart!)}~${_fmtDate(_customEnd!)}';
         }
-        return '自定义';
+        return l10n.historyCustomRange;
       default:
-        return '时间';
+        return l10n.historyTimeLabel;
     }
   }
 
-  String get _userLabel {
-    if (_filterUserName == null) return '用户';
+  String _userLabel(AppLocalizations l10n) {
+    if (_filterUserName == null) return l10n.historyUserLabel;
     final match = _userOptions.where((o) => o.value == _filterUserName).firstOrNull;
     return match?.label ?? _filterUserName!;
   }
@@ -368,6 +372,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   // ── User tabs ───────────────────────────────────────────────────────────────
 
   Widget _buildUserTabs() {
+    final l10n = AppLocalizations.of(context)!;
     final currentUsername = ref.read(currentUserProvider)?.username;
     final isAll = _filterUserName == null;
     return Container(
@@ -379,11 +384,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _tabButton('全部用户', isAll, () {
+          _tabButton(l10n.historyAllUsersTab, isAll, () {
             setState(() => _filterUserName = null);
             _load();
           }),
-          _tabButton('我的记录', !isAll, () {
+          _tabButton(l10n.historyMyRecords, !isAll, () {
             setState(() => _filterUserName = currentUsername);
             _load();
           }),
@@ -436,7 +441,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         onChanged: (_) => _load(),
         style: const TextStyle(fontSize: 14),
         decoration: InputDecoration(
-          hintText: '搜索操作记录...',
+          hintText: AppLocalizations.of(context)!.historySearchHint,
           hintStyle:
               TextStyle(fontSize: 14, color: Colors.grey.shade400),
           prefixIcon:
@@ -466,12 +471,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final canViewAll   = currentUser?.canViewAllHistory == true;
     final canPickUser  = currentUser?.canManageUsers == true;
 
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text('操作记录',
+        title: Text(l10n.historyTitle,
             style:
-                TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -500,19 +506,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   children: [
                     // 操作类型 dropdown
                     _FilterDropdown(
-                      label: _actionLabel,
+                      label: _actionLabel(l10n),
                       active: _filterBusinessAction != null,
-                      options: const [
-                        _FilterOption(label: '全部', value: null),
-                        _FilterOption(label: '导入', value: '导入'),
-                        _FilterOption(label: '新增', value: '新增SKU'),
-                        _FilterOption(label: '录入', value: '录入'),
-                        _FilterOption(label: '调整', value: '调整'),
-                        _FilterOption(label: '转移', value: '批量转移'),
-                        _FilterOption(label: '复制', value: '批量复制'),
-                        _FilterOption(label: '检查', value: '标记已检查'),
-                        _FilterOption(label: '入库', value: '入库'),
-                        _FilterOption(label: '出库', value: '出库'),
+                      options: [
+                        _FilterOption(label: l10n.historyFilterAll, value: null),
+                        _FilterOption(label: l10n.historyFilterImport, value: '导入'),
+                        _FilterOption(label: l10n.historyFilterNew, value: '新增SKU'),
+                        _FilterOption(label: l10n.historyFilterEntry, value: '录入'),
+                        _FilterOption(label: l10n.historyFilterAdjust, value: '调整'),
+                        _FilterOption(label: l10n.historyFilterTransfer, value: '批量转移'),
+                        _FilterOption(label: l10n.historyFilterCopy, value: '批量复制'),
+                        _FilterOption(label: l10n.historyFilterCheck, value: '标记已检查'),
+                        _FilterOption(label: l10n.historyFilterIn, value: '入库'),
+                        _FilterOption(label: l10n.historyFilterOut, value: '出库'),
                       ],
                       selected: _filterBusinessAction,
                       onSelect: (v) {
@@ -523,13 +529,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     const SizedBox(width: 8),
                     // 对象 dropdown
                     _FilterDropdown(
-                      label: _entityLabel,
+                      label: _entityLabel(l10n),
                       active: _filterEntity != null,
-                      options: const [
-                        _FilterOption(label: '全部', value: null),
-                        _FilterOption(label: 'SKU', value: 'sku'),
-                        _FilterOption(label: '库位', value: 'location'),
-                        _FilterOption(label: '库存', value: 'inventory'),
+                      options: [
+                        _FilterOption(label: l10n.historyFilterAll, value: null),
+                        _FilterOption(label: l10n.historyEntitySku, value: 'sku'),
+                        _FilterOption(label: l10n.historyEntityLocationLabel, value: 'location'),
+                        _FilterOption(label: l10n.historyEntityInventoryLabel, value: 'inventory'),
                       ],
                       selected: _filterEntity,
                       onSelect: (v) {
@@ -541,7 +547,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     // 用户 dropdown (admin only)
                     if (canPickUser) ...[
                       _FilterDropdown(
-                        label: _userLabel,
+                        label: _userLabel(l10n),
                         active: _filterUserName != null &&
                             _filterUserName != ref.read(currentUserProvider)?.username,
                         options: _userOptions,
@@ -555,7 +561,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     ],
                     // 时间 dropdown
                     _DateFilterDropdown(
-                      label: _dateLabel,
+                      label: _dateLabel(l10n),
                       active: _filterDateRange != null,
                       selected: _filterDateRange,
                       onSelect: (v) {
@@ -579,7 +585,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
             child: Text(
-              '共 $_total 条记录',
+              l10n.historyTotalRecords(_total),
               style:
                   TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
@@ -605,7 +611,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           children: [
             Icon(Icons.history, size: 48, color: Colors.grey.shade300),
             const SizedBox(height: 12),
-            Text('暂无操作记录',
+            Text(AppLocalizations.of(context)!.historyNoRecords,
                 style: TextStyle(color: Colors.grey.shade500)),
           ],
         ),
@@ -621,8 +627,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         return _RecordTile(
           record: r,
           style: style,
-          label: AuditLogDetailSheet.badgeLabel(r),
-          summaryText: listSummary(r),
+          label: AuditLogDetailSheet.badgeLabel(r, AppLocalizations.of(context)!),
+          summaryText: listSummary(r, AppLocalizations.of(context)!),
           timeLabel: _formatShort(r.createdAt),
           onTap: () => AuditLogDetailSheet.show(context, r),
         );
@@ -749,11 +755,11 @@ class _DateFilterDropdown extends StatefulWidget {
 class _DateFilterDropdownState extends State<_DateFilterDropdown> {
   bool _isOpen = false;
 
-  static const _dateOptions = [
-    _FilterOption(label: '全部时间', value: null),
-    _FilterOption(label: '今天', value: 'today'),
-    _FilterOption(label: '近7天', value: '7d'),
-    _FilterOption(label: '近30天', value: '30d'),
+  List<_FilterOption> _dateOptions(AppLocalizations l10n) => [
+    _FilterOption(label: l10n.historyAllTime, value: null),
+    _FilterOption(label: l10n.historyToday, value: 'today'),
+    _FilterOption(label: l10n.historyLast7Days, value: '7d'),
+    _FilterOption(label: l10n.historyLast30Days, value: '30d'),
   ];
 
   Future<void> _showOptions() async {
@@ -778,7 +784,7 @@ class _DateFilterDropdownState extends State<_DateFilterDropdown> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
       items: [
-        ..._dateOptions.map((opt) {
+        ..._dateOptions(AppLocalizations.of(context)!).map((opt) {
           final sel = opt.value == widget.selected;
           return PopupMenuItem<_V<String?>>(
             value: _V(opt.value),
@@ -802,7 +808,7 @@ class _DateFilterDropdownState extends State<_DateFilterDropdown> {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            '自定义时间',
+            AppLocalizations.of(context)!.historyCustomRange,
             style: TextStyle(
               fontSize: 14,
               fontWeight: widget.selected == 'custom'

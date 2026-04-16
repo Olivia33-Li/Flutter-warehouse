@@ -10,6 +10,7 @@ import '../../models/location.dart';
 import '../../utils/search_utils.dart';
 import '../../widgets/error_view.dart';
 import '../inventory/inventory_add_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const _bgColor      = Color(0xFFF0EDE8);
@@ -126,9 +127,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                         size: 16, color: _primary),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    '新增位置',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context)!.locationNewTitle,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: _titleColor,
@@ -142,7 +143,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 controller: codeCtrl,
                 textCapitalization: TextCapitalization.characters,
                 style: const TextStyle(fontSize: 14, color: _titleColor),
-                decoration: _dialogInputDeco('位置代码 *'),
+                decoration: _dialogInputDeco(AppLocalizations.of(context)!.locationCode),
                 autofocus: true,
               ),
               const SizedBox(height: 12),
@@ -150,7 +151,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               TextField(
                 controller: descCtrl,
                 style: const TextStyle(fontSize: 14, color: _titleColor),
-                decoration: _dialogInputDeco('描述（可选）'),
+                decoration: _dialogInputDeco(AppLocalizations.of(context)!.locationDescription),
               ),
               const SizedBox(height: 24),
               // Buttons
@@ -164,8 +165,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
                     ),
-                    child: const Text('取消',
-                        style: TextStyle(fontSize: 14)),
+                    child: Text(AppLocalizations.of(ctx)!.cancel,
+                        style: const TextStyle(fontSize: 14)),
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
@@ -184,7 +185,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                           final msg = e.response?.data?['message'];
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text(msg ?? '创建失败')));
+                              SnackBar(content: Text(msg ?? AppLocalizations.of(ctx)!.locationCreateFailed)));
                           }
                         }
                       },
@@ -198,8 +199,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: const Text('创建',
-                          style: TextStyle(
+                      child: Text(AppLocalizations.of(context)!.locationCreate,
+                          style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600)),
                     ),
@@ -251,9 +252,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  const Text(
-                    '位置管理',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context)!.locationScreenTitle,
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       color: _titleColor,
@@ -263,7 +264,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                   const Spacer(),
                   if (!_loading && _error == null)
                     Text(
-                      '${_allLocations.length} 个库位',
+                      AppLocalizations.of(context)!.locationCount(_allLocations.length),
                       style: const TextStyle(
                           fontSize: 13, color: _mutedColor),
                     ),
@@ -330,15 +331,15 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                         ),
                       ],
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.location_on_rounded,
+                        const Icon(Icons.location_on_rounded,
                             size: 16, color: _primary),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
-                          '新增位置',
-                          style: TextStyle(
+                          AppLocalizations.of(context)!.locationNewButton,
+                          style: const TextStyle(
                             fontSize: 13,
                             color: _titleColor,
                             fontWeight: FontWeight.w500,
@@ -370,15 +371,15 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                         ),
                       ],
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.inventory_2_rounded,
+                        const Icon(Icons.inventory_2_rounded,
                             size: 18, color: Colors.white),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
-                          '录入库存',
-                          style: TextStyle(
+                          AppLocalizations.of(context)!.locationAddInventory,
+                          style: const TextStyle(
                             fontSize: 15,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
@@ -395,10 +396,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Widget _emptyState() {
+    final l10n = AppLocalizations.of(context)!;
     if (_query.isEmpty) {
-      return const Center(
-        child: Text('暂无位置',
-            style: TextStyle(color: _mutedColor, fontSize: 14)),
+      return Center(
+        child: Text(l10n.locationEmpty,
+            style: const TextStyle(color: _mutedColor, fontSize: 14)),
       );
     }
     return Center(
@@ -407,11 +409,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         children: [
           const Icon(Icons.search_off, size: 48, color: _hintColor),
           const SizedBox(height: 12),
-          Text('未找到 "$_query"',
+          Text(l10n.locationNoResult(_query),
               style: const TextStyle(color: _mutedColor, fontSize: 15)),
           const SizedBox(height: 4),
-          const Text('尝试缩短关键词，或忽略大小写搜索',
-              style: TextStyle(color: _hintColor, fontSize: 12)),
+          Text(l10n.locationSearchTip,
+              style: const TextStyle(color: _hintColor, fontSize: 12)),
         ],
       ),
     );
@@ -445,7 +447,7 @@ class _SearchBar extends StatelessWidget {
               onChanged: onChanged,
               style: const TextStyle(fontSize: 14, color: _titleColor),
               decoration: InputDecoration(
-                hintText: '搜索位置码 / 备注...',
+                hintText: AppLocalizations.of(context)!.locationSearchHint,
                 hintStyle:
                     const TextStyle(fontSize: 14, color: _hintColor),
                 border: InputBorder.none,
@@ -538,7 +540,7 @@ class _LocationCard extends StatelessWidget {
                         child: Icon(Icons.check_circle_outline,
                             size: 15, color: Colors.green.shade500),
                       ),
-                    _stockBadge(isEmpty),
+                    _stockBadge(context, isEmpty),
                   ],
                 ),
 
@@ -566,18 +568,18 @@ class _LocationCard extends StatelessWidget {
                       if (location.totalBoxes > 0) ...[
                         const SizedBox(width: 12),
                         _statItem(Icons.inventory_2_outlined,
-                            '${location.totalBoxes} 箱'),
+                            '${location.totalBoxes} ${AppLocalizations.of(context)!.unitBox}'),
                       ],
                       if (location.totalQty > 0) ...[
                         const SizedBox(width: 12),
                         _statItem(Icons.tag_rounded,
-                            '${location.totalQty} 件'),
+                            '${location.totalQty} ${AppLocalizations.of(context)!.unitPiece}'),
                       ],
                       if (location.checkedAt != null) ...[
                         const SizedBox(width: 12),
                         _statItem(
                           Icons.schedule_outlined,
-                          '检查 ${_formatDate(location.checkedAt!)}',
+                          AppLocalizations.of(context)!.locationChecked(_formatDate(context, location.checkedAt!)),
                           color: Colors.green.shade600,
                         ),
                       ],
@@ -592,20 +594,21 @@ class _LocationCard extends StatelessWidget {
     );
   }
 
-  Widget _stockBadge(bool isEmpty) {
+  Widget _stockBadge(BuildContext context, bool isEmpty) {
+    final l10n = AppLocalizations.of(context)!;
     if (isEmpty) {
-      return const Text('空位置',
-          style: TextStyle(color: _hintColor, fontSize: 12));
+      return Text(l10n.locationEmpty2,
+          style: const TextStyle(color: _hintColor, fontSize: 12));
     }
     if (location.totalBoxes > 0) {
       return Text(
-        '${location.totalBoxes} 箱',
+        '${location.totalBoxes} ${l10n.unitBox}',
         style: const TextStyle(
             color: _primary, fontWeight: FontWeight.w600, fontSize: 14),
       );
     }
     return Text(
-      '${location.totalQty} 件',
+      '${location.totalQty} ${l10n.unitPiece}',
       style: const TextStyle(
           color: Color(0xFF67C23A),
           fontWeight: FontWeight.w600,
@@ -625,12 +628,13 @@ class _LocationCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime dt) {
+  String _formatDate(BuildContext context, DateTime dt) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final diff = now.difference(dt);
-    if (diff.inDays == 0) return '今天';
-    if (diff.inDays == 1) return '昨天';
-    if (diff.inDays < 7) return '${diff.inDays}天前';
+    if (diff.inDays == 0) return l10n.dateToday;
+    if (diff.inDays == 1) return l10n.dateYesterday;
+    if (diff.inDays < 7) return l10n.dateDaysAgo(diff.inDays);
     return DateFormat('MM/dd').format(dt);
   }
 }

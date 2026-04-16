@@ -95,16 +95,42 @@
     }
   },
 
-  "locationScreenTitle": "库位搜索",
-  "locationSearchHint": "搜索库位编号或描述...",
-  "locationEmpty": "暂无库位",
-  "locationNoResult": "未找到匹配库位",
-  "locationNewButton": "新建库位",
-  "locationNoStock": "暂无库存",
-  "locationTotalQty": "共 {qty} 件",
-  "@locationTotalQty": {
+  "locationScreenTitle": "位置管理",
+  "locationSearchHint": "搜索位置码 / 备注...",
+  "locationEmpty": "暂无位置",
+  "locationNoResult": "未找到 \"{query}\"",
+  "@locationNoResult": {
     "placeholders": {
-      "qty": { "type": "int" }
+      "query": { "type": "String" }
+    }
+  },
+  "locationSearchTip": "尝试缩短关键词，或忽略大小写搜索",
+  "locationCount": "{count} 个库位",
+  "@locationCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "locationNewButton": "新增位置",
+  "locationAddInventory": "录入库存",
+  "locationNewTitle": "新增位置",
+  "locationCode": "位置代码 *",
+  "locationDescription": "描述（可选）",
+  "locationCreate": "创建",
+  "locationCreateFailed": "创建失败",
+  "locationEmpty2": "空位置",
+  "locationChecked": "检查 {date}",
+  "@locationChecked": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "dateToday": "今天",
+  "dateYesterday": "昨天",
+  "dateDaysAgo": "{days}天前",
+  "@dateDaysAgo": {
+    "placeholders": {
+      "days": { "type": "int" }
     }
   },
 
@@ -234,6 +260,1218 @@
   "@operationFailed": {
     "placeholders": {
       "error": { "type": "String" }
+    }
+  },
+
+  "saveFailed": "保存失败",
+  "skuFormEditTitle": "编辑 SKU",
+  "skuFormNewTitle": "新增 SKU",
+  "skuFormSkuCodeLabel": "SKU 编号 *",
+  "skuFormProductName": "产品名称",
+  "skuFormBarcodeLabel": "条码",
+  "skuFormBarcodeAdminOnly": "仅管理员可修改条码",
+  "skuFormViewBarcodeHistory": "查看条码历史",
+  "skuFormCartonQtyLabel": "每箱个数",
+  "skuFormCreateButton": "创建",
+  "skuFormSaveButton": "保存",
+  "barcodeHistoryTitle": "条码变更历史",
+  "barcodeHistoryCurrent": "当前: {barcode}",
+  "@barcodeHistoryCurrent": {
+    "placeholders": {
+      "barcode": { "type": "String" }
+    }
+  },
+  "barcodeHistoryEmpty": "暂无条码变更记录",
+  "barcodeSourceManual": "手动编辑",
+  "barcodeSourceImport": "批量导入",
+  "barcodeCurrentLabel": "当前",
+
+  "pwdResetTitle": "密码重置申请",
+  "pwdResetHandleTitle": "处理申请 — {name}",
+  "@pwdResetHandleTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pwdResetInfoUsername": "用户名",
+  "pwdResetInfoTime": "申请时间",
+  "pwdResetInfoNote": "用户备注",
+  "pwdResetAction": "操作",
+  "pwdResetActionComplete": "重置密码",
+  "pwdResetActionReject": "拒绝申请",
+  "pwdResetTempPassword": "临时密码 *（至少 6 位）",
+  "pwdResetForceChangeNotice": "用户下次登录时将被强制修改此密码。",
+  "pwdResetRejectReason": "拒绝原因（可选）",
+  "pwdResetNoteOptional": "备注（可选）",
+  "pwdResetNoteHint": "例如：已通知用户",
+  "pwdResetPasswordTooShort": "密码至少需要 6 位",
+  "pwdResetOperationFailed": "操作失败",
+  "pwdResetConfirmComplete": "确认重置",
+  "pwdResetConfirmReject": "确认拒绝",
+  "pwdResetDeleteTitle": "删除记录",
+  "pwdResetDeleteContent": "确认删除 @{username} 的申请记录？",
+  "@pwdResetDeleteContent": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "pwdResetDelete": "删除",
+  "pwdResetEmpty": "暂无申请记录",
+  "pwdResetHandle": "处理",
+  "pwdResetRequestTime": "申请时间：{time}",
+  "@pwdResetRequestTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "pwdResetResolver": "处理人：{resolver}",
+  "@pwdResetResolver": {
+    "placeholders": {
+      "resolver": { "type": "String" }
+    }
+  },
+  "pwdResetStatusAll": "全部",
+  "pwdResetStatusPending": "待处理",
+  "pwdResetStatusCompleted": "已完成",
+  "pwdResetStatusRejected": "已拒绝",
+  "pwdResetStatusUnknown": "未知",
+
+  "historyAllTime": "全部时间",
+  "historyLast7Days": "近7天",
+  "historyLast30Days": "近30天",
+  "historyCustomRange": "自定义时间",
+  "historyCustomRangeTitle": "自定义时间范围",
+  "historyStartDate": "开始日期",
+  "historyEndDate": "结束日期",
+  "historyPleaseSelect": "请选择",
+  "historyClear": "清空",
+  "historyApply": "应用",
+  "historySearchHint": "搜索操作记录...",
+  "historyTotalRecords": "共 {total} 条记录",
+  "@historyTotalRecords": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "historyNoRecords": "暂无操作记录",
+  "historyActionTypeLabel": "操作类型",
+  "historyEntityLabel": "对象",
+  "historyEntityLocation": "库位",
+  "historyEntityInventory": "库存",
+  "historyUserLabel": "用户",
+  "historyTimeLabel": "时间",
+  "historyAllUsersTab": "全部用户",
+  "historyMyRecords": "我的记录",
+  "historyFilterAll": "全部",
+  "historyFilterImport": "导入",
+  "historyFilterNew": "新增",
+  "historyFilterEntry": "录入",
+  "historyFilterAdjust": "调整",
+  "historyFilterTransfer": "转移",
+  "historyFilterCopy": "复制",
+  "historyFilterCheck": "检查",
+  "historyFilterIn": "入库",
+  "historyFilterOut": "出库",
+  "historyEntitySku": "SKU",
+  "historyEntityLocationLabel": "库位",
+  "historyEntityInventoryLabel": "库存",
+  "historyPieceSuffix": "件",
+
+  "inventoryAddManualTitle": "手动录入库存",
+  "inventorySkuSection": "SKU",
+  "inventoryLocationSection": "库位",
+  "inventoryInitialStockSection": "初始库存",
+  "inventoryNewSkuLabel": "新建 SKU",
+  "inventorySearchExisting": "搜索已有",
+  "inventorySearchSkuHint": "搜索 SKU 编号 / 名称 / 条码",
+  "inventoryNewSkuTitle": "新建 \"{name}\"",
+  "@inventoryNewSkuTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "inventorySkuNotFound": "未找到，",
+  "inventoryCreateNewSku": "点击新建此 SKU",
+  "inventorySkuCodeLabel": "SKU 编号 *",
+  "inventoryProductNameLabel": "商品名称",
+  "inventoryBarcodeLabel": "条形码（可选）",
+  "inventoryNewLocationLabel": "新建库位",
+  "inventorySearchLocationHint": "搜索库位编号",
+  "inventoryNewLocationTitle": "新建 \"{name}\"",
+  "@inventoryNewLocationTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "inventoryLocationNotFound": "未找到，",
+  "inventoryCreateNewLocation": "点击新建此库位",
+  "inventoryLocationCodeLabel": "库位编号 *",
+  "inventoryLocationDescLabel": "描述（可选）",
+  "inventoryPendingTitle": "暂存 / 待清点",
+  "inventoryPendingSubtitle": "货已到位，数量暂未确认",
+  "inventoryModeCarton": "按箱规",
+  "inventoryModeBoxOnly": "仅箱数",
+  "inventoryModeQty": "按总数量",
+  "inventoryBoxesLabel": "箱数 *",
+  "inventoryBoxesSuffix": "箱",
+  "inventoryUnitsLabel": "每箱件数 *",
+  "inventoryTotalQtyLabel": "总件数 *",
+  "inventoryTotalQtySuffix": "件",
+  "inventoryNoteLabel": "备注（可选）",
+  "inventoryAddNoteHint": "添加备注",
+  "inventoryConfirmPending": "确认暂存",
+  "inventorySaveStock": "保存库存",
+  "inventoryStockSaved": "库存已保存",
+  "inventorySelectOrCreate": "请选择 SKU 或新建",
+  "inventorySkuCodeEmpty": "SKU 编号不能为空",
+  "inventorySelectLocation": "请选择库位",
+  "inventoryLocationCodeEmpty": "库位编号不能为空",
+  "inventoryValidBoxCount": "请输入有效箱数",
+  "inventoryValidUnits": "请输入每箱件数",
+  "inventoryValidQty": "请输入有效件数",
+  "inventoryTotal": "合计",
+  "inventoryBoxesTotal": "{boxes} 箱 · 箱规待确认",
+  "@inventoryBoxesTotal": {
+    "placeholders": {
+      "boxes": { "type": "int" }
+    }
+  },
+  "inventoryQtyTotal": "合计 {qty} 件",
+  "@inventoryQtyTotal": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "inventoryPendingNote": "将标记为\"暂存\"状态，数量不计入正式合计。",
+
+  "skuDetailNewLocation": "新增库位",
+  "skuDetailLocationSection": "库位",
+  "skuDetailNewLocationButton": "+ 新建库位",
+  "skuDetailSearchLocationHint": "搜索库位编号",
+  "skuDetailNewLocationTitle": "新建 \"{name}\"",
+  "@skuDetailNewLocationTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "skuDetailLocationNotFound": "未找到，点击新建",
+  "skuDetailLocationCodeHint": "库位编号 *",
+  "skuDetailLocationDescHint": "描述（可选）",
+  "skuDetailInitialStock": "初始库存",
+  "skuDetailPendingTitle": "暂存 / 待清点",
+  "skuDetailPendingSubtitle": "货已到位，数量暂未确认",
+  "skuDetailModeCarton": "按箱规",
+  "skuDetailModeBoxOnly": "仅箱数",
+  "skuDetailModeQty": "按总数量",
+  "skuDetailBoxesLabel": "箱数",
+  "skuDetailBoxesSuffix": "箱",
+  "skuDetailUnitsLabel": "每箱件数",
+  "skuDetailUnitsSuffix": "件/箱",
+  "skuDetailBoxesOnlyHelp": "仅记录箱数，每箱件数可后续补充",
+  "skuDetailTotalLabel": "初始总件数",
+  "skuDetailTotalSuffix": "件",
+  "skuDetailNoteLabel": "备注（可选）",
+  "skuDetailCancel": "取消",
+  "skuDetailCreate": "创建",
+  "skuDetailSelectSku": "请选择 SKU",
+  "skuDetailValidBoxes": "请输入有效的箱数和每箱件数",
+  "skuDetailValidBoxesOnly": "请输入有效箱数",
+  "skuDetailValidQty": "请输入有效的数量",
+  "skuDetailConfirmPending": "确认暂存",
+  "skuDetailSave": "保存",
+  "skuDetailDeleteConfirmTitle": "确认删除",
+  "skuDetailDeleteConfirmContent": "确定删除 {location} 中的\n{sku} 当前库存记录吗？\n此操作不可恢复。",
+  "@skuDetailDeleteConfirmContent": {
+    "placeholders": {
+      "location": { "type": "String" },
+      "sku": { "type": "String" }
+    }
+  },
+  "skuDetailDelete": "删除",
+  "skuDetailDeleteFailed": "删除失败: {error}",
+  "@skuDetailDeleteFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailArchiveWithStockContent": "{skuCode} 仍有 {count} 条库存记录。\n\n归档后该 SKU 不允许新入库，但现有库存仍可查看和出库。\n\n确认归档？",
+  "@skuDetailArchiveWithStockContent": {
+    "placeholders": {
+      "skuCode": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailArchiveContent": "确定归档 SKU {skuCode}？归档后不允许新入库。",
+  "@skuDetailArchiveContent": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailArchiveTitle": "确认归档",
+  "skuDetailConfirmArchive": "确认归档",
+  "skuDetailArchived": "{skuCode} 已归档",
+  "@skuDetailArchived": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailOperationFailed": "操作失败: {error}",
+  "@skuDetailOperationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailRestoreTitle": "恢复 SKU",
+  "skuDetailRestoreContent": "确定将 {skuCode} 恢复为\"在用\"状态？",
+  "@skuDetailRestoreContent": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailConfirmRestore": "确认恢复",
+  "skuDetailRestored": "{skuCode} 已恢复为在用",
+  "@skuDetailRestored": {
+    "placeholders": {
+      "skuCode": { "type": "String" }
+    }
+  },
+  "skuDetailArchivedNotice": "此 SKU 已归档，不允许新入库。现有库存仍可查看和出库。",
+  "skuDetailTotalStock": "总库存",
+  "skuDetailTotalBoxes": "{boxes} 箱",
+  "@skuDetailTotalBoxes": {
+    "placeholders": {
+      "boxes": { "type": "int" }
+    }
+  },
+  "skuDetailTotalQtyPieces": "{qty} 件",
+  "@skuDetailTotalQtyPieces": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailLocationCol": "库位",
+  "skuDetailBoxesCol": "箱数",
+  "skuDetailDefaultCarton": "默认箱规",
+  "skuDetailCartonQtyDisplay": "{qty} 件/箱",
+  "@skuDetailCartonQtyDisplay": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailStockLocations": "库存位置",
+  "skuDetailAddLocation": "添加库位",
+  "skuDetailBadgePending": "待清点",
+  "skuDetailBadgeBoxOnly": "仅箱数",
+  "skuDetailBadgeCarton": "按箱规",
+  "skuDetailUnknownLocation": "未知位置",
+  "skuDetailStockDelete": "删除",
+  "skuDetailSkuStock": "库存 SKU ({total})",
+  "@skuDetailSkuStock": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailSkuStockShown": "库存 SKU ({shown} / {total})",
+  "@skuDetailSkuStockShown": {
+    "placeholders": {
+      "shown": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailTransferLabel": "转移",
+  "skuDetailCopyLabel": "复制",
+  "skuDetailNoMatchingSku": "暂无匹配的 SKU",
+  "skuDetailClearFilter": "清除筛选",
+  "skuDetailFilterStock": "库存:",
+  "skuDetailFilterBusiness": "业务:",
+  "skuDetailFilterAll": "全部",
+  "skuDetailFilterHasStock": "有库存",
+  "skuDetailFilterZeroStock": "0库存",
+  "skuDetailFilterNormal": "正常",
+  "skuDetailFilterPending": "暂存",
+  "skuDetailChecked": "已检查",
+  "skuDetailLastCheck": "上次检查",
+  "skuDetailNoCheckRecord": "无检查记录",
+  "skuDetailLastChange": "上次变更",
+  "skuDetailNoChangeRecord": "无变更记录",
+  "skuDetailTotalBoxesLabel": "总箱数",
+  "skuDetailTotalPiecesLabel": "总件数",
+  "skuDetailChangeRecords": "{locationCode} 变更记录",
+  "@skuDetailChangeRecords": {
+    "placeholders": {
+      "locationCode": { "type": "String" }
+    }
+  },
+  "skuDetailLoadFailed": "加载失败: {error}",
+  "@skuDetailLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailNoChangeRecords": "暂无变更记录",
+  "skuDetailViewAllRecords": "查看全部 {total} 条记录",
+  "@skuDetailViewAllRecords": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailViewHistoryPage": "在操作记录页查看",
+  "skuDetailNoSkuHere": "该库位暂无可操作的 SKU",
+  "skuDetailCheckInventory": "请确认库位 {code} 是否已录入库存，\n或联系管理员检查数据",
+  "@skuDetailCheckInventory": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "skuDetailCreateSkuError": "请输入 SKU 编码",
+  "skuDetailCreateFailed": "创建失败: {error}",
+  "@skuDetailCreateFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailPendingMarkTitle": "标记为暂存 / 待清点",
+  "skuDetailPendingMarkSubtitle1": "此记录将归入暂存分类，可填写实际数量",
+  "skuDetailPendingMarkSubtitle2": "勾选后归入暂存分类，数量仍正常录入",
+  "skuDetailNewSkuCode": "SKU 编码 *",
+  "skuDetailNewSkuName": "货号名称（可选）",
+  "skuDetailEmptyFilterMsg": "当前筛选「{parts}」下暂无 SKU",
+  "@skuDetailEmptyFilterMsg": {
+    "placeholders": {
+      "parts": { "type": "String" }
+    }
+  },
+  "skuDetailNoInventory": "暂无库存 SKU",
+  "skuDetailQtyLinePending": "待补充库存信息",
+  "skuDetailQtyLineBoxes": "{boxes}箱 · 箱规待确认",
+  "@skuDetailQtyLineBoxes": {
+    "placeholders": {
+      "boxes": { "type": "int" }
+    }
+  },
+  "skuDetailQtyLineCarton": "{boxes}箱 · {qty}件",
+  "@skuDetailQtyLineCarton": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailSelectedSkus": "已选 {count} 种 SKU，请选择目标库位",
+  "@skuDetailSelectedSkus": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailTargetLocationHint": "输入库位编码...",
+  "skuDetailEnterCodeToSearch": "输入库位编码以搜索目标位置",
+  "skuDetailLoadTargetFailed": "加载目标库位失败",
+  "skuDetailCreateLocationFailed": "创建库位失败: {error}",
+  "@skuDetailCreateLocationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailNewAndTransfer": "新建库位 \"{code}\" 并{action}到此",
+  "@skuDetailNewAndTransfer": {
+    "placeholders": {
+      "code": { "type": "String" },
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailSelectedSkuCount": "{count} 种 SKU",
+  "@skuDetailSelectedSkuCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailConflictMsg": "目标库位已有 {count} 种相同 SKU，请选择处理方式：",
+  "@skuDetailConflictMsg": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailMerge": "合并",
+  "skuDetailMergeDesc": "将来源库存合并到目标已有库存中",
+  "skuDetailOverwrite": "覆盖",
+  "skuDetailOverwriteDesc": "用来源库存替换目标已有库存",
+  "skuDetailStack": "叠加",
+  "skuDetailStackDesc": "将来源库存叠加到目标已有库存中",
+  "skuDetailNoConflict": "无冲突 SKU（{count} 种，将直接{action}）：",
+  "@skuDetailNoConflict": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailTransferDeleteNotice": "转移完成后，原库位对应的 SKU 库存数据将被删除。",
+  "skuDetailTransferFailed": "{action}失败: {error}",
+  "@skuDetailTransferFailed": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "error": { "type": "String" }
+    }
+  },
+  "skuDetailBulkTitle": "批量{action}库存",
+  "@skuDetailBulkTitle": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailBulkSelectHint": "选择要{action}的 SKU（来源：{code}）",
+  "@skuDetailBulkSelectHint": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "code": { "type": "String" }
+    }
+  },
+  "skuDetailSkuCountSuffix": "{count} 种 SKU · ",
+  "@skuDetailSkuCountSuffix": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailSelectedCount": "已选 {count} 种",
+  "@skuDetailSelectedCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailDeselectAll": "取消全选",
+  "skuDetailSelectAll": "全选",
+  "skuDetailReturn": "返回",
+  "skuDetailConfirmActionCount": "确认{action} {count} 种",
+  "@skuDetailConfirmActionCount": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailNextStep": "下一步",
+  "skuDetailNextStepWithCount": "下一步（已选 {count} 种）",
+  "@skuDetailNextStepWithCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailConfirmAction": "确认{action}",
+  "@skuDetailConfirmAction": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailRouteLabel": "{src} → {dst}，共 {total} 种 SKU",
+  "@skuDetailRouteLabel": {
+    "placeholders": {
+      "src": { "type": "String" },
+      "dst": { "type": "String" },
+      "total": { "type": "int" }
+    }
+  },
+  "skuDetailDirectAction": "直接{action}",
+  "@skuDetailDirectAction": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "skuDetailResultSection": "{title}（{count} 种）",
+  "@skuDetailResultSection": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "skuDetailTransferDone": "{action}完成",
+  "@skuDetailTransferDone": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+
+  "importTitle": "批量导入",
+  "importSelectType": "选择导入类型",
+  "importRecordsTab": "记录",
+  "importHistoryTab": "导入记录",
+  "importHistoryTitle": "导入记录",
+  "importSkuMasterLabel": "SKU 主档导入",
+  "importSkuMasterSubtitle": "批量新增或更新 SKU 基础资料",
+  "importLocationMasterLabel": "库位主档导入",
+  "importLocationMasterSubtitle": "批量新增或更新库位",
+  "importInventoryLabel": "库存明细导入",
+  "importInventorySubtitle": "批量录入库存数量（SKU 和库位须已存在）",
+  "importSkuBarcodeLabel": "SKU 条码批量更新",
+  "importSkuBarcodeSubtitle": "仅更新已有 SKU 的条形码字段",
+  "importSkuCartonLabel": "SKU 箱规批量更新",
+  "importSkuCartonSubtitle": "仅更新已有 SKU 的默认箱规字段",
+  "importTemplateColumns": "模板列说明：",
+  "importReselect": "重新选择",
+  "importConfirm": "确认导入 ({count} 条)",
+  "@importConfirm": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importNoData": "无可导入数据",
+  "importReimport": "重新导入",
+  "importDownloadTemplate": "下载模板",
+  "importValidating": "校验中…",
+  "importImporting": "导入中…",
+  "importSelectFile": "选择文件",
+  "importColName": "列名",
+  "importColRequired": "必填",
+  "importColDesc": "说明",
+  "importReqRequired": "必填",
+  "importReqEitherA": "二选A",
+  "importReqEitherB": "二选B",
+  "importReqOptional": "可选",
+  "importValidationOkWithErrors": "校验完成（含部分错误）",
+  "importValidationAllErrors": "校验完成（全部行有错误）",
+  "importValidationPassed": "校验通过，可以导入",
+  "importFilename": "文件: {filename}",
+  "@importFilename": {
+    "placeholders": {
+      "filename": { "type": "String" }
+    }
+  },
+  "importStatTotal": "共",
+  "importStatCreate": "待创建",
+  "importStatUpdate": "待更新",
+  "importStatSkip": "跳过",
+  "importStatError": "错误",
+  "importErrorDetails": "错误详情：",
+  "importRowLabel": "第 {row} 行  ",
+  "@importRowLabel": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "importMoreErrors": "… 还有 {count} 条错误（请修正文件后重新选择）",
+  "@importMoreErrors": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importPreviewData": "将写入数据预览：",
+  "importMoreRows": "… 还有 {count} 条（确认后将全部写入）",
+  "@importMoreRows": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importCreate": "新建",
+  "importUpdate": "更新",
+  "importDoneTitle": "导入完成",
+  "importDoneWithErrors": "导入完成（有部分问题）",
+  "importResultTotal": "共",
+  "importResultCreate": "新建",
+  "importResultUpdate": "更新",
+  "importResultSkip": "跳过",
+  "importResultError": "错误",
+  "importRowErrorDetails": "行级错误详情：",
+  "importMoreRowErrors": "… 还有 {count} 条错误",
+  "@importMoreRowErrors": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importValidationFailed": "校验失败，请检查文件格式",
+  "importValidationError": "校验失败: {error}",
+  "@importValidationError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "importFailed": "导入失败，请检查文件格式",
+  "importError": "导入失败: {error}",
+  "@importError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "importHistoryTotal": "共 {count} 条记录",
+  "@importHistoryTotal": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importHistoryEmpty": "暂无导入记录",
+  "importHistoryLoadMore": "加载更多",
+  "importExportFailed": "导出失败: {error}",
+  "@importExportFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "importStatusSuccess": "成功",
+  "importStatusPartial": "部分成功",
+  "importStatusAllFailed": "全部失败",
+  "importStatusSkipped": "完成（有跳过）",
+  "importHistoryStatTotal": "共",
+  "importHistoryStatCreate": "新建",
+  "importHistoryStatUpdate": "更新",
+  "importHistoryStatSkip": "跳过",
+  "importHistoryStatError": "错误",
+  "importHistoryRowErrors": "行级错误详情：",
+  "importHistoryMoreErrors": "… 还有 {count} 条错误",
+  "@importHistoryMoreErrors": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "importExporting": "导出中…",
+  "importExportDetail": "导出详情 Excel",
+  "importFilterAll": "全部",
+  "importFilterSku": "SKU 主档",
+  "importFilterLocation": "库位主档",
+  "importFilterInventory": "库存明细",
+  "importFilterBarcodeUpdate": "条码更新",
+  "importFilterCartonUpdate": "箱规更新",
+  "importRefresh": "刷新",
+
+  "historyBulkSkuCount": "{total} 种SKU",
+  "@historyBulkSkuCount": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "badgeActionCreate": "新增",
+  "badgeActionUpdate": "编辑",
+  "badgeActionDelete": "删除",
+
+  "auditBasicInfo": "基础信息",
+  "auditActionType": "操作类型",
+  "auditEntity": "操作对象",
+  "auditEntityId": "对象 ID",
+  "auditOperator": "操作人",
+  "auditTime": "操作时间",
+  "auditDescription": "操作说明",
+  "auditFieldChanges": "字段变更",
+  "auditBefore": "变更前",
+  "auditAfter": "变更后",
+  "auditNone": "无",
+  "auditStockInTitle": "入库内容",
+  "auditStockOutTitle": "出库内容",
+  "auditAdjustTitle": "调整内容",
+  "auditEntryTitle": "录入内容",
+  "auditDeleteStockTitle": "删除内容",
+  "auditStructureTitle": "修改内容",
+  "auditTransferTitle": "转移路径",
+  "auditCopyTitle": "复制路径",
+  "auditCheckTitle": "检查状态",
+  "auditLocationOpTitle": "库位信息",
+  "auditLocation": "库位",
+  "auditSku": "SKU",
+  "auditQtyAdded": "+{qty}件",
+  "@auditQtyAdded": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditQtyReduced": "-{qty}件",
+  "@auditQtyReduced": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditQtyPcs": "{qty}件",
+  "@auditQtyPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditQtyBoxes": "{boxes}箱",
+  "@auditQtyBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "auditQtyPcsPerBox": "{qty}件/箱",
+  "@auditQtyPcsPerBox": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditBeforeAfterChange": "前后变化",
+  "auditChangeLabel": "变化",
+  "auditBeforeLabel": "操作前",
+  "auditAfterLabel": "操作后",
+  "auditNoStock": "无库存",
+  "auditNote": "备注",
+  "auditDeletedNotice": "该 SKU 在此库位的所有库存数据已删除，此操作不可恢复。",
+  "auditAdjustMode": "调整方式",
+  "auditAdjustModeConfig": "按箱规调整",
+  "auditAdjustModeQty": "按总数量调整",
+  "auditFirstEntry": "首次录入 · 共{qty}件",
+  "@auditFirstEntry": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditSourceLocation": "来源库位",
+  "auditTargetLocation": "目标库位",
+  "auditSkuTotal": "{total} 种SKU",
+  "@auditSkuTotal": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+  "auditAffectedDetails": "涉及明细",
+  "auditDirectTransfer": "直接转移",
+  "auditDirectTransferDesc": "目标库位原无此 SKU，直接写入",
+  "auditMerged": "合并",
+  "auditMergedDesc": "与目标库位已有库存合并，按箱规叠加",
+  "auditOverwritten": "覆盖",
+  "auditOverwrittenDesc": "用来源库存替换了目标库位的原有库存",
+  "auditImpactResult": "影响结果",
+  "auditTransferDeleteNotice": "转移完成后，来源库位中对应的 SKU 库存数据已被删除。\n目标库位已新增或更新上述 SKU 的库存。",
+  "auditDirectCopy": "直接复制",
+  "auditDirectCopyDesc": "目标库位原无此 SKU，直接写入",
+  "auditStacked": "叠加",
+  "auditStackedDesc": "与目标库位已有库存叠加，按箱规合并",
+  "auditCopySourceUnchanged": "来源库位无变化（复制操作不删除来源数据）",
+  "auditCheckedChange": "状态变化",
+  "auditMarkChecked": "未检查  →  已检查",
+  "auditUnmarkChecked": "已检查  →  未检查",
+  "auditCheckedBy": "检查人",
+  "auditCheckedAt": "检查时间",
+  "auditLocationCode": "库位编码",
+  "auditDescription2": "描述",
+  "auditTotalSkuCount": "{total} 种SKU",
+  "@auditTotalSkuCount": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+  "auditTargetLocationChange": "目标库位变化",
+  "auditSkuTypeCount": "{count} 种",
+  "@auditSkuTypeCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "auditGroupTitle": "{title}（{count}种）",
+  "@auditGroupTitle": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "auditQtyPcsBold": "{qty}件",
+  "@auditQtyPcsBold": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "auditBusinessActionStockIn": "入库",
+  "auditBusinessActionStockOut": "出库",
+  "auditBusinessActionAdjust": "调整",
+  "auditBusinessActionEntry": "录入",
+  "auditBusinessActionDeleteStock": "删除库存",
+  "auditBusinessActionStructure": "结构修改",
+  "auditBusinessActionTransfer": "批量转移",
+  "auditBusinessActionTransferIn": "批量转入",
+  "auditBusinessActionCopy": "批量复制",
+  "auditBusinessActionCopyIn": "批量复制进入",
+  "auditBusinessActionNewLocation": "新建库位",
+  "auditBusinessActionEditLocation": "编辑库位",
+  "auditBusinessActionDeleteLocation": "删除库位",
+  "auditBusinessActionMarkChecked": "标记已检查",
+  "auditBusinessActionUnmarkChecked": "取消已检查",
+  "auditBusinessActionNewSku": "新建SKU",
+  "auditBusinessActionEditSku": "编辑SKU",
+  "auditBusinessActionDeleteSku": "删除SKU",
+
+  "skuDetailInitialPreviewCarton": "初始库存：{boxes}箱 × {units}件/箱 = {qty}件",
+  "@skuDetailInitialPreviewCarton": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "units": { "type": "int" },
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailInitialPreviewBoxOnly": "初始库存：{qty} 箱（每箱件数待定）",
+  "@skuDetailInitialPreviewBoxOnly": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "skuDetailInitialPreviewQty": "初始库存：{qty} 件",
+  "@skuDetailInitialPreviewQty": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+
+  "locDetailAddSkuTitle": "新增 SKU",
+  "locDetailEditStock": "编辑库存",
+  "locDetailReselectSku": "重新选择",
+  "locDetailSearchSkuHint": "搜索编码 / 名称 / 条码",
+  "locDetailNewSkuButton": "+ 新建货号",
+  "locDetailOperationFailedRetry": "操作失败，请重试",
+  "locDetailParamError": "参数错误，请检查输入",
+  "locDetailTotalPcs": "共 {qty} 件",
+  "@locDetailTotalPcs": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "locDetailConfigCarton": "{boxes}箱 × {units}件/箱",
+  "@locDetailConfigCarton": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "units": { "type": "int" }
+    }
+  },
+
+  "errPermissionDenied": "权限不足，无法执行此操作",
+  "errSessionExpired": "登录已过期，请重新登录",
+  "errResourceNotFound": "目标资源不存在，请刷新后重试",
+  "errRequestFailed": "请求失败（{code}），请重试",
+  "@errRequestFailed": {
+    "placeholders": { "code": { "type": "int" } }
+  },
+  "errCannotConnectServer": "无法连接服务器，请检查网络",
+  "errNetworkFailed": "网络请求失败，请重试",
+  "errOperationFailed": "操作失败，请重试",
+
+  "invDetailQtyUnknown": "未填写",
+  "invDetailBoxesSuffix": "箱",
+  "invDetailPieceSuffix": "件",
+  "invDetailUnitsPerBoxSuffix": "件/箱",
+
+  "invDetailCurrentStatusPending": "当前状态: 待清点",
+  "invDetailCurrentStock": "当前库存: {label}",
+  "@invDetailCurrentStock": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+
+  "invDetailModeByCarton": "按箱规",
+  "invDetailModeBoxesOnly": "仅箱数",
+  "invDetailModeByQty": "按总数量",
+
+  "invDetailBoxesLabel": "箱数 *",
+  "invDetailPendingBoxes": "暂存箱数: ",
+  "invDetailStockInBoxes": "入库箱数: ",
+  "invDetailBoxesValue": "{boxes} 箱",
+  "@invDetailBoxesValue": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailCartonTBD": "  · 箱规待确认",
+
+  "invDetailStockInTotal": "入库总量: ",
+  "invDetailAddQty": "+ {qty} 件",
+  "@invDetailAddQty": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailNewTotal": "  →  {total} 件",
+  "@invDetailNewTotal": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+
+  "invDetailStockInQtyLabel": "入库件数 *",
+
+  "invDetailPendingMarkNote": "将标记此库存为【待清点】，当前数量不变。后续确认后可通过【调整】更新数量。",
+
+  "invDetailErrInvalidBoxes": "请输入有效箱数",
+  "invDetailErrInvalidBoxesAndUnits": "请输入有效的箱数和每箱件数",
+  "invDetailErrInvalidQty": "请输入有效件数",
+
+  "invDetailConfirmPendingBtn": "确认暂存",
+  "invDetailConfirmStockIn": "确认入库",
+
+  "invDetailStockInTitle": "入库",
+  "invDetailStockOutTitle": "出库",
+
+  "invDetailOutTotal": "出库总量: ",
+  "invDetailOutBoxesValue": "{boxes} 箱",
+  "@invDetailOutBoxesValue": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailOutPcsValue": "{qty} 件",
+  "@invDetailOutPcsValue": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailRemainCartonBoxes": "  →  剩余 {boxes} 箱",
+  "@invDetailRemainCartonBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailRemainBoxes": "  →  剩余 {boxes} 箱",
+  "@invDetailRemainBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailRemainPcs": "  →  剩余 {qty} 件",
+  "@invDetailRemainPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+
+  "invDetailNoCartonData": "当前无箱规数据，请使用其他模式",
+  "invDetailSelectOutBoxes": "选择出库箱数:",
+  "invDetailUnitsPerBoxDisplay": "{units}件/箱",
+  "@invDetailUnitsPerBoxDisplay": {
+    "placeholders": { "units": { "type": "int" } }
+  },
+  "invDetailTotalBoxesDisplay": "共{boxes}箱",
+  "@invDetailTotalBoxesDisplay": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailOutMaxBoxes": "出库 (最多{boxes}箱)",
+  "@invDetailOutMaxBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailExceedBoxes": "超出可用{boxes}箱",
+  "@invDetailExceedBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailEqPcs": "= {qty}件",
+  "@invDetailEqPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+
+  "invDetailOutBoxesLabel": "出库箱数 * (最多 {boxes} 箱)",
+  "@invDetailOutBoxesLabel": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailBoxesOnlyHelp": "适用：箱规不确定，仅按箱数出库。",
+  "invDetailOutQtyLabel": "出库件数 *",
+
+  "invDetailErrNegativeBoxes": "出库箱数不能为负数",
+  "invDetailErrExceedCartonBoxes": "{units}件/箱：超过可用箱数 ({boxes} 箱)",
+  "@invDetailErrExceedCartonBoxes": {
+    "placeholders": {
+      "units": { "type": "int" },
+      "boxes": { "type": "int" }
+    }
+  },
+  "invDetailErrAtLeastOneCarton": "请至少输入一种箱规的出库数量",
+  "invDetailErrExceedStockBoxes": "出库数量不能超过当前库存（{boxes} 箱）",
+  "@invDetailErrExceedStockBoxes": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailErrExceedStockPcs": "出库数量不能超过当前库存（{qty} 件）",
+  "@invDetailErrExceedStockPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailConfirmStockOut": "确认出库",
+
+  "invDetailAdjustTitle": "库存调整",
+  "invDetailAdjustedTotalLabel": "调整后总件数 *",
+  "invDetailAdjustQtyHelp": "适用场景：盘点差异、货损等，直接修正总件数。",
+  "invDetailBoxesOnlyPanelHelp": "每箱件数保持不变，仅修改各规格箱数：",
+  "invDetailSubtotalPcs": "={qty}件",
+  "@invDetailSubtotalPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailCartonGroupsLabel": "各箱规库存（最多3组）:",
+  "invDetailAddCarton": "新增箱规",
+  "invDetailAddFirstCarton": "添加第一组箱规",
+  "invDetailUnitsPerBoxLabel": "件/箱",
+  "invDetailBoxesAdjustLabel": "箱数",
+
+  "invDetailSkuCorrectCurrent": "当前：",
+  "invDetailSkuCorrectSelectHint": "（请从下方选择）",
+  "invDetailSkuCorrectSearch": "搜索新 SKU 编码或名称",
+  "invDetailQtyRetained": "库存数量 {label} 将保留不变",
+  "@invDetailQtyRetained": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+
+  "invDetailAdjustModeQty": "总数量",
+  "invDetailAdjustModeBoxesOnly": "仅箱数",
+  "invDetailAdjustModeCarton": "按箱规",
+  "invDetailAdjustModeSkuCorrect": "SKU更正",
+
+  "invDetailReasonSkuCorrect": "更正原因 *（必填）",
+  "invDetailReasonAdjust": "调整原因 *（必填）",
+  "invDetailReasonSkuCorrectHint": "例：录错货号、暂存转正式SKU",
+  "invDetailReasonAdjustHint": "例：盘点差异、货损、退货补库",
+
+  "invDetailErrReasonRequired": "请填写原因（必填）",
+  "invDetailErrSelectNewSku": "请从下拉列表中选择新 SKU",
+  "invDetailErrSameSkuNotAllowed": "新旧 SKU 不能相同",
+  "invDetailErrNoInventoryId": "无法获取库存记录 ID，请关闭后重试",
+  "invDetailErrAtLeastOneBoxesGroup": "至少填写一组的箱数（> 0）",
+  "invDetailErrAtLeastOneCartonGroup": "至少需要一组箱规",
+  "invDetailErrValidCartonGroup": "请输入有效的箱数和每箱件数（均需 > 0）",
+  "invDetailErrValidQtyGte0": "请输入有效件数（≥ 0）",
+
+  "invDetailConfirmSkuCorrect": "确认更正",
+  "invDetailConfirmBoxesAdjust": "确认箱数调整",
+  "invDetailConfirmAdjust": "确认调整",
+
+  "invDetailAdjustedTotalRow": "调整后总库存: ",
+  "invDetailBoxesLabelStar": "箱数 *",
+  "invDetailUnitsLabelStar": "每箱件数 *",
+  "invDetailNoteOptional": "备注（可选）",
+
+  "invDetailQtyUnknownHeader": "待补充库存信息",
+  "invDetailBoxesOnlyHeader": "{boxes}箱 · 箱规待确认",
+  "@invDetailBoxesOnlyHeader": {
+    "placeholders": { "boxes": { "type": "int" } }
+  },
+  "invDetailBoxesAndPcs": "{boxes}箱 · {qty}件",
+  "@invDetailBoxesAndPcs": {
+    "placeholders": {
+      "boxes": { "type": "int" },
+      "qty": { "type": "int" }
+    }
+  },
+
+  "invDetailStockIn": "入库",
+  "invDetailStockOut": "出库",
+  "invDetailAdjust": "库存调整",
+  "invDetailConfirmPendingLabel": "确认为正式",
+  "invDetailSplitPendingLabel": "拆分为正式SKU",
+
+  "invDetailSkuDetail": "SKU 详情",
+  "invDetailLocDetail": "库位详情",
+
+  "invDetailRecentOps": "最近操作",
+  "invDetailViewAll": "查看全部记录",
+  "invDetailLoadFailed": "加载失败，点击重试",
+  "invDetailNoRecords": "暂无操作记录",
+
+  "invDetailConfirmOfficialTitle": "确认为正式库存",
+  "invDetailPendingToOfficial": "暂存 → 正式库存",
+  "invDetailCorrectSkuCode": "同时更正SKU编码",
+  "invDetailSearchNewSku": "搜索新 SKU 编码或名称",
+  "invDetailConfirmReasonLabel": "原因 *",
+  "invDetailConfirmReasonHint": "请说明确认原因",
+  "invDetailErrReasonEmpty": "请填写原因",
+  "invDetailErrSelectNewSkuCode": "请从下拉列表中选择新SKU编码",
+  "invDetailConfirmedOfficial": "已确认为正式库存",
+  "invDetailConfirmToOfficial": "确认转正式",
+
+  "invDetailSplitTitle": "拆分为正式SKU",
+  "invDetailSplitSource": "原暂存: {sku}",
+  "@invDetailSplitSource": {
+    "placeholders": { "sku": { "type": "String" } }
+  },
+  "invDetailSplitSourceInfo": "{locationCode}  ·  录入方式：{sourceLabel}",
+  "@invDetailSplitSourceInfo": {
+    "placeholders": {
+      "locationCode": { "type": "String" },
+      "sourceLabel": { "type": "String" }
+    }
+  },
+  "invDetailSplitTotalConserve": "总量 {amount} {unit}  ·  按{unit}守恒",
+  "@invDetailSplitTotalConserve": {
+    "placeholders": {
+      "amount": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "invDetailSplitBalanced": "✓ 已平衡",
+  "invDetailSplitProgress": "已分 {total} / {original}",
+  "@invDetailSplitProgress": {
+    "placeholders": {
+      "total": { "type": "int" },
+      "original": { "type": "int" }
+    }
+  },
+  "invDetailSplitNoSku": "未选择SKU",
+  "invDetailSplitModeByCarton": "按箱规",
+  "invDetailSplitModeBoxesOnly": "仅箱数",
+  "invDetailSplitModeByQty": "按总数量",
+  "invDetailSplitSearchSku": "搜索 SKU",
+  "invDetailSplitBoxesLabel": "箱数",
+  "invDetailSplitBoxesSuffix": "箱",
+  "invDetailSplitUnitsLabel": "件/箱",
+  "invDetailSplitUnitsSuffix": "件/箱",
+  "invDetailSplitCartonTBD": "· 箱规待确认",
+  "invDetailSplitTotalQtyLabel": "总件数",
+  "invDetailSplitTotalQtySuffix": "件",
+  "invDetailSplitCalcPcs": "= {qty} 件",
+  "@invDetailSplitCalcPcs": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "invDetailAddSplitTarget": "添加拆分目标",
+  "invDetailSplitReasonLabel": "拆分原因 *",
+  "invDetailSplitReasonHint": "请说明拆分原因",
+  "invDetailErrSplitReasonEmpty": "请填写拆分原因",
+  "invDetailErrSplitSelectSku": "第 {index} 条：请从下拉列表中选择SKU",
+  "@invDetailErrSplitSelectSku": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitBoxesMustBePositive": "第 {index} 条箱数必须大于0",
+  "@invDetailErrSplitBoxesMustBePositive": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitUnitsMustBePositive": "第 {index} 条件/箱必须大于0",
+  "@invDetailErrSplitUnitsMustBePositive": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitTotalQtyMustBePositive": "第 {index} 条总件数必须大于0",
+  "@invDetailErrSplitTotalQtyMustBePositive": {
+    "placeholders": { "index": { "type": "int" } }
+  },
+  "invDetailErrSplitUnbalanced": "拆分总量 {total} {unit} ≠ 原暂存 {original} {unit}，请调整",
+  "@invDetailErrSplitUnbalanced": {
+    "placeholders": {
+      "total": { "type": "int" },
+      "original": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "invDetailSplitSuccess": "拆分成功，正式SKU已创建",
+  "invDetailConfirmSplit": "确认拆分",
+
+  "invDetailSourceModeBoxesOnly": "仅箱数",
+  "invDetailSourceModeQty": "按总数量",
+  "invDetailSourceModeCarton": "按箱规",
+
+  "invDetailMergeConfirmTitle": "目标SKU已有库存",
+  "invDetailMergeConfirm": "确认合并",
+
+  "invDetailSkuSearchHint": "输入编码或品名搜索",
+  "invDetailSkuNotFound": "未找到匹配的SKU",
+  "invDetailSkuArchived": "已停用",
+  "invDetailDefaultAction": "操作",
+
+  "invHistoryTitle": "入出库记录",
+  "invHistoryEmpty": "暂无出入库记录",
+  "invHistoryEmptyFiltered": "没有符合条件的记录",
+  "invHistoryViewAll": "查看全部类型",
+  "invHistorySplitSrc": "原暂存",
+  "invHistorySplitTargets": "拆分目标",
+  "invHistorySplitCleared": "原记录已清零（拆分完成）",
+  "invHistoryReason": "原因",
+
+  "errApiNotFound": "接口不存在，请联系管理员",
+  "errPermission": "无权限查看此记录",
+  "errLoadRetry": "加载失败，请重试",
+
+  "userMgmtTitle": "用户管理",
+  "userMgmtCreateBtn": "创建账号",
+  "userMgmtCreateTitle": "创建账号",
+  "userMgmtUsernameLabel": "用户名",
+  "userMgmtDisplayNameLabel": "显示名称",
+  "userMgmtInitPasswordLabel": "初始密码（至少6位）",
+  "userMgmtRoleLabel": "角色",
+  "userMgmtRoleAdmin": "管理员",
+  "userMgmtRoleSupervisor": "仓库主管",
+  "userMgmtRoleStaff": "普通员工",
+  "userMgmtCreateValidation": "请填写完整信息，密码至少6位",
+  "userMgmtCreateFailed": "创建失败",
+  "userMgmtEditRoleTitle": "修改角色",
+  "userMgmtLoadFailed": "加载失败: {error}",
+  "@userMgmtLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "userMgmtMe": "我",
+  "userMgmtDisabled": "已停用",
+  "userMgmtToggleTitle": "确认{action}",
+  "@userMgmtToggleTitle": {
+    "placeholders": {
+      "action": { "type": "String" }
+    }
+  },
+  "userMgmtToggleContent": "确定要{action}该账号吗？{notice}",
+  "@userMgmtToggleContent": {
+    "placeholders": {
+      "action": { "type": "String" },
+      "notice": { "type": "String" }
+    }
+  },
+  "userMgmtDisableNotice": "停用后该用户将无法登录。",
+  "userMgmtEnable": "启用",
+  "userMgmtDisable": "停用",
+  "userMgmtResetPasswordTitle": "重置密码",
+  "userMgmtNewPasswordLabel": "新密码（至少6位）",
+  "userMgmtPasswordTooShort": "密码至少6位",
+  "userMgmtPasswordReset": "密码已重置",
+  "userMgmtResetFailed": "重置失败",
+  "userMgmtResetBtn": "重置",
+  "userMgmtOperationFailed": "操作失败",
+  "clearDoneMsg": "清空完成：库存 {inv} 条，SKU {sku} 条，库位 {loc} 条，流水 {tx} 条，日志 {log} 条，导入记录 {imp} 条",
+  "@clearDoneMsg": {
+    "placeholders": {
+      "inv": { "type": "Object" },
+      "sku": { "type": "Object" },
+      "loc": { "type": "Object" },
+      "tx": { "type": "Object" },
+      "log": { "type": "Object" },
+      "imp": { "type": "Object" }
     }
   }
 }

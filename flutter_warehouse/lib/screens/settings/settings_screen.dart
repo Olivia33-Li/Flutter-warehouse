@@ -332,19 +332,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final result = await InventoryService().clearAllData();
       if (!mounted) return;
       final deleted = result['deleted'] as Map<String, dynamic>? ?? {};
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
-          '清空完成：库存 ${deleted['inventories']} 条，'
-          'SKU ${deleted['skus']} 条，库位 ${deleted['locations']} 条，'
-          '流水 ${deleted['transactions']} 条，日志 ${deleted['auditLogs']} 条，'
-          '导入记录 ${deleted['importLogs']} 条',
+          l10n.clearDoneMsg(
+            deleted['inventories'],
+            deleted['skus'],
+            deleted['locations'],
+            deleted['transactions'],
+            deleted['auditLogs'],
+            deleted['importLogs'],
+          ),
         ),
         duration: const Duration(seconds: 6),
       ));
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e'), backgroundColor: Colors.red));
+          SnackBar(content: Text('${l10n.userMgmtOperationFailed}: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -857,80 +863,83 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('创建账号'),
-          content: SizedBox(
-            width: 320,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: userCtrl,
-                  decoration: const InputDecoration(
-                      labelText: '用户名', border: OutlineInputBorder(), isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                      labelText: '显示名称', border: OutlineInputBorder(), isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: passCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                      labelText: '初始密码（至少6位）', border: OutlineInputBorder(), isDense: true),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: role,
-                  decoration: const InputDecoration(
-                      labelText: '角色', border: OutlineInputBorder(), isDense: true),
-                  items: const [
-                    DropdownMenuItem(value: 'admin',      child: Text('管理员')),
-                    DropdownMenuItem(value: 'supervisor', child: Text('仓库主管')),
-                    DropdownMenuItem(value: 'staff',      child: Text('普通员工')),
+        builder: (ctx, setS) {
+          final ctxL10n = AppLocalizations.of(ctx)!;
+          return AlertDialog(
+            title: Text(ctxL10n.userMgmtCreateTitle),
+            content: SizedBox(
+              width: 320,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: userCtrl,
+                    decoration: InputDecoration(
+                        labelText: ctxL10n.userMgmtUsernameLabel, border: const OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                        labelText: ctxL10n.userMgmtDisplayNameLabel, border: const OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                        labelText: ctxL10n.userMgmtInitPasswordLabel, border: const OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: InputDecoration(
+                        labelText: ctxL10n.userMgmtRoleLabel, border: const OutlineInputBorder(), isDense: true),
+                    items: [
+                      DropdownMenuItem(value: 'admin',      child: Text(ctxL10n.userMgmtRoleAdmin)),
+                      DropdownMenuItem(value: 'supervisor', child: Text(ctxL10n.userMgmtRoleSupervisor)),
+                      DropdownMenuItem(value: 'staff',      child: Text(ctxL10n.userMgmtRoleStaff)),
+                    ],
+                    onChanged: (v) => setS(() => role = v ?? 'staff'),
+                  ),
+                  if (err != null) ...[
+                    const SizedBox(height: 8),
+                    Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                   ],
-                  onChanged: (v) => setS(() => role = v ?? 'staff'),
-                ),
-                if (err != null) ...[
-                  const SizedBox(height: 8),
-                  Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                 ],
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: saving ? null : () => ctx.pop(), child: const Text('取消')),
-            FilledButton(
-              onPressed: saving ? null : () async {
-                if (userCtrl.text.trim().isEmpty || nameCtrl.text.trim().isEmpty || passCtrl.text.length < 6) {
-                  setS(() => err = '请填写完整信息，密码至少6位');
-                  return;
-                }
-                setS(() { saving = true; err = null; });
-                try {
-                  await ApiService.instance.dio.post('/users', data: {
-                    'username': userCtrl.text.trim().toLowerCase(),
-                    'name': nameCtrl.text.trim(),
-                    'password': passCtrl.text,
-                    'role': role,
-                  });
-                  if (ctx.mounted) ctx.pop();
-                  _load();
-                } on DioException catch (e) {
-                  final msg = e.response?.data?['message'];
-                  setS(() { saving = false; err = msg is List ? msg.join(', ') : (msg ?? '创建失败'); });
-                }
-              },
-              child: saving
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('创建'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(onPressed: saving ? null : () => ctx.pop(), child: Text(ctxL10n.cancel)),
+              FilledButton(
+                onPressed: saving ? null : () async {
+                  if (userCtrl.text.trim().isEmpty || nameCtrl.text.trim().isEmpty || passCtrl.text.length < 6) {
+                    setS(() => err = ctxL10n.userMgmtCreateValidation);
+                    return;
+                  }
+                  setS(() { saving = true; err = null; });
+                  try {
+                    await ApiService.instance.dio.post('/users', data: {
+                      'username': userCtrl.text.trim().toLowerCase(),
+                      'name': nameCtrl.text.trim(),
+                      'password': passCtrl.text,
+                      'role': role,
+                    });
+                    if (ctx.mounted) ctx.pop();
+                    _load();
+                  } on DioException catch (e) {
+                    final msg = e.response?.data?['message'];
+                    setS(() { saving = false; err = msg is List ? msg.join(', ') : (msg ?? ctxL10n.userMgmtCreateFailed); });
+                  }
+                },
+                child: saving
+                    ? const SizedBox(width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Text(ctxL10n.userMgmtCreateBtn),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -940,54 +949,62 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('修改角色'),
-          content: DropdownButtonFormField<String>(
-            initialValue: newRole,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            items: const [
-              DropdownMenuItem(value: 'admin',      child: Text('管理员')),
-              DropdownMenuItem(value: 'supervisor', child: Text('仓库主管')),
-              DropdownMenuItem(value: 'staff',      child: Text('普通员工')),
-            ],
-            onChanged: (v) => setS(() => newRole = v ?? currentRole),
-          ),
-          actions: [
-            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  await ApiService.instance.dio.patch('/users/$userId/role', data: {'role': newRole});
-                  if (ctx.mounted) ctx.pop();
-                  _load();
-                } catch (_) {}
-              },
-              child: const Text('确认'),
+        builder: (ctx, setS) {
+          final ctxL10n = AppLocalizations.of(ctx)!;
+          return AlertDialog(
+            title: Text(ctxL10n.userMgmtEditRoleTitle),
+            content: DropdownButtonFormField<String>(
+              initialValue: newRole,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              items: [
+                DropdownMenuItem(value: 'admin',      child: Text(ctxL10n.userMgmtRoleAdmin)),
+                DropdownMenuItem(value: 'supervisor', child: Text(ctxL10n.userMgmtRoleSupervisor)),
+                DropdownMenuItem(value: 'staff',      child: Text(ctxL10n.userMgmtRoleStaff)),
+              ],
+              onChanged: (v) => setS(() => newRole = v ?? currentRole),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(onPressed: () => ctx.pop(), child: Text(ctxL10n.cancel)),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    await ApiService.instance.dio.patch('/users/$userId/role', data: {'role': newRole});
+                    if (ctx.mounted) ctx.pop();
+                    _load();
+                  } catch (_) {}
+                },
+                child: Text(ctxL10n.confirm),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   Future<void> _toggleActive(String userId, bool currentlyActive) async {
-    final action = currentlyActive ? '停用' : '启用';
+    final l10n = AppLocalizations.of(context)!;
+    final action = currentlyActive ? l10n.userMgmtDisable : l10n.userMgmtEnable;
+    final notice = currentlyActive ? l10n.userMgmtDisableNotice : '';
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('确认$action'),
-        content: Text('确定要$action该账号吗？${currentlyActive ? '停用后该用户将无法登录。' : ''}'),
-        actions: [
-          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
-          FilledButton(
-            style: currentlyActive
-                ? FilledButton.styleFrom(backgroundColor: Colors.red)
-                : null,
-            onPressed: () => ctx.pop(true),
-            child: Text(action),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final ctxL10n = AppLocalizations.of(ctx)!;
+        return AlertDialog(
+          title: Text(ctxL10n.userMgmtToggleTitle(action)),
+          content: Text(ctxL10n.userMgmtToggleContent(action, notice)),
+          actions: [
+            TextButton(onPressed: () => ctx.pop(false), child: Text(ctxL10n.cancel)),
+            FilledButton(
+              style: currentlyActive
+                  ? FilledButton.styleFrom(backgroundColor: Colors.red)
+                  : null,
+              onPressed: () => ctx.pop(true),
+              child: Text(action),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true) return;
     try {
@@ -998,7 +1015,7 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
       final msg = e.response?.data?['message'];
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg ?? '操作失败'), backgroundColor: Colors.red));
+          SnackBar(content: Text(msg ?? l10n.userMgmtOperationFailed), backgroundColor: Colors.red));
       }
     }
   }
@@ -1009,48 +1026,51 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('重置密码'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: ctrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                    labelText: '新密码（至少6位）', border: OutlineInputBorder()),
-              ),
-              if (err != null) ...[
-                const SizedBox(height: 8),
-                Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+        builder: (ctx, setS) {
+          final ctxL10n = AppLocalizations.of(ctx)!;
+          return AlertDialog(
+            title: Text(ctxL10n.userMgmtResetPasswordTitle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: ctrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                      labelText: ctxL10n.userMgmtNewPasswordLabel, border: const OutlineInputBorder()),
+                ),
+                if (err != null) ...[
+                  const SizedBox(height: 8),
+                  Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ],
               ],
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
-            FilledButton(
-              onPressed: () async {
-                if (ctrl.text.length < 6) {
-                  setS(() => err = '密码至少6位');
-                  return;
-                }
-                try {
-                  await ApiService.instance.dio
-                      .patch('/users/$userId/reset-password', data: {'newPassword': ctrl.text});
-                  if (ctx.mounted) ctx.pop();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('密码已重置')));
-                  }
-                } on DioException catch (e) {
-                  final msg = e.response?.data?['message'];
-                  setS(() => err = msg ?? '重置失败');
-                }
-              },
-              child: const Text('重置'),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(onPressed: () => ctx.pop(), child: Text(ctxL10n.cancel)),
+              FilledButton(
+                onPressed: () async {
+                  if (ctrl.text.length < 6) {
+                    setS(() => err = ctxL10n.userMgmtPasswordTooShort);
+                    return;
+                  }
+                  try {
+                    await ApiService.instance.dio
+                        .patch('/users/$userId/reset-password', data: {'newPassword': ctrl.text});
+                    if (ctx.mounted) ctx.pop();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(AppLocalizations.of(context)!.userMgmtPasswordReset)));
+                    }
+                  } on DioException catch (e) {
+                    final msg = e.response?.data?['message'];
+                    setS(() => err = msg ?? ctxL10n.userMgmtResetFailed);
+                  }
+                },
+                child: Text(ctxL10n.userMgmtResetBtn),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1058,6 +1078,7 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1072,8 +1093,8 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
               padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
               child: Row(
                 children: [
-                  const Text('用户管理',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
+                  Text(l10n.userMgmtTitle,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 18, color: _muted),
@@ -1086,7 +1107,7 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                     height: 35,
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.person_add_outlined, size: 14),
-                      label: const Text('创建账号', style: TextStyle(fontSize: 13)),
+                      label: Text(l10n.userMgmtCreateBtn, style: const TextStyle(fontSize: 13)),
                       onPressed: _showCreateDialog,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _buttonPrimary,
@@ -1117,7 +1138,7 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
             else if (_error != null)
               Padding(
                 padding: const EdgeInsets.all(20),
-                child: Text('加载失败: $_error',
+                child: Text(l10n.userMgmtLoadFailed(_error!),
                     style: const TextStyle(color: Colors.red)),
               )
             else
@@ -1165,8 +1186,8 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                                 color: const Color(0xFFEEF1FE),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('我',
-                                  style: TextStyle(fontSize: 10, color: Color(0xFF4A6CF7))),
+                              child: Text(l10n.userMgmtMe,
+                                  style: const TextStyle(fontSize: 10, color: Color(0xFF4A6CF7))),
                             ),
                           ],
                           if (!isActive) ...[
@@ -1177,14 +1198,14 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                                 color: Colors.red.shade50,
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text('已停用',
+                              child: Text(l10n.userMgmtDisabled,
                                   style: TextStyle(fontSize: 10, color: Colors.red.shade700)),
                             ),
                           ],
                         ],
                       ),
                       subtitle: Text(
-                        '@${u['username'] ?? ''}  ·  ${_roleLabelOf(role)}',
+                        '@${u['username'] ?? ''}  ·  ${_roleLabelOf(context, role)}',
                         style: TextStyle(
                             fontSize: 12,
                             color: isActive ? _muted : Colors.grey.shade400),
@@ -1192,20 +1213,20 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
                       trailing: PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert, size: 18, color: _muted),
                         itemBuilder: (_) => [
-                          const PopupMenuItem(value: 'role',
-                              child: ListTile(dense: true, leading: Icon(Icons.badge),
-                                  title: Text('修改角色'), contentPadding: EdgeInsets.zero)),
+                          PopupMenuItem(value: 'role',
+                              child: ListTile(dense: true, leading: const Icon(Icons.badge),
+                                  title: Text(l10n.userMgmtEditRoleTitle), contentPadding: EdgeInsets.zero)),
                           PopupMenuItem(value: 'toggle',
                               child: ListTile(dense: true,
                                   leading: Icon(isActive ? Icons.block : Icons.check_circle,
                                       color: isActive ? Colors.red : Colors.green),
-                                  title: Text(isActive ? '停用账号' : '启用账号',
+                                  title: Text(isActive ? l10n.userMgmtDisable : l10n.userMgmtEnable,
                                       style: TextStyle(
                                           color: isActive ? Colors.red : Colors.green)),
                                   contentPadding: EdgeInsets.zero)),
-                          const PopupMenuItem(value: 'password',
-                              child: ListTile(dense: true, leading: Icon(Icons.lock_reset),
-                                  title: Text('重置密码'), contentPadding: EdgeInsets.zero)),
+                          PopupMenuItem(value: 'password',
+                              child: ListTile(dense: true, leading: const Icon(Icons.lock_reset),
+                                  title: Text(l10n.userMgmtResetPasswordTitle), contentPadding: EdgeInsets.zero)),
                         ],
                         onSelected: (action) async {
                           if (action == 'role')     await _setRole(uid, role);
@@ -1231,11 +1252,12 @@ class _UserManagementDialogState extends ConsumerState<_UserManagementDialog> {
     }
   }
 
-  String _roleLabelOf(String role) {
+  String _roleLabelOf(BuildContext context, String role) {
+    final l10n = AppLocalizations.of(context)!;
     switch (role) {
-      case 'admin':      return '管理员';
-      case 'supervisor': return '仓库主管';
-      default:           return '普通员工';
+      case 'admin':      return l10n.userMgmtRoleAdmin;
+      case 'supervisor': return l10n.userMgmtRoleSupervisor;
+      default:           return l10n.userMgmtRoleStaff;
     }
   }
 }

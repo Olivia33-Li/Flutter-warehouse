@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../services/password_reset_service.dart';
+import '../../l10n/app_localizations.dart';
 
 // ── Design tokens (shared with login / register) ──────────────────────────────
 const _bgColor    = Color(0xFFF5F3F0);
@@ -36,7 +37,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _submit() async {
     final username = _usernameCtrl.text.trim();
     if (username.isEmpty) {
-      setState(() => _error = '请输入您的用户名');
+      setState(() => _error = AppLocalizations.of(context)!.forgotEmptyError);
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -48,9 +49,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (mounted) setState(() => _submitted = true);
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
-      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? '提交失败，请重试'));
+      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.forgotSubmitFailed));
     } catch (e) {
-      setState(() => _error = '提交失败: $e');
+      setState(() => _error = AppLocalizations.of(context)!.forgotSubmitFailed);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -111,6 +112,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   // ── Success state ─────────────────────────────────────────────────────────
 
   Widget _buildSuccess() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -128,9 +130,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
-          '申请已提交',
-          style: TextStyle(
+        Text(
+          l10n.forgotSuccessTitle,
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w500,
             color: _titleColor,
@@ -138,14 +140,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
-          '管理员收到您的申请后将重置密码\n并告知您临时密码，请耐心等待。',
+        Text(
+          l10n.forgotSuccessDesc,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: _descColor, height: 1.7),
+          style: const TextStyle(fontSize: 13, color: _descColor, height: 1.7),
         ),
         const SizedBox(height: 36),
         _PrimaryButton(
-          label: '返回登录',
+          label: l10n.forgotBackToLogin,
           onTap: () => context.go('/login'),
         ),
       ],
@@ -155,6 +157,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   // ── Form state ────────────────────────────────────────────────────────────
 
   Widget _buildForm() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -169,9 +172,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: const Icon(Icons.shield_outlined, size: 30, color: _primary),
         ),
         const SizedBox(height: 20),
-        const Text(
-          '忘记密码',
-          style: TextStyle(
+        Text(
+          l10n.forgotTitle,
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w500,
             color: _titleColor,
@@ -179,10 +182,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
-          '请联系管理员重置您的账号密码。\n填写用户名后提交申请，管理员会尽快处理。',
+        Text(
+          l10n.forgotSubtitle,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: _descColor, height: 1.7),
+          style: const TextStyle(fontSize: 13, color: _descColor, height: 1.7),
         ),
         const SizedBox(height: 28),
 
@@ -218,23 +221,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '联系管理员',
-                      style: TextStyle(
+                      l10n.forgotAdminContact,
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                         color: _titleColor,
                         height: 1.5,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      '仓库管理系统的密码由管理员统一管理。请联系您的仓库主管或系统管理员，告知您的用户名，由管理员为您重置密码。',
-                      style: TextStyle(
+                      l10n.forgotAdminDesc,
+                      style: const TextStyle(
                           fontSize: 11, color: _mutedColor, height: 1.6),
                     ),
                   ],
@@ -260,7 +263,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   onChanged: (_) => setState(() {}),
                   style: const TextStyle(fontSize: 14, color: _titleColor),
                   decoration: InputDecoration(
-                    hintText: '用户名',
+                    hintText: l10n.loginUsername,
                     hintStyle:
                         const TextStyle(fontSize: 14, color: _hintColor),
                     border: InputBorder.none,
@@ -317,15 +320,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   maxLines: 2,
                   textInputAction: TextInputAction.done,
                   style: const TextStyle(fontSize: 14, color: _titleColor),
-                  decoration: const InputDecoration(
-                    hintText: '备注（可选）—— 如：联系方式 / 具体情况',
+                  decoration: InputDecoration(
+                    hintText: l10n.forgotNote,
                     hintStyle:
-                        TextStyle(fontSize: 13, color: _hintColor),
+                        const TextStyle(fontSize: 13, color: _hintColor),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
@@ -347,19 +350,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
         // ── Submit button ───────────────────────────────────────────────
         _PrimaryButton(
-          label: '提交申请',
+          label: l10n.forgotSubmit,
           loading: _loading,
           onTap: _loading ? null : _submit,
         ),
         const SizedBox(height: 16),
 
-        // ── 我知道了 ────────────────────────────────────────────────────
+        // ── Dismiss ─────────────────────────────────────────────────────
         GestureDetector(
           onTap: () =>
               context.canPop() ? context.pop() : context.go('/login'),
-          child: const Text(
-            '我知道了',
-            style: TextStyle(
+          child: Text(
+            l10n.forgotDismiss,
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: _mutedColor,

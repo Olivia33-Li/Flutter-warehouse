@@ -3,57 +3,60 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../../services/import_service.dart';
+import '../../l10n/app_localizations.dart';
 
 // ─── Import hub ───────────────────────────────────────────────────────────────
 
 class ImportScreen extends StatelessWidget {
   const ImportScreen({super.key});
 
-  static const _entries = [
+  static List<_HubEntry> _buildEntries(AppLocalizations l10n) => [
     _HubEntry(
       type: 'skus',
-      label: 'SKU 主档导入',
-      subtitle: '批量新增或更新 SKU 基础资料',
+      label: l10n.importSkuMasterLabel,
+      subtitle: l10n.importSkuMasterSubtitle,
       icon: Icons.inventory_2_outlined,
-      avatarBg: Color(0xFFEEF1FE),
-      iconColor: Color(0xFF4A6CF7),
+      avatarBg: const Color(0xFFEEF1FE),
+      iconColor: const Color(0xFF4A6CF7),
     ),
     _HubEntry(
       type: 'locations',
-      label: '库位主档导入',
-      subtitle: '批量新增或更新库位',
+      label: l10n.importLocationMasterLabel,
+      subtitle: l10n.importLocationMasterSubtitle,
       icon: Icons.shelves,
-      avatarBg: Color(0xFFEEF6F0),
-      iconColor: Color(0xFF4EBB6A),
+      avatarBg: const Color(0xFFEEF6F0),
+      iconColor: const Color(0xFF4EBB6A),
     ),
     _HubEntry(
       type: 'inventory',
-      label: '库存明细导入',
-      subtitle: '批量录入库存数量（SKU 和库位须已存在）',
+      label: l10n.importInventoryLabel,
+      subtitle: l10n.importInventorySubtitle,
       icon: Icons.table_chart_outlined,
-      avatarBg: Color(0xFFFDF5E8),
-      iconColor: Color(0xFFE09030),
+      avatarBg: const Color(0xFFFDF5E8),
+      iconColor: const Color(0xFFE09030),
     ),
     _HubEntry(
       type: 'sku-barcode-update',
-      label: 'SKU 条码批量更新',
-      subtitle: '仅更新已有 SKU 的条形码字段',
+      label: l10n.importSkuBarcodeLabel,
+      subtitle: l10n.importSkuBarcodeSubtitle,
       icon: Icons.qr_code_outlined,
-      avatarBg: Color(0xFFF3EEFC),
-      iconColor: Color(0xFF9A6CF7),
+      avatarBg: const Color(0xFFF3EEFC),
+      iconColor: const Color(0xFF9A6CF7),
     ),
     _HubEntry(
       type: 'sku-carton-qty-update',
-      label: 'SKU 箱规批量更新',
-      subtitle: '仅更新已有 SKU 的默认箱规字段',
+      label: l10n.importSkuCartonLabel,
+      subtitle: l10n.importSkuCartonSubtitle,
       icon: Icons.inventory_outlined,
-      avatarBg: Color(0xFFFEF0E8),
-      iconColor: Color(0xFFE87040),
+      avatarBg: const Color(0xFFFEF0E8),
+      iconColor: const Color(0xFFE87040),
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final entries = _buildEntries(l10n);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F3F0),
       body: SafeArea(
@@ -77,9 +80,9 @@ class ImportScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    '批量导入',
-                    style: TextStyle(
+                  Text(
+                    l10n.importTitle,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A2E),
@@ -89,11 +92,11 @@ class ImportScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 28),
-            const Padding(
-              padding: EdgeInsets.only(left: 24, bottom: 12),
+            Padding(
+              padding: const EdgeInsets.only(left: 24, bottom: 12),
               child: Text(
-                '选择导入类型',
-                style: TextStyle(
+                l10n.importSelectType,
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF8E8E9A),
@@ -103,15 +106,15 @@ class ImportScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
-                children: _entries.map((e) => _HubTile(entry: e)).toList(),
+                children: entries.map((e) => _HubTile(entry: e)).toList(),
               ),
             ),
             const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.only(left: 24, bottom: 12),
+            Padding(
+              padding: const EdgeInsets.only(left: 24, bottom: 12),
               child: Text(
-                '记录',
-                style: TextStyle(
+                l10n.importRecordsTab,
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF8E8E9A),
@@ -124,8 +127,8 @@ class ImportScreen extends StatelessWidget {
                 avatarBg: const Color(0xFFF5F4F2),
                 icon: Icons.history,
                 iconColor: const Color(0xFFB5B5C0),
-                label: '导入记录',
-                subtitle: '查看历史导入日志',
+                label: l10n.importHistoryTab,
+                subtitle: l10n.importHistoryTitle,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const _ImportLogsScreen()),
                 ),
@@ -262,41 +265,41 @@ class _ImportDetailScreen extends StatelessWidget {
   final String type;
   const _ImportDetailScreen({required this.type});
 
-  static const _configs = <String, ({
+  Map<String, ({
     String title,
     String description,
     List<_ColDef> columns,
     List<String> notes,
-  })>{
+  })> _buildConfigs(AppLocalizations l10n) => {
     'skus': (
-      title: 'SKU 主档导入',
+      title: l10n.importSkuMasterLabel,
       description: '用于批量新增或更新 SKU 基础资料。\n已存在的 SKU 将被更新（upsert），不会重复创建。',
-      columns: [
+      columns: const [
         _ColDef('sku_code', _ColReq.required, 'SKU 编码，全大写'),
         _ColDef('name', _ColReq.optional, '商品名称'),
         _ColDef('barcode', _ColReq.optional, '条形码（请将 Excel 列格式设为文本，防止科学计数法）'),
         _ColDef('default_carton_qty', _ColReq.optional, '默认箱规（正整数），供库存导入时参考'),
         _ColDef('status', _ColReq.optional, 'active（在用）或 inactive（停用），默认 active'),
       ],
-      notes: [
+      notes: const [
         '条形码注意：在 Excel 中请将条形码列格式设为【文本】后再填入数据，'
             '否则 Excel 会将长数字转为科学计数法（如 1.23E+12）导致数据损坏。',
       ],
     ),
     'locations': (
-      title: '库位主档导入',
+      title: l10n.importLocationMasterLabel,
       description: '用于批量新增或更新库位基础资料。\n已存在的库位将被更新（upsert），不会重复创建。',
-      columns: [
+      columns: const [
         _ColDef('location_code', _ColReq.required, '库位编码，全大写'),
         _ColDef('description', _ColReq.optional, '库位描述'),
         _ColDef('status', _ColReq.optional, 'active（在用）或 inactive（停用），默认 active'),
       ],
-      notes: [],
+      notes: const [],
     ),
     'inventory': (
-      title: '库存明细导入',
+      title: l10n.importInventoryLabel,
       description: '用于批量录入库存数据。\nSKU 和库位必须已存在（请先完成主档导入）。\n已有记录将被替换（upsert），不会累加。',
-      columns: [
+      columns: const [
         _ColDef('sku_code', _ColReq.required, 'SKU 编码'),
         _ColDef('location_code', _ColReq.required, '库位编码'),
         _ColDef('boxes', _ColReq.optional, '箱数，需与 carton_qty 同时填写'),
@@ -305,35 +308,37 @@ class _ImportDetailScreen extends StatelessWidget {
         _ColDef('stock_status', _ColReq.optional, 'confirmed / pending_count / temporary，默认 confirmed'),
         _ColDef('note', _ColReq.optional, '备注'),
       ],
-      notes: [
+      notes: const [
         '数量规则：填写 boxes+carton_qty（按箱规）或 total_qty（按总件数）。\n'
             '若数量字段均为空，系统将创建"待补充数量"记录，不报错。',
         '多箱规：同一 SKU+库位 可在文件中出现多行（不同箱规），系统自动合并为多箱规记录。',
       ],
     ),
     'sku-barcode-update': (
-      title: 'SKU 条码批量更新',
+      title: l10n.importSkuBarcodeLabel,
       description: '仅更新已有 SKU 的条形码字段，不影响其他字段。\nSKU 不存在时报错；条形码无变化时跳过。',
-      columns: [
+      columns: const [
         _ColDef('sku_code', _ColReq.required, 'SKU 编码，必须已存在'),
         _ColDef('barcode', _ColReq.required, '新条形码（请将 Excel 列格式设为文本）'),
       ],
-      notes: [],
+      notes: const [],
     ),
     'sku-carton-qty-update': (
-      title: 'SKU 箱规批量更新',
+      title: l10n.importSkuCartonLabel,
       description: '仅更新已有 SKU 的默认箱规（default_carton_qty）字段，不影响其他字段。\nSKU 不存在时报错；箱规无变化时跳过。',
-      columns: [
+      columns: const [
         _ColDef('sku_code', _ColReq.required, 'SKU 编码，必须已存在'),
         _ColDef('default_carton_qty', _ColReq.required, '新箱规，正整数'),
       ],
-      notes: [],
+      notes: const [],
     ),
   };
 
   @override
   Widget build(BuildContext context) {
-    final cfg = _configs[type]!;
+    final l10n = AppLocalizations.of(context)!;
+    final configs = _buildConfigs(l10n);
+    final cfg = configs[type]!;
     return Scaffold(
       appBar: AppBar(title: Text(cfg.title)),
       body: _ImportTab(
@@ -354,8 +359,9 @@ class _ImportLogsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('导入记录')),
+      appBar: AppBar(title: Text(l10n.importHistoryTitle)),
       body: const _ImportLogsTab(),
     );
   }
@@ -408,6 +414,7 @@ class _ImportTabState extends State<_ImportTab> {
   // ── Step 1: pick file and validate ──────────────────────────────────────
 
   Future<void> _pickAndValidate() async {
+    final l10n = AppLocalizations.of(context)!;
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'xlsx'],
@@ -449,12 +456,12 @@ class _ImportTabState extends State<_ImportTab> {
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
       setState(() {
-        _error = msg is List ? msg.join(', ') : (msg ?? '校验失败，请检查文件格式');
+        _error = msg is List ? msg.join(', ') : (msg ?? l10n.importValidationFailed);
         _phase = _Phase.idle;
       });
     } catch (e) {
       setState(() {
-        _error = '校验失败: $e';
+        _error = l10n.importValidationError(e.toString());
         _phase = _Phase.idle;
       });
     }
@@ -464,6 +471,7 @@ class _ImportTabState extends State<_ImportTab> {
 
   Future<void> _confirmImport() async {
     if (_pendingBytes == null || _pendingFilename == null) return;
+    final l10n = AppLocalizations.of(context)!;
 
     setState(() {
       _phase = _Phase.importing;
@@ -493,12 +501,12 @@ class _ImportTabState extends State<_ImportTab> {
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
       setState(() {
-        _error = msg is List ? msg.join(', ') : (msg ?? '导入失败，请检查文件格式');
+        _error = msg is List ? msg.join(', ') : (msg ?? l10n.importFailed);
         _phase = _Phase.preview; // stay on preview so user can retry
       });
     } catch (e) {
       setState(() {
-        _error = '导入失败: $e';
+        _error = l10n.importError(e.toString());
         _phase = _Phase.preview;
       });
     }
@@ -519,6 +527,7 @@ class _ImportTabState extends State<_ImportTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -543,9 +552,9 @@ class _ImportTabState extends State<_ImportTab> {
                         color: Colors.grey.shade700,
                         height: 1.5)),
                 const SizedBox(height: 14),
-                const Text('模板列说明：',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(l10n.importTemplateColumns,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(height: 6),
                 _colTable(context),
                 // Notes
@@ -579,7 +588,7 @@ class _ImportTabState extends State<_ImportTab> {
         const SizedBox(height: 12),
 
         // ── Action buttons ────────────────────────────────────────────────
-        _buildActionRow(),
+        _buildActionRow(l10n),
 
         // ── Error banner ──────────────────────────────────────────────────
         if (_error != null) ...[
@@ -605,7 +614,7 @@ class _ImportTabState extends State<_ImportTab> {
     );
   }
 
-  Widget _buildActionRow() {
+  Widget _buildActionRow(AppLocalizations l10n) {
     final busy = _phase == _Phase.validating || _phase == _Phase.importing;
 
     if (_phase == _Phase.preview) {
@@ -613,7 +622,7 @@ class _ImportTabState extends State<_ImportTab> {
       return Row(children: [
         OutlinedButton.icon(
           icon: const Icon(Icons.arrow_back, size: 16),
-          label: const Text('重新选择'),
+          label: Text(l10n.importReselect),
           onPressed: _reset,
         ),
         const SizedBox(width: 8),
@@ -621,8 +630,8 @@ class _ImportTabState extends State<_ImportTab> {
           child: FilledButton.icon(
             icon: const Icon(Icons.check_circle_outline, size: 18),
             label: Text(_preview!.hasValidRows
-                ? '确认导入 (${_preview!.willCreate + _preview!.willUpdate} 条)'
-                : '无可导入数据'),
+                ? l10n.importConfirm(_preview!.willCreate + _preview!.willUpdate)
+                : l10n.importNoData),
             style: FilledButton.styleFrom(
               backgroundColor: _preview!.hasValidRows
                   ? Theme.of(context).colorScheme.primary
@@ -639,7 +648,7 @@ class _ImportTabState extends State<_ImportTab> {
         Expanded(
           child: OutlinedButton.icon(
             icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('重新导入'),
+            label: Text(l10n.importReimport),
             onPressed: _reset,
           ),
         ),
@@ -647,7 +656,7 @@ class _ImportTabState extends State<_ImportTab> {
         Expanded(
           child: OutlinedButton.icon(
             icon: const Icon(Icons.download_outlined, size: 18),
-            label: const Text('下载模板'),
+            label: Text(l10n.importDownloadTemplate),
             onPressed: () => _service.downloadTemplate(widget.type),
           ),
         ),
@@ -659,7 +668,7 @@ class _ImportTabState extends State<_ImportTab> {
       Expanded(
         child: OutlinedButton.icon(
           icon: const Icon(Icons.download_outlined, size: 18),
-          label: const Text('下载模板'),
+          label: Text(l10n.importDownloadTemplate),
           onPressed: busy ? null : () => _service.downloadTemplate(widget.type),
         ),
       ),
@@ -674,10 +683,10 @@ class _ImportTabState extends State<_ImportTab> {
                       strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.upload_file, size: 18),
           label: Text(_phase == _Phase.validating
-              ? '校验中…'
+              ? l10n.importValidating
               : _phase == _Phase.importing
-                  ? '导入中…'
-                  : '选择文件'),
+                  ? l10n.importImporting
+                  : l10n.importSelectFile),
           onPressed: busy ? null : _pickAndValidate,
         ),
       ),
@@ -687,6 +696,7 @@ class _ImportTabState extends State<_ImportTab> {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Widget _colTable(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final primary = Theme.of(context).colorScheme.primary;
     return Table(
       columnWidths: const {
@@ -697,11 +707,11 @@ class _ImportTabState extends State<_ImportTab> {
       children: [
         TableRow(
           decoration: BoxDecoration(color: Colors.grey.shade100),
-          children: [_th('列名'), _th('必填'), _th('说明')],
+          children: [_th(l10n.importColName), _th(l10n.importColRequired), _th(l10n.importColDesc)],
         ),
         ...widget.columns.map((c) => TableRow(children: [
               _td(c.name, mono: true, color: primary),
-              _tdReq(c.req),
+              _tdReq(c.req, l10n),
               _td(c.desc),
             ])),
       ],
@@ -723,12 +733,12 @@ class _ImportTabState extends State<_ImportTab> {
                 fontFamily: mono ? 'monospace' : null)),
       );
 
-  Widget _tdReq(_ColReq req) {
+  Widget _tdReq(_ColReq req, AppLocalizations l10n) {
     final (label, color) = switch (req) {
-      _ColReq.required => ('必填', Colors.red.shade600),
-      _ColReq.eitherA => ('二选A', Colors.deepOrange.shade600),
-      _ColReq.eitherB => ('二选B', Colors.deepOrange.shade600),
-      _ColReq.optional => ('可选', Colors.grey.shade500),
+      _ColReq.required => (l10n.importReqRequired, Colors.red.shade600),
+      _ColReq.eitherA => (l10n.importReqEitherA, Colors.deepOrange.shade600),
+      _ColReq.eitherB => (l10n.importReqEitherB, Colors.deepOrange.shade600),
+      _ColReq.optional => (l10n.importReqOptional, Colors.grey.shade500),
     };
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -761,6 +771,7 @@ class _PreviewPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final hasErrors = preview.hasErrors;
     final hasValid = preview.hasValidRows;
 
@@ -810,8 +821,8 @@ class _PreviewPanel extends StatelessWidget {
                   children: [
                     Text(
                       hasErrors
-                          ? (hasValid ? '校验完成（含部分错误）' : '校验完成（全部行有错误）')
-                          : '校验通过，可以导入',
+                          ? (hasValid ? l10n.importValidationOkWithErrors : l10n.importValidationAllErrors)
+                          : l10n.importValidationPassed,
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: hasErrors
@@ -820,7 +831,7 @@ class _PreviewPanel extends StatelessWidget {
                                   : Colors.red.shade700)
                               : Colors.green.shade700),
                     ),
-                    Text('文件: $filename',
+                    Text(l10n.importFilename(filename),
                         style: TextStyle(
                             fontSize: 11, color: Colors.grey.shade600)),
                   ],
@@ -833,13 +844,13 @@ class _PreviewPanel extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Wrap(spacing: 16, runSpacing: 4, children: [
-              _stat('共', preview.total, Colors.grey.shade700),
-              _stat('待创建', preview.willCreate, Colors.green.shade700),
-              _stat('待更新', preview.willUpdate, Colors.blue.shade700),
+              _stat(l10n.importStatTotal, preview.total, Colors.grey.shade700),
+              _stat(l10n.importStatCreate, preview.willCreate, Colors.green.shade700),
+              _stat(l10n.importStatUpdate, preview.willUpdate, Colors.blue.shade700),
               if (preview.willSkip > 0)
-                _stat('跳过', preview.willSkip, Colors.orange.shade700),
+                _stat(l10n.importStatSkip, preview.willSkip, Colors.orange.shade700),
               if (preview.hasErrors)
-                _stat('错误', preview.errorCount, Colors.red.shade700),
+                _stat(l10n.importStatError, preview.errorCount, Colors.red.shade700),
             ]),
           ),
 
@@ -851,7 +862,7 @@ class _PreviewPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('错误详情：',
+                  Text(l10n.importErrorDetails,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -865,7 +876,7 @@ class _PreviewPanel extends StatelessWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('第 ${r.row} 行  ',
+                                Text(l10n.importRowLabel(r.row),
                                     style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
@@ -881,7 +892,7 @@ class _PreviewPanel extends StatelessWidget {
                           )),
                   if (preview.errorCount > 20)
                     Text(
-                        '… 还有 ${preview.errorCount - 20} 条错误（请修正文件后重新选择）',
+                        l10n.importMoreErrors(preview.errorCount - 20),
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade600)),
                 ],
@@ -897,7 +908,7 @@ class _PreviewPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('将写入数据预览：',
+                  Text(l10n.importPreviewData,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -922,7 +933,7 @@ class _PreviewPanel extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    r.isCreate ? '新建' : '更新',
+                                    r.isCreate ? l10n.importCreate : l10n.importUpdate,
                                     style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w600,
@@ -939,7 +950,7 @@ class _PreviewPanel extends StatelessWidget {
                           )),
                   if (preview.willCreate + preview.willUpdate > 30)
                     Text(
-                        '… 还有 ${preview.willCreate + preview.willUpdate - 30} 条（确认后将全部写入）',
+                        l10n.importMoreRows(preview.willCreate + preview.willUpdate - 30),
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade600)),
                 ],
@@ -972,6 +983,7 @@ class _ResultPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final allOk = result.isClean;
     return Container(
       decoration: BoxDecoration(
@@ -995,7 +1007,7 @@ class _ResultPanel extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                allOk ? '导入完成' : '导入完成（有部分问题）',
+                allOk ? l10n.importDoneTitle : l10n.importDoneWithErrors,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: allOk
@@ -1008,13 +1020,13 @@ class _ResultPanel extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Wrap(spacing: 16, runSpacing: 4, children: [
-              _stat('共', result.total, Colors.grey.shade700),
-              _stat('新建', result.created, Colors.green.shade700),
-              _stat('更新', result.updated, Colors.blue.shade700),
+              _stat(l10n.importResultTotal, result.total, Colors.grey.shade700),
+              _stat(l10n.importResultCreate, result.created, Colors.green.shade700),
+              _stat(l10n.importResultUpdate, result.updated, Colors.blue.shade700),
               if (result.skipped > 0)
-                _stat('跳过', result.skipped, Colors.orange.shade700),
+                _stat(l10n.importResultSkip, result.skipped, Colors.orange.shade700),
               if (result.hasErrors)
-                _stat('错误', result.errors.length, Colors.red.shade700),
+                _stat(l10n.importResultError, result.errors.length, Colors.red.shade700),
             ]),
           ),
           if (result.hasErrors) ...[
@@ -1027,7 +1039,7 @@ class _ResultPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('行级错误详情：',
+                  Text(l10n.importRowErrorDetails,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1039,7 +1051,7 @@ class _ResultPanel extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('第 ${e.row} 行  ',
+                              Text(l10n.importRowLabel(e.row),
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -1056,7 +1068,7 @@ class _ResultPanel extends StatelessWidget {
                       ),
                   if (result.errors.length > 20)
                     Text(
-                        '… 还有 ${result.errors.length - 20} 条错误',
+                        l10n.importMoreRowErrors(result.errors.length - 20),
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade600)),
                 ],
@@ -1100,13 +1112,13 @@ class _ImportLogsTabState extends State<_ImportLogsTab> {
   String? _error;
   String? _filterType;
 
-  static const _typeOptions = [
-    (null, '全部'),
-    ('skus', 'SKU 主档'),
-    ('locations', '库位主档'),
-    ('inventory', '库存明细'),
-    ('sku-barcode-update', '条码更新'),
-    ('sku-carton-qty-update', '箱规更新'),
+  List<(String?, String)> _buildTypeOptions(AppLocalizations l10n) => [
+    (null, l10n.importFilterAll),
+    ('skus', l10n.importFilterSku),
+    ('locations', l10n.importFilterLocation),
+    ('inventory', l10n.importFilterInventory),
+    ('sku-barcode-update', l10n.importFilterBarcodeUpdate),
+    ('sku-carton-qty-update', l10n.importFilterCartonUpdate),
   ];
 
   @override
@@ -1140,6 +1152,8 @@ class _ImportLogsTabState extends State<_ImportLogsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final typeOptions = _buildTypeOptions(l10n);
     return Column(
       children: [
         Padding(
@@ -1151,7 +1165,7 @@ class _ImportLogsTabState extends State<_ImportLogsTab> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     spacing: 6,
-                    children: _typeOptions.map((opt) {
+                    children: typeOptions.map((opt) {
                       final selected = _filterType == opt.$1;
                       return FilterChip(
                         label: Text(opt.$2),
@@ -1168,7 +1182,7 @@ class _ImportLogsTabState extends State<_ImportLogsTab> {
               ),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20),
-                tooltip: '刷新',
+                tooltip: l10n.importRefresh,
                 onPressed: () => _load(reset: true),
               ),
             ],
@@ -1180,7 +1194,7 @@ class _ImportLogsTabState extends State<_ImportLogsTab> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('共 $_total 条记录',
+              child: Text(l10n.importHistoryTotal(_total),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             ),
           ),
@@ -1197,13 +1211,13 @@ class _ImportLogsTabState extends State<_ImportLogsTab> {
                           const SizedBox(height: 8),
                           TextButton(
                               onPressed: () => _load(reset: true),
-                              child: const Text('重试')),
+                              child: Text(l10n.errorRetry)),
                         ],
                       ),
                     )
                   : _records.isEmpty
                       ? Center(
-                          child: Text('暂无导入记录',
+                          child: Text(l10n.importHistoryEmpty,
                               style: TextStyle(color: Colors.grey.shade500)))
                       : RefreshIndicator(
                           onRefresh: () => _load(reset: true),
@@ -1218,7 +1232,7 @@ class _ImportLogsTabState extends State<_ImportLogsTab> {
                                   child: Center(
                                     child: TextButton(
                                       onPressed: () { _page++; _load(); },
-                                      child: const Text('加载更多'),
+                                      child: Text(l10n.importHistoryLoadMore),
                                     ),
                                   ),
                                 );
@@ -1255,8 +1269,9 @@ class _LogCardState extends State<_LogCard> {
       await _service.exportLog(widget.record);
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: $e'), backgroundColor: Colors.red));
+          SnackBar(content: Text(l10n.importExportFailed(e.toString())), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -1265,6 +1280,7 @@ class _LogCardState extends State<_LogCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final record = widget.record;
     final fmt = DateFormat('MM-dd HH:mm');
     final hasErrors = record.hasErrors;
@@ -1280,25 +1296,25 @@ class _LogCardState extends State<_LogCard> {
       borderColor = Colors.green.shade200;
       bgColor = Colors.green.shade50;
       statusColor = Colors.green.shade700;
-      statusLabel = '成功';
+      statusLabel = l10n.importStatusSuccess;
       statusIcon = Icons.check_circle_outline;
     } else if (hasErrors && record.created + record.updated > 0) {
       borderColor = Colors.orange.shade200;
       bgColor = Colors.orange.shade50;
       statusColor = Colors.orange.shade700;
-      statusLabel = '部分成功';
+      statusLabel = l10n.importStatusPartial;
       statusIcon = Icons.warning_amber_outlined;
     } else if (hasErrors && record.created + record.updated == 0) {
       borderColor = Colors.red.shade200;
       bgColor = Colors.red.shade50;
       statusColor = Colors.red.shade600;
-      statusLabel = '全部失败';
+      statusLabel = l10n.importStatusAllFailed;
       statusIcon = Icons.error_outline;
     } else {
       borderColor = Colors.blue.shade200;
       bgColor = Colors.blue.shade50;
       statusColor = Colors.blue.shade700;
-      statusLabel = '完成（有跳过）';
+      statusLabel = l10n.importStatusSkipped;
       statusIcon = Icons.info_outline;
     }
 
@@ -1364,18 +1380,18 @@ class _LogCardState extends State<_LogCard> {
                   spacing: 14,
                   runSpacing: 4,
                   children: [
-                    _stat('共', record.total, Colors.grey.shade700),
-                    _stat('新建', record.created, Colors.green.shade700),
-                    _stat('更新', record.updated, Colors.blue.shade700),
+                    _stat(l10n.importHistoryStatTotal, record.total, Colors.grey.shade700),
+                    _stat(l10n.importHistoryStatCreate, record.created, Colors.green.shade700),
+                    _stat(l10n.importHistoryStatUpdate, record.updated, Colors.blue.shade700),
                     if (record.skipped > 0)
-                      _stat('跳过', record.skipped, Colors.orange.shade700),
+                      _stat(l10n.importHistoryStatSkip, record.skipped, Colors.orange.shade700),
                     if (hasErrors)
-                      _stat('错误', record.errors.length, Colors.red.shade600),
+                      _stat(l10n.importHistoryStatError, record.errors.length, Colors.red.shade600),
                   ],
                 ),
                 if (hasErrors) ...[
                   const SizedBox(height: 10),
-                  Text('行级错误详情：',
+                  Text(l10n.importHistoryRowErrors,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1386,7 +1402,7 @@ class _LogCardState extends State<_LogCard> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('第 ${e.row} 行  ',
+                            Text(l10n.importRowLabel(e.row),
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -1402,7 +1418,7 @@ class _LogCardState extends State<_LogCard> {
                         ),
                       )),
                   if (record.errors.length > 20)
-                    Text('… 还有 ${record.errors.length - 20} 条错误',
+                    Text(l10n.importHistoryMoreErrors(record.errors.length - 20),
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade500)),
                 ],
@@ -1416,7 +1432,7 @@ class _LogCardState extends State<_LogCard> {
                             height: 14,
                             child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.download_outlined, size: 16),
-                    label: Text(_exporting ? '导出中…' : '导出详情 Excel'),
+                    label: Text(_exporting ? l10n.importExporting : l10n.importExportDetail),
                     onPressed: _exporting ? null : _exportLog,
                   ),
                 ),

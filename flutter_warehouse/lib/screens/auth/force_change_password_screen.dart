@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Shown when user.mustChangePassword == true after login.
 /// User cannot dismiss this — they must change their password first.
@@ -38,20 +39,21 @@ class _ForceChangePasswordScreenState
     final newPwd = _newCtrl.text;
     final confirm = _confirmCtrl.text;
 
+    final l10n = AppLocalizations.of(context)!;
     if (oldPwd.isEmpty || newPwd.isEmpty || confirm.isEmpty) {
-      setState(() => _error = '请填写所有字段');
+      setState(() => _error = l10n.forceChangeEmptyError);
       return;
     }
     if (newPwd.length < 6) {
-      setState(() => _error = '新密码至少需要 6 位');
+      setState(() => _error = l10n.forceChangeShortError);
       return;
     }
     if (newPwd != confirm) {
-      setState(() => _error = '两次输入的新密码不一致');
+      setState(() => _error = l10n.forceChangeMismatchError);
       return;
     }
     if (newPwd == oldPwd) {
-      setState(() => _error = '新密码不能与当前密码相同');
+      setState(() => _error = l10n.forceChangeSameError);
       return;
     }
 
@@ -65,9 +67,9 @@ class _ForceChangePasswordScreenState
       ref.read(currentUserProvider.notifier).clearMustChangePassword();
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
-      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? '修改失败，请重试'));
+      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.forceChangeFailed));
     } catch (e) {
-      setState(() => _error = '修改失败: $e');
+      setState(() => _error = AppLocalizations.of(context)!.forceChangeFailed);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -75,6 +77,7 @@ class _ForceChangePasswordScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -88,8 +91,8 @@ class _ForceChangePasswordScreenState
                 children: [
                   const Icon(Icons.lock_reset, size: 48, color: Colors.orange),
                   const SizedBox(height: 16),
-                  const Text('请修改密码',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text(l10n.forceChangeTitle,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -104,7 +107,7 @@ class _ForceChangePasswordScreenState
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '管理员已重置您的密码。请先修改密码后再继续使用系统。',
+                            l10n.forceChangeNotice,
                             style: TextStyle(
                                 color: Colors.orange.shade800, fontSize: 13, height: 1.4),
                           ),
@@ -115,7 +118,7 @@ class _ForceChangePasswordScreenState
                   const SizedBox(height: 24),
                   _PasswordField(
                     controller: _oldCtrl,
-                    label: '当前密码（临时密码）',
+                    label: l10n.forceChangeOldPassword,
                     obscure: _obscureOld,
                     onToggle: () => setState(() => _obscureOld = !_obscureOld),
                     action: TextInputAction.next,
@@ -123,7 +126,7 @@ class _ForceChangePasswordScreenState
                   const SizedBox(height: 14),
                   _PasswordField(
                     controller: _newCtrl,
-                    label: '新密码（至少 6 位）',
+                    label: l10n.forceChangeNewPassword,
                     obscure: _obscureNew,
                     onToggle: () => setState(() => _obscureNew = !_obscureNew),
                     action: TextInputAction.next,
@@ -131,7 +134,7 @@ class _ForceChangePasswordScreenState
                   const SizedBox(height: 14),
                   _PasswordField(
                     controller: _confirmCtrl,
-                    label: '确认新密码',
+                    label: l10n.forceChangeConfirmPassword,
                     obscure: _obscureConfirm,
                     onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
                     action: TextInputAction.done,
@@ -153,7 +156,7 @@ class _ForceChangePasswordScreenState
                               height: 20, width: 20,
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
-                          : const Text('确认修改'),
+                          : Text(l10n.forceChangeButton),
                     ),
                   ),
                 ],

@@ -10,6 +10,7 @@ import '../../models/inventory.dart';
 import '../../models/location.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/inventory_detail_sheet.dart';
+import '../../l10n/app_localizations.dart';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const _bgColor    = Color(0xFFF5F3F0);
@@ -126,9 +127,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   ),
 
                   // ── Title ────────────────────────────────────────────────
-                  const Text(
-                    '新增库位',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(ctx)!.skuDetailNewLocation,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                       color: _titleColor,
@@ -139,9 +140,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   // ── Location selector ────────────────────────────────────
                   Row(
                     children: [
-                      const Text(
-                        '库位',
-                        style: TextStyle(
+                      Text(
+                        AppLocalizations.of(ctx)!.skuDetailLocationSection,
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: Color(0xFF6E6E80),
@@ -162,7 +163,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           }
                         }),
                         child: Text(
-                          isNewLoc ? '搜索已有' : '+ 新建库位',
+                          isNewLoc ? AppLocalizations.of(ctx)!.inventorySearchExisting : AppLocalizations.of(ctx)!.skuDetailNewLocationButton,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -211,7 +212,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       // Search input
                       _SheetInput(
                         controller: locSearchCtrl,
-                        hint: '搜索库位编号',
+                        hint: AppLocalizations.of(ctx)!.skuDetailSearchLocationHint,
                         icon: Icons.location_on_outlined,
                         onChanged: (v) => searchLocs(v),
                         suffix: locSearching
@@ -259,7 +260,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                 dense: true,
                                 leading: const Icon(Icons.add_circle_outline, color: _primary, size: 18),
                                 title: Text(
-                                  '新建 "${locSearchCtrl.text}"',
+                                  AppLocalizations.of(ctx)!.skuDetailNewLocationTitle(locSearchCtrl.text),
                                   style: const TextStyle(color: _primary, fontSize: 13),
                                 ),
                                 onTap: () => setS(() {
@@ -281,9 +282,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                             isNewLoc = true;
                             newLocCodeCtrl.text = locSearchCtrl.text;
                           }),
-                          child: const Text(
-                            '未找到，点击新建',
-                            style: TextStyle(
+                          child: Text(
+                            AppLocalizations.of(ctx)!.skuDetailLocationNotFound,
+                            style: const TextStyle(
                               color: _primary,
                               decoration: TextDecoration.underline,
                               fontSize: 13,
@@ -297,14 +298,14 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   if (isNewLoc) ...[
                     _SheetInput(
                       controller: newLocCodeCtrl,
-                      hint: '库位编号 *',
+                      hint: AppLocalizations.of(ctx)!.skuDetailLocationCodeHint,
                       icon: Icons.location_on_outlined,
                       textCapitalization: TextCapitalization.characters,
                     ),
                     const SizedBox(height: 8),
                     _SheetInput(
                       controller: newLocDescCtrl,
-                      hint: '描述（可选）',
+                      hint: AppLocalizations.of(ctx)!.skuDetailLocationDescHint,
                       icon: Icons.notes_outlined,
                     ),
                   ],
@@ -312,8 +313,8 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   const SizedBox(height: 20),
 
                   // ── Initial inventory ────────────────────────────────────
-                  const Text(
-                    '初始库存',
+                  Text(
+                    AppLocalizations.of(ctx)!.skuDetailInitialStock,
                     style: TextStyle(
                       fontSize: 10,
                       color: _hintColor,
@@ -357,7 +358,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '暂存 / 待清点',
+                                AppLocalizations.of(ctx)!.skuDetailPendingTitle,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
@@ -365,7 +366,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                 ),
                               ),
                               Text(
-                                '货已到位，数量暂未确认',
+                                AppLocalizations.of(ctx)!.skuDetailPendingSubtitle,
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   color: isPending ? Colors.orange.shade600 : _hintColor,
@@ -391,17 +392,17 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       child: Row(
                         children: [
                           _ModeTab(
-                            label: '按箱规',
+                            label: AppLocalizations.of(ctx)!.skuDetailModeCarton,
                             selected: inputMode == 'carton',
                             onTap: () => setS(() => inputMode = 'carton'),
                           ),
                           _ModeTab(
-                            label: '仅箱数',
+                            label: AppLocalizations.of(ctx)!.skuDetailModeBoxOnly,
                             selected: inputMode == 'boxesOnly',
                             onTap: () => setS(() => inputMode = 'boxesOnly'),
                           ),
                           _ModeTab(
-                            label: '按总数量',
+                            label: AppLocalizations.of(ctx)!.skuDetailModeQty,
                             selected: inputMode == 'qty',
                             onTap: () => setS(() => inputMode = 'qty'),
                           ),
@@ -417,7 +418,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                         children: [
                           Expanded(
                             child: _LabeledInput(
-                              label: '箱数 *',
+                              label: AppLocalizations.of(ctx)!.skuDetailBoxesLabel,
                               controller: boxesCtrl,
                               hint: '0',
                               keyboardType: TextInputType.number,
@@ -433,7 +434,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           ),
                           Expanded(
                             child: _LabeledInput(
-                              label: '每箱件数 *',
+                              label: AppLocalizations.of(ctx)!.skuDetailUnitsLabel,
                               controller: unitsCtrl,
                               hint: _data?['cartonQty']?.toString() ?? '1',
                               keyboardType: TextInputType.number,
@@ -444,7 +445,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       ),
                     ] else if (inputMode == 'boxesOnly') ...[
                       _LabeledInput(
-                        label: '箱数 *',
+                        label: AppLocalizations.of(ctx)!.skuDetailBoxesLabel,
                         controller: boxesCtrl,
                         hint: '0',
                         keyboardType: TextInputType.number,
@@ -452,7 +453,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       ),
                     ] else ...[
                       _LabeledInput(
-                        label: '总件数 *',
+                        label: AppLocalizations.of(ctx)!.skuDetailTotalLabel,
                         controller: qtyCtrl,
                         hint: '0',
                         keyboardType: TextInputType.number,
@@ -471,10 +472,10 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                         ),
                         child: Text(
                           inputMode == 'carton'
-                              ? '初始库存：$previewBoxes箱 × $previewUnits件/箱 = $previewQty件'
+                              ? AppLocalizations.of(ctx)!.skuDetailInitialPreviewCarton(previewBoxes, previewUnits, previewQty)
                               : inputMode == 'boxesOnly'
-                                  ? '初始库存：$previewQty 箱（每箱件数待定）'
-                                  : '初始库存：$previewQty 件',
+                                  ? AppLocalizations.of(ctx)!.skuDetailInitialPreviewBoxOnly(previewQty)
+                                  : AppLocalizations.of(ctx)!.skuDetailInitialPreviewQty(previewQty),
                           style: const TextStyle(
                             fontSize: 12,
                             color: _greenText,
@@ -488,9 +489,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   const SizedBox(height: 14),
 
                   // ── Note ─────────────────────────────────────────────────
-                  const Text(
-                    '备注',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(ctx)!.skuDetailNoteLabel,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                       color: _hintColor,
@@ -499,7 +500,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   const SizedBox(height: 4),
                   _SheetInput(
                     controller: noteCtrl,
-                    hint: '添加备注（可选）',
+                    hint: AppLocalizations.of(ctx)!.inventoryAddNoteHint,
                   ),
 
                   // Error
@@ -527,9 +528,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             alignment: Alignment.center,
-                            child: const Text(
-                              '取消',
-                              style: TextStyle(
+                            child: Text(
+                              AppLocalizations.of(ctx)!.cancel,
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                                 color: Color(0xFF6E6E80),
@@ -547,8 +548,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                               ? null
                               : () async {
                                   String? locId = selectedLocationId;
+                                  final sl10n = AppLocalizations.of(ctx)!;
                                   if (!isNewLoc && locId == null) {
-                                    setS(() => sheetError = '请选择或新建库位');
+                                    setS(() => sheetError = sl10n.inventorySelectOrCreate);
                                     return;
                                   }
                                   int boxes, units;
@@ -559,24 +561,24 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                     boxes = int.tryParse(boxesCtrl.text) ?? 0;
                                     units = int.tryParse(unitsCtrl.text) ?? 0;
                                     if (boxes <= 0) {
-                                      setS(() => sheetError = '请输入有效箱数');
+                                      setS(() => sheetError = sl10n.skuDetailValidBoxes);
                                       return;
                                     }
                                     if (units <= 0) {
-                                      setS(() => sheetError = '请输入有效每箱件数');
+                                      setS(() => sheetError = sl10n.skuDetailValidBoxes);
                                       return;
                                     }
                                   } else if (inputMode == 'boxesOnly') {
                                     boxes = int.tryParse(boxesCtrl.text) ?? 0;
                                     units = 1;
                                     if (boxes <= 0) {
-                                      setS(() => sheetError = '请输入有效箱数');
+                                      setS(() => sheetError = sl10n.skuDetailValidBoxesOnly);
                                       return;
                                     }
                                   } else {
                                     final qty = int.tryParse(qtyCtrl.text) ?? 0;
                                     if (qty <= 0) {
-                                      setS(() => sheetError = '请输入有效总件数');
+                                      setS(() => sheetError = sl10n.skuDetailValidQty);
                                       return;
                                     }
                                     boxes = 1;
@@ -587,7 +589,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                     if (isNewLoc) {
                                       final code = newLocCodeCtrl.text.trim().toUpperCase();
                                       if (code.isEmpty) {
-                                        setS(() { saving = false; sheetError = '库位编号不能为空'; });
+                                        setS(() { saving = false; sheetError = sl10n.inventoryLocationCodeEmpty; });
                                         return;
                                       }
                                       final newLoc = await LocationService().create(
@@ -613,8 +615,8 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                     _load();
                                   } catch (e) {
                                     final msg = e is DioException
-                                        ? (e.response?.data?['message'] ?? '操作失败')
-                                        : '操作失败: $e';
+                                        ? (e.response?.data?['message'] ?? sl10n.pwdResetOperationFailed)
+                                        : '${sl10n.pwdResetOperationFailed}: $e';
                                     setS(() {
                                       saving = false;
                                       sheetError = msg is List
@@ -649,7 +651,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                         strokeWidth: 2, color: Colors.white),
                                   )
                                 : Text(
-                                    isPending ? '确认暂存' : '确认新增',
+                                    isPending ? AppLocalizations.of(ctx)!.skuDetailConfirmPending : AppLocalizations.of(ctx)!.skuDetailCreate,
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
@@ -673,18 +675,19 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
   // ── Delete inventory ───────────────────────────────────────────────────────
 
   Future<void> _deleteInventory(InventoryRecord record) async {
+    final l10n = AppLocalizations.of(context)!;
     final loc = record.locationId is Map ? record.locationId['code'] : '?';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定删除 $loc 中的\n${_data?['sku'] ?? ''} 当前库存记录吗？\n此操作不可恢复。'),
+        title: Text(l10n.skuDetailDeleteConfirmTitle),
+        content: Text(l10n.skuDetailDeleteConfirmContent(loc, _data?['sku'] ?? '')),
         actions: [
-          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+          TextButton(onPressed: () => ctx.pop(false), child: Text(l10n.cancel)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => ctx.pop(true),
-            child: const Text('删除'),
+            child: Text(l10n.skuDetailDelete),
           ),
         ],
       ),
@@ -696,7 +699,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')));
+          SnackBar(content: Text(AppLocalizations.of(context)!.skuDetailDeleteFailed(e.toString()))));
       }
     }
   }
@@ -704,23 +707,24 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
   // ── Archive / Restore ──────────────────────────────────────────────────────
 
   Future<void> _archiveSku() async {
+    final l10n = AppLocalizations.of(context)!;
     final data = _data!;
     final skuCode = data['sku'] as String;
     final inventoryList = (data['inventory'] as List?) ?? [];
     final String content = inventoryList.isNotEmpty
-        ? '$skuCode 仍有 ${inventoryList.length} 条库存记录。\n\n归档后该 SKU 不允许新入库，但现有库存仍可查看和出库。\n\n确认归档？'
-        : '确定归档 SKU $skuCode？归档后不允许新入库。';
+        ? l10n.skuDetailArchiveWithStockContent(skuCode, inventoryList.length)
+        : l10n.skuDetailArchiveContent(skuCode);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('确认归档'),
+        title: Text(l10n.skuDetailArchiveTitle),
         content: Text(content),
         actions: [
-          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+          TextButton(onPressed: () => ctx.pop(false), child: Text(l10n.cancel)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade700),
             onPressed: () => ctx.pop(true),
-            child: const Text('确认归档'),
+            child: Text(l10n.skuDetailConfirmArchive),
           ),
         ],
       ),
@@ -729,27 +733,28 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     try {
       await _skuService.archive(widget.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$skuCode 已归档')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.skuDetailArchived(skuCode))));
         _load();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e'), backgroundColor: Colors.red));
+          SnackBar(content: Text(l10n.skuDetailOperationFailed(e.toString())), backgroundColor: Colors.red));
       }
     }
   }
 
   Future<void> _restoreSku() async {
+    final l10n = AppLocalizations.of(context)!;
     final skuCode = _data?['sku'] as String? ?? '';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('恢复 SKU'),
-        content: Text('确定将 $skuCode 恢复为"在用"状态？'),
+        title: Text(l10n.skuDetailRestoreTitle),
+        content: Text(l10n.skuDetailRestoreContent(skuCode)),
         actions: [
-          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
-          FilledButton(onPressed: () => ctx.pop(true), child: const Text('确认恢复')),
+          TextButton(onPressed: () => ctx.pop(false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => ctx.pop(true), child: Text(l10n.skuDetailConfirmRestore)),
         ],
       ),
     );
@@ -757,13 +762,13 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     try {
       await _skuService.restore(widget.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$skuCode 已恢复为在用')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.skuDetailRestored(skuCode))));
         _load();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e'), backgroundColor: Colors.red));
+          SnackBar(content: Text(l10n.skuDetailOperationFailed(e.toString())), backgroundColor: Colors.red));
       }
     }
   }
@@ -891,6 +896,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
     final cartonQty   = data['cartonQty'];
     final allBoxesOnly = inventory.isNotEmpty && inventory.every((r) => r.boxesOnlyMode);
 
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: _bgColor,
       body: SafeArea(
@@ -919,7 +925,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '此 SKU 已归档，不允许新入库。现有库存仍可查看和出库。',
+                              l10n.skuDetailArchivedNotice,
                               style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
                             ),
                           ),
@@ -964,9 +970,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                         const Icon(Icons.widgets_outlined,
                                             size: 12, color: _hintColor),
                                         const SizedBox(width: 6),
-                                        const Text(
-                                          '总库存',
-                                          style: TextStyle(
+                                        Text(
+                                          l10n.skuDetailTotalStock,
+                                          style: const TextStyle(
                                             fontSize: 10,
                                             color: _hintColor,
                                             letterSpacing: 0.25,
@@ -977,8 +983,8 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                     const Spacer(),
                                     Text(
                                       allBoxesOnly
-                                          ? '$totalBoxes 箱'
-                                          : '$totalQty 件',
+                                          ? l10n.skuDetailTotalBoxes(totalBoxes as int)
+                                          : l10n.skuDetailTotalQtyPieces(totalQty as int),
                                       style: const TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.w600,
@@ -1013,9 +1019,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              const Text(
-                                                '库位',
-                                                style: TextStyle(fontSize: 10, color: _hintColor),
+                                              Text(
+                                                l10n.skuDetailLocationCol,
+                                                style: const TextStyle(fontSize: 10, color: _hintColor),
                                               ),
                                               Text(
                                                 '$locCount',
@@ -1048,9 +1054,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              const Text(
-                                                '箱数',
-                                                style: TextStyle(fontSize: 10, color: _hintColor),
+                                              Text(
+                                                l10n.skuDetailBoxesCol,
+                                                style: const TextStyle(fontSize: 10, color: _hintColor),
                                               ),
                                               Text(
                                                 '$totalBoxes',
@@ -1076,13 +1082,13 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                         const SizedBox(height: 14),
                         Row(
                           children: [
-                            const Text(
-                              '默认箱规',
-                              style: TextStyle(fontSize: 12, color: _hintColor),
+                            Text(
+                              l10n.skuDetailDefaultCarton,
+                              style: const TextStyle(fontSize: 12, color: _hintColor),
                             ),
                             const Spacer(),
                             Text(
-                              cartonQty != null ? '$cartonQty 件/箱' : '-',
+                              cartonQty != null ? l10n.skuDetailCartonQtyDisplay(cartonQty as int) : '-',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF5A5A6E),
@@ -1097,9 +1103,9 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                   const SizedBox(height: 20),
 
                   // ── Inventory locations section ─────────────────────────
-                  const Text(
-                    '库存位置',
-                    style: TextStyle(fontSize: 12, color: _hintColor),
+                  Text(
+                    l10n.skuDetailStockLocations,
+                    style: const TextStyle(fontSize: 12, color: _hintColor),
                   ),
                   const SizedBox(height: 10),
 
@@ -1161,14 +1167,14 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                           ),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add, size: 14, color: _hintColor),
-                            SizedBox(width: 6),
+                            const Icon(Icons.add, size: 14, color: _hintColor),
+                            const SizedBox(width: 6),
                             Text(
-                              '添加库位',
-                              style: TextStyle(
+                              l10n.skuDetailAddLocation,
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: _hintColor,
@@ -1208,21 +1214,22 @@ class _LocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Mode badge
     final String badgeLabel;
     final Color badgeBg;
     final Color badgeText;
 
     if (record.quantityUnknown) {
-      badgeLabel = '待清点';
+      badgeLabel = l10n.skuDetailBadgePending;
       badgeBg    = const Color(0xFFFFF3E0);
       badgeText  = const Color(0xFFD4820A);
     } else if (record.boxesOnlyMode) {
-      badgeLabel = '仅箱数';
+      badgeLabel = l10n.skuDetailBadgeBoxOnly;
       badgeBg    = const Color(0xFFE8F3FF);
       badgeText  = const Color(0xFF4A9EFF);
     } else {
-      badgeLabel = '按箱规';
+      badgeLabel = l10n.skuDetailBadgeCarton;
       badgeBg    = _greenBg;
       badgeText  = _greenText;
     }
@@ -1274,7 +1281,7 @@ class _LocationCard extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            location?.code ?? '未知位置',
+                            location?.code ?? l10n.skuDetailUnknownLocation,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -1318,13 +1325,13 @@ class _LocationCard extends StatelessWidget {
                       if (value == 'delete') onDelete();
                     },
                     itemBuilder: (ctx) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('删除', style: TextStyle(color: Colors.red)),
+                            const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(AppLocalizations.of(ctx)!.skuDetailStockDelete, style: const TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/history_service.dart';
 import '../../models/change_record.dart';
+import '../../l10n/app_localizations.dart';
 
 class InventoryHistoryScreen extends StatefulWidget {
   final String skuCode;
@@ -57,16 +58,17 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
 
   /// Convert raw exception to a user-readable string.
   String _friendlyError(Object e) {
+    final l10n = AppLocalizations.of(context)!;
     final raw = e.toString();
-    if (raw.contains('404')) return '接口不存在，请联系管理员';
-    if (raw.contains('401') || raw.contains('403')) return '无权限查看此记录';
+    if (raw.contains('404')) return l10n.errApiNotFound;
+    if (raw.contains('401') || raw.contains('403')) return l10n.errPermission;
     if (raw.contains('SocketException') || raw.contains('Connection refused')) {
-      return '无法连接服务器，请检查网络';
+      return l10n.errCannotConnectServer;
     }
     if (raw.contains('DioException') || raw.contains('DioError')) {
-      return '网络请求失败，请重试';
+      return l10n.errNetworkFailed;
     }
-    return '加载失败，请重试';
+    return l10n.errLoadRetry;
   }
 
   Future<void> _load({bool reset = false}) async {
@@ -132,9 +134,10 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('入出库记录'),
+        title: Text(l10n.invHistoryTitle),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(76),
           child: Column(
@@ -152,7 +155,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
                     _LocationChip(widget.locationCode),
                     const Spacer(),
                     if (!_loading && _errorMsg == null && _total > 0)
-                      Text('共 $_total 条',
+                      Text(l10n.historyTotalRecords(_total),
                           style: const TextStyle(
                               fontSize: 12, color: Colors.grey)),
                   ],
@@ -164,22 +167,22 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: Row(
                   children: [
-                    _TypeChip(label: '全部', selected: _typeFilter == null,
+                    _TypeChip(label: l10n.historyFilterAll, selected: _typeFilter == null,
                         onTap: () => _setFilter(null)),
                     const SizedBox(width: 8),
-                    _TypeChip(label: '入库', color: Colors.green,
+                    _TypeChip(label: l10n.historyFilterIn, color: Colors.green,
                         selected: _typeFilter == 'IN',
                         onTap: () => _setFilter('IN')),
                     const SizedBox(width: 8),
-                    _TypeChip(label: '出库', color: Colors.red,
+                    _TypeChip(label: l10n.historyFilterOut, color: Colors.red,
                         selected: _typeFilter == 'OUT',
                         onTap: () => _setFilter('OUT')),
                     const SizedBox(width: 8),
-                    _TypeChip(label: '调整', color: Colors.orange,
+                    _TypeChip(label: l10n.historyFilterAdjust, color: Colors.orange,
                         selected: _typeFilter == 'ADJUST',
                         onTap: () => _setFilter('ADJUST')),
                     const SizedBox(width: 8),
-                    _TypeChip(label: '转移', color: Colors.blue,
+                    _TypeChip(label: l10n.historyFilterTransfer, color: Colors.blue,
                         selected: _typeFilter == 'TRANSFER',
                         onTap: () => _setFilter('TRANSFER')),
                   ],
@@ -213,7 +216,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
               const SizedBox(height: 20),
               FilledButton.icon(
                 icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
+                label: Text(AppLocalizations.of(context)!.retry),
                 onPressed: _load,
               ),
             ],
@@ -230,14 +233,16 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
             Icon(Icons.history, size: 56, color: Colors.grey.shade200),
             const SizedBox(height: 12),
             Text(
-              _typeFilter == null ? '暂无出入库记录' : '没有符合条件的记录',
+              _typeFilter == null
+                  ? AppLocalizations.of(context)!.invHistoryEmpty
+                  : AppLocalizations.of(context)!.invHistoryEmptyFiltered,
               style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
             ),
             if (_typeFilter != null) ...[
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => _setFilter(null),
-                child: const Text('查看全部类型'),
+                child: Text(AppLocalizations.of(context)!.invHistoryViewAll),
               ),
             ],
           ],
@@ -420,6 +425,7 @@ class _HistoryTileState extends State<_HistoryTile> {
   }
 
   Widget _buildSplitDetails(Map<String, dynamic> details, Color color) {
+    final l10n = AppLocalizations.of(context)!;
     final src = details['source'] as Map<String, dynamic>?;
     final targets = (details['targets'] as List).cast<Map<String, dynamic>>();
     final note = details['note'] as String? ?? '';
@@ -435,14 +441,14 @@ class _HistoryTileState extends State<_HistoryTile> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 原暂存
+          // Source pending
           if (src != null) ...[
-            _detailRow('原暂存', '${src['skuCode']}  ${src['qtyDesc']}',
+            _detailRow(l10n.invHistorySplitSrc, '${src['skuCode']}  ${src['qtyDesc']}',
                 icon: Icons.inventory_2_outlined, color: Colors.grey.shade600),
             const SizedBox(height: 6),
           ],
-          // 拆分目标列表
-          _detailLabel('拆分目标', color),
+          // Split targets list
+          _detailLabel(l10n.invHistorySplitTargets, color),
           const SizedBox(height: 4),
           ...targets.map((t) => Padding(
                 padding: const EdgeInsets.only(left: 8, bottom: 3),
@@ -461,14 +467,14 @@ class _HistoryTileState extends State<_HistoryTile> {
                   ],
                 ),
               )),
-          // 原记录处理
+          // Source record disposition
           const SizedBox(height: 6),
-          _detailRow('原记录', '已清零（拆分完成）',
+          _detailRow(l10n.invHistorySplitSrc, l10n.invHistorySplitCleared,
               icon: Icons.check_circle_outline, color: Colors.green.shade700),
-          // 原因
+          // Reason
           if (note.isNotEmpty) ...[
             const SizedBox(height: 6),
-            _detailRow('原因', note,
+            _detailRow(l10n.invHistoryReason, note,
                 icon: Icons.notes_outlined, color: Colors.grey.shade600),
           ],
         ],
@@ -523,8 +529,9 @@ class _HistoryTileState extends State<_HistoryTile> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final color = _color;
-    final action = widget.record.businessAction ?? '操作';
+    final action = widget.record.businessAction ?? l10n.invDetailDefaultAction;
     final summary = _extractSummary();
     final fmt = DateFormat('yyyy-MM-dd HH:mm');
 

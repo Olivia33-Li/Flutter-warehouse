@@ -5,6 +5,7 @@ import '../../models/location.dart';
 import '../../services/sku_service.dart';
 import '../../services/location_service.dart';
 import '../../services/inventory_service.dart';
+import '../../l10n/app_localizations.dart';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const _bg           = Color(0xFFF0EDE8);
@@ -144,17 +145,18 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context)!;
     if (!_isNewSku && _selectedSku == null) {
-      setState(() => _error = '请选择 SKU 或新建');
+      setState(() => _error = l10n.inventorySelectOrCreate);
       return;
     }
     if (_isNewSku && _skuSearchCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'SKU 编号不能为空');
+      setState(() => _error = l10n.inventorySkuCodeEmpty);
       return;
     }
-    if (!_isNewLoc && _selectedLoc == null) { setState(() => _error = '请选择库位'); return; }
+    if (!_isNewLoc && _selectedLoc == null) { setState(() => _error = l10n.inventorySelectLocation); return; }
     if (_isNewLoc && _newLocCodeCtrl.text.trim().isEmpty) {
-      setState(() => _error = '库位编号不能为空');
+      setState(() => _error = l10n.inventoryLocationCodeEmpty);
       return;
     }
 
@@ -163,19 +165,19 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
     bool boxesOnlyMode = false;
     if (_inputMode == 'carton') {
       final qty = int.tryParse(_qtyCtrl.text);
-      if (qty == null || qty <= 0) { setState(() => _error = '请输入有效箱数'); return; }
+      if (qty == null || qty <= 0) { setState(() => _error = l10n.inventoryValidBoxCount); return; }
       final u = int.tryParse(_cartonQtyCtrl.text);
-      if (u == null || u <= 0) { setState(() => _error = '请输入每箱件数'); return; }
+      if (u == null || u <= 0) { setState(() => _error = l10n.inventoryValidUnits); return; }
       boxes = qty;
       unitsPerBox = u;
     } else if (_inputMode == 'boxesOnly') {
       final qty = int.tryParse(_qtyCtrl.text);
-      if (qty == null || qty <= 0) { setState(() => _error = '请输入有效箱数'); return; }
+      if (qty == null || qty <= 0) { setState(() => _error = l10n.inventoryValidBoxCount); return; }
       boxes = qty;
       boxesOnlyMode = true;
     } else {
       final total = int.tryParse(_totalQtyCtrl.text);
-      if (total == null || total <= 0) { setState(() => _error = '请输入有效件数'); return; }
+      if (total == null || total <= 0) { setState(() => _error = l10n.inventoryValidQty); return; }
       boxes = 1;
       unitsPerBox = total;
     }
@@ -242,12 +244,12 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('库存已保存')));
+          SnackBar(content: Text(AppLocalizations.of(context)!.inventoryStockSaved)));
         Navigator.of(context).pop(true);
       }
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
-      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? '保存失败'));
+      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.saveFailed));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -369,6 +371,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -380,9 +383,9 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
               size: 18, color: _bodyColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          '手动录入库存',
-          style: TextStyle(
+        title: Text(
+          l10n.inventoryAddManualTitle,
+          style: const TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w600,
               color: _bodyColor),
@@ -396,12 +399,12 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
           children: [
             // ── SKU 部分 ────────────────────────────────────────────────────
             _sectionHeader(
-              title: 'SKU',
+              title: l10n.inventorySkuSection,
               icon: Icons.qr_code_rounded,
               iconColor: const Color(0xFF4A6CF7),
-              actionLabel: _isNewSku ? null : '新建 SKU',
+              actionLabel: _isNewSku ? null : l10n.inventoryNewSkuLabel,
               onAction: _isNewSku ? null : _enterNewSkuMode,
-              secondaryLabel: _isNewSku ? '搜索已有' : null,
+              secondaryLabel: _isNewSku ? l10n.inventorySearchExisting : null,
               onSecondaryAction: _isNewSku
                   ? () => setState(() {
                         _isNewSku = false;
@@ -418,7 +421,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                 controller: _skuSearchCtrl,
                 style: const TextStyle(fontSize: 14, color: _bodyColor),
                 decoration: _inputDeco(
-                  '搜索 SKU 编号 / 名称 / 条码',
+                  l10n.inventorySearchSkuHint,
                   prefixIcon: const Icon(Icons.search, size: 18, color: _hintColor),
                 ).copyWith(
                   suffixIcon: _skuSearching
@@ -453,7 +456,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                         }),
                       )),
                   _dropdownItem(
-                    title: '新建 "${_skuSearchCtrl.text}"',
+                    title: l10n.inventoryNewSkuTitle(_skuSearchCtrl.text),
                     titleColor: _primaryDark,
                     leading: const Icon(Icons.add_circle_outline,
                         color: _primaryDark, size: 18),
@@ -470,11 +473,11 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                     children: [
                       const Icon(Icons.info_outline, size: 15, color: _mutedColor),
                       const SizedBox(width: 6),
-                      const Text('未找到，',
-                          style: TextStyle(color: _mutedColor, fontSize: 13)),
+                      Text(l10n.inventorySkuNotFound,
+                          style: const TextStyle(color: _mutedColor, fontSize: 13)),
                       GestureDetector(
                         onTap: _enterNewSkuMode,
-                        child: const Text('点击新建此 SKU',
+                        child: Text(l10n.inventoryCreateNewSku,
                             style: TextStyle(
                                 color: _primaryDark,
                                 fontSize: 13,
@@ -494,19 +497,19 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                     controller: _skuSearchCtrl,
                     textCapitalization: TextCapitalization.characters,
                     style: const TextStyle(fontSize: 14, color: _bodyColor),
-                    decoration: _inputDeco('SKU 编号 *'),
+                    decoration: _inputDeco(l10n.inventorySkuCodeLabel),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _skuNameCtrl,
                     style: const TextStyle(fontSize: 14, color: _bodyColor),
-                    decoration: _inputDeco('商品名称'),
+                    decoration: _inputDeco(l10n.inventoryProductNameLabel),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _skuBarcodeCtrl,
                     style: const TextStyle(fontSize: 14, color: _bodyColor),
-                    decoration: _inputDeco('条形码（可选）'),
+                    decoration: _inputDeco(l10n.inventoryBarcodeLabel),
                   ),
                 ],
               ),
@@ -515,12 +518,12 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
 
             // ── 库位部分 ────────────────────────────────────────────────────
             _sectionHeader(
-              title: '库位',
+              title: l10n.inventoryLocationSection,
               icon: Icons.location_on_rounded,
               iconColor: _locIcon,
-              actionLabel: _isNewLoc ? null : '新建库位',
+              actionLabel: _isNewLoc ? null : l10n.inventoryNewLocationLabel,
               onAction: _isNewLoc ? null : _enterNewLocMode,
-              secondaryLabel: _isNewLoc ? '搜索已有' : null,
+              secondaryLabel: _isNewLoc ? l10n.inventorySearchExisting : null,
               onSecondaryAction: _isNewLoc
                   ? () => setState(() {
                         _isNewLoc = false;
@@ -537,7 +540,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                 controller: _locSearchCtrl,
                 style: const TextStyle(fontSize: 14, color: _bodyColor),
                 decoration: _inputDeco(
-                  '搜索库位编号',
+                  l10n.inventorySearchLocationHint,
                   prefixIcon: const Icon(Icons.location_searching_rounded,
                       size: 18, color: _hintColor),
                 ).copyWith(
@@ -570,7 +573,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                         }),
                       )),
                   _dropdownItem(
-                    title: '新建 "${_locSearchCtrl.text}"',
+                    title: l10n.inventoryNewLocationTitle(_locSearchCtrl.text),
                     titleColor: _primaryDark,
                     leading: const Icon(Icons.add_circle_outline,
                         color: _primaryDark, size: 18),
@@ -587,11 +590,11 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                     children: [
                       const Icon(Icons.info_outline, size: 15, color: _mutedColor),
                       const SizedBox(width: 6),
-                      const Text('未找到，',
-                          style: TextStyle(color: _mutedColor, fontSize: 13)),
+                      Text(l10n.inventoryLocationNotFound,
+                          style: const TextStyle(color: _mutedColor, fontSize: 13)),
                       GestureDetector(
                         onTap: _enterNewLocMode,
-                        child: const Text('点击新建此库位',
+                        child: Text(l10n.inventoryCreateNewLocation,
                             style: TextStyle(
                                 color: _primaryDark,
                                 fontSize: 13,
@@ -611,13 +614,13 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                     controller: _newLocCodeCtrl,
                     textCapitalization: TextCapitalization.characters,
                     style: const TextStyle(fontSize: 14, color: _bodyColor),
-                    decoration: _inputDeco('库位编号 *'),
+                    decoration: _inputDeco(l10n.inventoryLocationCodeLabel),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _newLocDescCtrl,
                     style: const TextStyle(fontSize: 14, color: _bodyColor),
-                    decoration: _inputDeco('描述（可选）'),
+                    decoration: _inputDeco(l10n.inventoryLocationDescLabel),
                   ),
                 ],
               ),
@@ -626,7 +629,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
 
             // ── 初始库存 ───────────────────────────────────────────────────
             _sectionHeader(
-              title: '初始库存',
+              title: l10n.inventoryInitialStockSection,
               icon: Icons.inventory_2_rounded,
               iconColor: _invIcon,
             ),
@@ -668,18 +671,18 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                           : null,
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('暂存 / 待清点',
-                              style: TextStyle(
+                          Text(l10n.inventoryPendingTitle,
+                              style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                   color: _bodyColor)),
-                          SizedBox(height: 2),
-                          Text('货已到位，数量暂未确认',
-                              style: TextStyle(
+                          const SizedBox(height: 2),
+                          Text(l10n.inventoryPendingSubtitle,
+                              style: const TextStyle(
                                   fontSize: 12, color: _mutedColor)),
                         ],
                       ),
@@ -703,9 +706,9 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
               ),
               child: Row(
                 children: [
-                  Expanded(child: _modeTab('按箱规', 'carton', Icons.view_list_rounded)),
-                  Expanded(child: _modeTab('仅箱数', 'boxesOnly', Icons.inventory_2_outlined)),
-                  Expanded(child: _modeTab('按总数量', 'qty', Icons.tag_rounded)),
+                  Expanded(child: _modeTab(l10n.inventoryModeCarton, 'carton', Icons.view_list_rounded)),
+                  Expanded(child: _modeTab(l10n.inventoryModeBoxOnly, 'boxesOnly', Icons.inventory_2_outlined)),
+                  Expanded(child: _modeTab(l10n.inventoryModeQty, 'qty', Icons.tag_rounded)),
                 ],
               ),
             ),
@@ -715,13 +718,14 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
             // Quantity inputs
             StatefulBuilder(
               builder: (ctx, setS) {
+                final il10n = AppLocalizations.of(ctx)!;
                 if (_inputMode == 'boxesOnly') {
                   final boxes = int.tryParse(_qtyCtrl.text) ?? 0;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('箱数 *',
-                          style: TextStyle(
+                      Text(il10n.inventoryBoxesLabel,
+                          style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                               color: _bodyColor)),
@@ -730,12 +734,12 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                         controller: _qtyCtrl,
                         keyboardType: TextInputType.number,
                         style: const TextStyle(fontSize: 15, color: _bodyColor),
-                        decoration: _inputDeco('0').copyWith(suffixText: '箱'),
+                        decoration: _inputDeco('0').copyWith(suffixText: il10n.inventoryBoxesSuffix),
                         onChanged: (_) => setS(() {}),
                       ),
                       if (boxes > 0) ...[
                         const SizedBox(height: 10),
-                        _totalRow('$boxes 箱 · 箱规待确认'),
+                        _totalRow(il10n.inventoryBoxesTotal(boxes)),
                       ],
                     ],
                   );
@@ -745,8 +749,8 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('总件数 *',
-                          style: TextStyle(
+                      Text(il10n.inventoryTotalQtyLabel,
+                          style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                               color: _bodyColor)),
@@ -755,12 +759,12 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                         controller: _totalQtyCtrl,
                         keyboardType: TextInputType.number,
                         style: const TextStyle(fontSize: 15, color: _bodyColor),
-                        decoration: _inputDeco('0').copyWith(suffixText: '件'),
+                        decoration: _inputDeco('0').copyWith(suffixText: il10n.inventoryTotalQtySuffix),
                         onChanged: (_) => setS(() {}),
                       ),
                       if (total > 0) ...[
                         const SizedBox(height: 10),
-                        _totalRow('合计 $total 件'),
+                        _totalRow(il10n.inventoryQtyTotal(total)),
                       ],
                     ],
                   );
@@ -772,8 +776,8 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('箱数 × 每箱件数',
-                        style: TextStyle(
+                    Text('${il10n.inventoryBoxesLabel.replaceAll(' *', '')} × ${il10n.inventoryUnitsLabel.replaceAll(' *', '')}',
+                        style: const TextStyle(
                             fontSize: 12,
                             color: _mutedColor)),
                     const SizedBox(height: 8),
@@ -784,8 +788,8 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('箱数 *',
-                                  style: TextStyle(
+                              Text(il10n.inventoryBoxesLabel,
+                                  style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
                                       color: _bodyColor)),
@@ -811,8 +815,8 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('每箱件数 *',
-                                  style: TextStyle(
+                              Text(il10n.inventoryUnitsLabel,
+                                  style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
                                       color: _bodyColor)),
@@ -831,7 +835,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _totalRow(total > 0 ? '$total 件' : '—'),
+                    _totalRow(total > 0 ? il10n.inventoryQtyTotal(total) : '—'),
                   ],
                 );
               },
@@ -850,10 +854,10 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                   children: [
                     Icon(Icons.info_outline, size: 15, color: Colors.orange.shade700),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        '将标记为"暂存"状态，数量不计入正式合计。',
-                        style: TextStyle(fontSize: 12, color: Color(0xFFB45309)),
+                        l10n.inventoryPendingNote,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFFB45309)),
                       ),
                     ),
                   ],
@@ -863,8 +867,8 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
 
             // ── 备注 ────────────────────────────────────────────────────────
             const SizedBox(height: 20),
-            const Text('备注（可选）',
-                style: TextStyle(
+            Text(l10n.inventoryNoteLabel,
+                style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: _bodyColor)),
@@ -873,7 +877,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
               controller: _noteCtrl,
               maxLines: 2,
               style: const TextStyle(fontSize: 14, color: _bodyColor),
-              decoration: _inputDeco('添加备注'),
+              decoration: _inputDeco(l10n.inventoryAddNoteHint),
             ),
 
             if (_error != null) ...[
@@ -926,7 +930,7 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
                         : Icons.save_rounded,
                         size: 18),
                 label: Text(
-                  _isPending ? '确认暂存' : '保存库存',
+                  _isPending ? l10n.inventoryConfirmPending : l10n.inventorySaveStock,
                   style: const TextStyle(
                       fontSize: 15, fontWeight: FontWeight.w600),
                 ),
@@ -1020,8 +1024,8 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
         ),
         child: Row(
           children: [
-            const Text('合计',
-                style: TextStyle(
+            Text(AppLocalizations.of(context)!.inventoryTotal,
+                style: const TextStyle(
                     fontSize: 14, color: _mutedColor)),
             const Spacer(),
             Text(value,

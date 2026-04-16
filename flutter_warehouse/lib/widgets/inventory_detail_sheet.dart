@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
 import '../services/history_service.dart';
 import '../services/inventory_service.dart';
 import '../services/sku_service.dart';
@@ -76,8 +77,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
         r.stockStatus == 'temporary';
   }
 
-  /// Converts a raw exception into a short user-friendly Chinese message.
-  String _friendly(Object e) {
+  /// Converts a raw exception into a short user-friendly message.
+  String _friendly(Object e, AppLocalizations l10n) {
     // Dio 5.x: response body is in e.response.data, NOT in toString().
     if (e is DioException) {
       final data = e.response?.data;
@@ -87,17 +88,17 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
         if (msg is List && msg.isNotEmpty) return msg.first.toString();
       }
       final code = e.response?.statusCode;
-      if (code == 403) return '权限不足，无法执行此操作';
-      if (code == 401) return '登录已过期，请重新登录';
-      if (code == 404) return '目标资源不存在，请刷新后重试';
-      if (code != null && code >= 400) return '请求失败（$code），请重试';
+      if (code == 403) return l10n.errPermissionDenied;
+      if (code == 401) return l10n.errSessionExpired;
+      if (code == 404) return l10n.errResourceNotFound;
+      if (code != null && code >= 400) return l10n.errRequestFailed(code);
       if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout) {
-        return '无法连接服务器，请检查网络';
+        return l10n.errCannotConnectServer;
       }
-      return '网络请求失败，请重试';
+      return l10n.errNetworkFailed;
     }
-    return '操作失败，请重试';
+    return l10n.errOperationFailed;
   }
 
   // Live getters — prefer freshly-loaded data over stale widget props
@@ -106,7 +107,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   int get _units => _invRecord?.unitsPerBox ?? widget.unitsPerBox;
   bool get _quantityUnknown => _invRecord?.quantityUnknown ?? widget.quantityUnknown;
   bool get _boxesOnlyMode => _invRecord?.boxesOnlyMode ?? false;
-  String get _qtyLabel => _quantityUnknown ? '未填写' : (_boxesOnlyMode ? '$_boxes 箱' : '$_qty 件');
+  String _qtyLabel(AppLocalizations l10n) => _quantityUnknown
+      ? l10n.invDetailQtyUnknown
+      : (_boxesOnlyMode
+          ? l10n.invDetailBoxesValue(_boxes)
+          : '$_qty ${l10n.invDetailPieceSuffix}');
   List<InventoryConfig> get _configs =>
       _invRecord != null ? _invRecord!.configurations : widget.configurations;
 
@@ -158,6 +163,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
   // ── 入库 ──
   Future<void> _showStockInDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     final boxesCtrl = TextEditingController();
     final unitsCtrl = TextEditingController();
     final qtyCtrl = TextEditingController();
@@ -181,7 +187,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               : 0;
 
           return AlertDialog(
-            title: const Text('入库'),
+            title: Text(l10n.invDetailStockInTitle),
             content: SizedBox(
               width: 340,
               child: SingleChildScrollView(
@@ -207,8 +213,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                   fontSize: 13, fontWeight: FontWeight.w600)),
                           Text(
                             _invRecord?.pendingCount == true
-                                ? '当前状态: 待清点'
-                                : '当前库存: $_qtyLabel',
+                                ? l10n.invDetailCurrentStatusPending
+                                : l10n.invDetailCurrentStock(_qtyLabel(l10n)),
                             style: TextStyle(
                                 fontSize: 12,
                                 color: isPending
@@ -224,10 +230,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     CheckboxListTile(
                       value: isPending,
                       onChanged: (v) => setS(() => isPending = v ?? false),
-                      title: const Text('暂存 / 待清点',
-                          style: TextStyle(fontSize: 14)),
-                      subtitle: const Text('货已到位，数量暂未确认',
-                          style: TextStyle(fontSize: 12)),
+                      title: Text(l10n.inventoryPendingTitle,
+                          style: const TextStyle(fontSize: 14)),
+                      subtitle: Text(l10n.inventoryPendingSubtitle,
+                          style: const TextStyle(fontSize: 12)),
                       secondary: Icon(Icons.pending_actions_outlined,
                           color: isPending ? Colors.orange : Colors.grey,
                           size: 20),
@@ -239,19 +245,19 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
                     // Mode selector — always visible
                     SegmentedButton<String>(
-                      segments: const [
+                      segments: [
                         ButtonSegment(
                             value: 'carton',
-                            label: Text('按箱规'),
-                            icon: Icon(Icons.view_list, size: 16)),
+                            label: Text(l10n.invDetailModeByCarton),
+                            icon: const Icon(Icons.view_list, size: 16)),
                         ButtonSegment(
                             value: 'boxesOnly',
-                            label: Text('仅箱数'),
-                            icon: Icon(Icons.inventory_2_outlined, size: 16)),
+                            label: Text(l10n.invDetailModeBoxesOnly),
+                            icon: const Icon(Icons.inventory_2_outlined, size: 16)),
                         ButtonSegment(
                             value: 'qty',
-                            label: Text('按总数量'),
-                            icon: Icon(Icons.numbers, size: 16)),
+                            label: Text(l10n.invDetailModeByQty),
+                            icon: const Icon(Icons.numbers, size: 16)),
                       ],
                       selected: {stockInMode},
                       onSelectionChanged: (v) =>
@@ -264,11 +270,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       TextField(
                         controller: boxesCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: '箱数 *',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.invDetailBoxesLabel,
+                          border: const OutlineInputBorder(),
                           isDense: true,
-                          suffixText: '箱',
+                          suffixText: l10n.invDetailBoxesSuffix,
                         ),
                         onChanged: (_) => setS(() {}),
                       ),
@@ -289,16 +295,16 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           ),
                           child: Row(
                             children: [
-                              Text(isPending ? '暂存箱数: ' : '入库箱数: ',
+                              Text(isPending ? l10n.invDetailPendingBoxes : l10n.invDetailStockInBoxes,
                                   style: const TextStyle(fontSize: 13)),
-                              Text('$previewBoxes 箱',
+                              Text(l10n.invDetailBoxesValue(previewBoxes),
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15,
                                       color: isPending
                                           ? Colors.orange.shade700
                                           : Colors.green.shade700)),
-                              Text('  · 箱规待确认',
+                              Text(l10n.invDetailCartonTBD,
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade500)),
@@ -321,14 +327,14 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           ),
                           child: Row(
                             children: [
-                              const Text('入库总量: ',
-                                  style: TextStyle(fontSize: 13)),
-                              Text('+ $previewQty 件',
+                              Text(l10n.invDetailStockInTotal,
+                                  style: const TextStyle(fontSize: 13)),
+                              Text(l10n.invDetailAddQty(previewQty),
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15,
                                       color: Colors.green.shade700)),
-                              Text('  →  ${_qty + previewQty} 件',
+                              Text(l10n.invDetailNewTotal(_qty + previewQty),
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade500)),
@@ -340,11 +346,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       TextField(
                         controller: qtyCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: '入库件数 *',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.invDetailStockInQtyLabel,
+                          border: const OutlineInputBorder(),
                           isDense: true,
-                          suffixText: '件',
+                          suffixText: l10n.invDetailPieceSuffix,
                         ),
                         onChanged: (_) => setS(() {}),
                       ),
@@ -360,14 +366,14 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           ),
                           child: Row(
                             children: [
-                              const Text('入库总量: ',
-                                  style: TextStyle(fontSize: 13)),
-                              Text('+ $previewQty 件',
+                              Text(l10n.invDetailStockInTotal,
+                                  style: const TextStyle(fontSize: 13)),
+                              Text(l10n.invDetailAddQty(previewQty),
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15,
                                       color: Colors.green.shade700)),
-                              Text('  →  ${_qty + previewQty} 件',
+                              Text(l10n.invDetailNewTotal(_qty + previewQty),
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade500)),
@@ -392,8 +398,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                '将标记此库存为"待清点"，当前数量不变。'
-                                '后续确认后可通过"调整"更新数量。',
+                                l10n.invDetailPendingMarkNote,
                                 style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.orange.shade800),
@@ -418,7 +423,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+              TextButton(onPressed: () => ctx.pop(), child: Text(l10n.cancel)),
               FilledButton(
                 style: FilledButton.styleFrom(
                     backgroundColor: isPending
@@ -431,7 +436,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           // boxesOnly mode: add boxes, with or without pending
                           final boxes = int.tryParse(boxesCtrl.text) ?? 0;
                           if (boxes <= 0) {
-                            setS(() => err = '请输入有效箱数');
+                            setS(() => err = l10n.invDetailErrInvalidBoxes);
                             return;
                           }
                           setS(() { saving = true; err = null; });
@@ -448,7 +453,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
-                            setS(() { saving = false; err = _friendly(e); });
+                            setS(() { saving = false; err = _friendly(e, l10n); });
                           }
                           return;
                         }
@@ -464,7 +469,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
-                            setS(() { saving = false; err = _friendly(e); });
+                            setS(() { saving = false; err = _friendly(e, l10n); });
                           }
                           return;
                         }
@@ -473,13 +478,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           boxes = int.tryParse(boxesCtrl.text) ?? 0;
                           units = int.tryParse(unitsCtrl.text) ?? 0;
                           if (boxes <= 0 || units <= 0) {
-                            setS(() => err = '请输入有效的箱数和每箱件数');
+                            setS(() => err = l10n.invDetailErrInvalidBoxesAndUnits);
                             return;
                           }
                         } else {
                           final qty = int.tryParse(qtyCtrl.text) ?? 0;
                           if (qty <= 0) {
-                            setS(() => err = '请输入有效件数');
+                            setS(() => err = l10n.invDetailErrInvalidQty);
                             return;
                           }
                           boxes = 1;
@@ -498,12 +503,12 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           widget.onChanged?.call();
                           _load();
                         } catch (e) {
-                          setS(() { saving = false; err = _friendly(e); });
+                          setS(() { saving = false; err = _friendly(e, l10n); });
                         }
                       },
                 child: saving
                     ? _spinner()
-                    : Text(isPending ? '确认暂存' : '确认入库'),
+                    : Text(isPending ? l10n.invDetailConfirmPendingBtn : l10n.invDetailConfirmStockIn),
               ),
             ],
           );
@@ -519,6 +524,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
   // ── 出库 ──
   Future<void> _showStockOutDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     final effectiveConfigs = _configs.isNotEmpty
         ? _configs
         : (_boxes > 0
@@ -582,11 +588,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Text('出库总量: ', style: TextStyle(fontSize: 13)),
+                    Text(l10n.invDetailOutTotal, style: const TextStyle(fontSize: 13)),
                     Text(
                       stockOutMode == 'boxesOnly'
-                          ? '$totalOutBoxes 箱'
-                          : '$previewOut 件',
+                          ? l10n.invDetailOutBoxesValue(totalOutBoxes)
+                          : l10n.invDetailOutPcsValue(previewOut),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -601,10 +607,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         (previewOut > 0 || totalOutBoxes > 0)) ...[
                       Text(
                         stockOutMode == 'carton'
-                            ? '  →  剩余 ${totalAvailableBoxes - totalOutBoxes} 箱'
+                            ? l10n.invDetailRemainCartonBoxes(totalAvailableBoxes - totalOutBoxes)
                             : stockOutMode == 'boxesOnly'
-                                ? '  →  剩余 ${_boxes - totalOutBoxes} 箱'
-                                : '  →  剩余 ${_qty - previewOut} 件',
+                                ? l10n.invDetailRemainBoxes(_boxes - totalOutBoxes)
+                                : l10n.invDetailRemainPcs(_qty - previewOut),
                         style: TextStyle(
                             fontSize: 12, color: Colors.grey.shade500),
                       ),
@@ -614,7 +620,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               );
 
           return AlertDialog(
-            title: const Text('出库'),
+            title: Text(l10n.invDetailStockOutTitle),
             content: SizedBox(
               width: 340,
               child: SingleChildScrollView(
@@ -636,7 +642,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           Text('${widget.skuCode}  @  ${widget.locationCode}',
                               style: const TextStyle(
                                   fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text('当前库存: $_qtyLabel',
+                          Text(l10n.invDetailCurrentStock(_qtyLabel(l10n)),
                               style: TextStyle(
                                   fontSize: 12, color: Colors.red.shade700)),
                         ],
@@ -646,19 +652,19 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
                     // Mode toggle — 3 options
                     SegmentedButton<String>(
-                      segments: const [
+                      segments: [
                         ButtonSegment(
                             value: 'carton',
-                            label: Text('按箱规'),
-                            icon: Icon(Icons.view_list, size: 16)),
+                            label: Text(l10n.invDetailModeByCarton),
+                            icon: const Icon(Icons.view_list, size: 16)),
                         ButtonSegment(
                             value: 'boxesOnly',
-                            label: Text('仅箱数'),
-                            icon: Icon(Icons.inventory_2_outlined, size: 16)),
+                            label: Text(l10n.invDetailModeBoxesOnly),
+                            icon: const Icon(Icons.inventory_2_outlined, size: 16)),
                         ButtonSegment(
                             value: 'qty',
-                            label: Text('按总数量'),
-                            icon: Icon(Icons.numbers, size: 16)),
+                            label: Text(l10n.invDetailModeByQty),
+                            icon: const Icon(Icons.numbers, size: 16)),
                       ],
                       selected: {stockOutMode},
                       onSelectionChanged: (v) =>
@@ -669,12 +675,12 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     // ── 按箱规 mode ──
                     if (stockOutMode == 'carton') ...[
                       if (effectiveConfigs.isEmpty)
-                        Text('当前无箱规数据，请使用其他模式',
+                        Text(l10n.invDetailNoCartonData,
                             style: TextStyle(
                                 color: Colors.grey.shade500, fontSize: 13))
                       else ...[
-                        const Text('选择出库箱数:',
-                            style: TextStyle(
+                        Text(l10n.invDetailSelectOutBoxes,
+                            style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
                         ...List.generate(effectiveConfigs.length, (i) {
@@ -699,11 +705,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
                                     children: [
-                                      Text('${cfg.unitsPerBox}件/箱',
+                                      Text(l10n.invDetailUnitsPerBoxDisplay(cfg.unitsPerBox),
                                           style: const TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600)),
-                                      Text('共${cfg.boxes}箱',
+                                      Text(l10n.invDetailTotalBoxesDisplay(cfg.boxes),
                                           style: TextStyle(
                                               fontSize: 10,
                                               color: Colors.grey.shade500)),
@@ -716,19 +722,19 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                     controller: configCtrls[i],
                                     keyboardType: TextInputType.number,
                                     decoration: InputDecoration(
-                                      labelText: '出库 (最多${cfg.boxes}箱)',
+                                      labelText: l10n.invDetailOutMaxBoxes(cfg.boxes),
                                       border: const OutlineInputBorder(),
                                       isDense: true,
-                                      suffixText: '箱',
+                                      suffixText: l10n.invDetailBoxesSuffix,
                                       errorText: overLimit
-                                          ? '超出可用${cfg.boxes}箱'
+                                          ? l10n.invDetailExceedBoxes(cfg.boxes)
                                           : null,
                                     ),
                                     onChanged: (_) => setS(() {}),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text('= $outQty件',
+                                Text(l10n.invDetailEqPcs(outQty),
                                     style: TextStyle(
                                         color: overLimit
                                             ? Colors.red
@@ -747,15 +753,15 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         controller: boxesOnlyCtrl,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          labelText: '出库箱数 * (最多 $_boxes 箱)',
+                          labelText: l10n.invDetailOutBoxesLabel(_boxes),
                           border: const OutlineInputBorder(),
                           isDense: true,
-                          suffixText: '箱',
+                          suffixText: l10n.invDetailBoxesSuffix,
                         ),
                         onChanged: (_) => setS(() {}),
                       ),
                       const SizedBox(height: 6),
-                      Text('适用：箱规不确定，仅按箱数出库。',
+                      Text(l10n.invDetailBoxesOnlyHelp,
                           style: TextStyle(
                               fontSize: 12, color: Colors.grey.shade600)),
                     ],
@@ -765,11 +771,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       TextField(
                         controller: qtyCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: '出库件数 *',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.invDetailOutQtyLabel,
+                          border: const OutlineInputBorder(),
                           isDense: true,
-                          suffixText: '件',
+                          suffixText: l10n.invDetailPieceSuffix,
                         ),
                         onChanged: (_) => setS(() {}),
                       ),
@@ -792,7 +798,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => ctx.pop(), child: const Text('取消')),
+              TextButton(onPressed: () => ctx.pop(), child: Text(l10n.cancel)),
               FilledButton(
                 style:
                     FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -807,23 +813,23 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             final outBoxes =
                                 int.tryParse(configCtrls[i].text) ?? 0;
                             if (outBoxes < 0) {
-                              setS(() => err = '出库箱数不能为负数');
+                              setS(() => err = l10n.invDetailErrNegativeBoxes);
                               return;
                             }
                             if (outBoxes > effectiveConfigs[i].boxes) {
                               setS(() => err =
-                                  '${effectiveConfigs[i].unitsPerBox}件/箱：超过可用箱数 (${effectiveConfigs[i].boxes} 箱)');
+                                  l10n.invDetailErrExceedCartonBoxes(effectiveConfigs[i].unitsPerBox, effectiveConfigs[i].boxes));
                               return;
                             }
                           }
                           qty = configTotal;
                           if (qty <= 0) {
-                            setS(() => err = '请至少输入一种箱规的出库数量');
+                            setS(() => err = l10n.invDetailErrAtLeastOneCarton);
                             return;
                           }
                           if (totalOutBoxes > totalAvailableBoxes) {
                             setS(() => err =
-                                '出库数量不能超过当前库存（$totalAvailableBoxes 箱）');
+                                l10n.invDetailErrExceedStockBoxes(totalAvailableBoxes));
                             return;
                           }
                           removalConfigs = List.generate(
@@ -842,12 +848,12 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           final outBoxes =
                               int.tryParse(boxesOnlyCtrl.text) ?? 0;
                           if (outBoxes <= 0) {
-                            setS(() => err = '请输入有效箱数');
+                            setS(() => err = l10n.invDetailErrInvalidBoxes);
                             return;
                           }
                           if (outBoxes > _boxes) {
                             setS(() => err =
-                                '出库数量不能超过当前库存（$_boxes 箱）');
+                                l10n.invDetailErrExceedStockBoxes(_boxes));
                             return;
                           }
                           // send as configurations so backend handles boxes correctly
@@ -858,12 +864,12 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         } else {
                           qty = int.tryParse(qtyCtrl.text) ?? 0;
                           if (qty <= 0) {
-                            setS(() => err = '请输入有效件数');
+                            setS(() => err = l10n.invDetailErrInvalidQty);
                             return;
                           }
                           if (_qty > 0 && qty > _qty) {
                             setS(() => err =
-                                '出库数量不能超过当前库存（$_qty 件）');
+                                l10n.invDetailErrExceedStockPcs(_qty));
                             return;
                           }
                         }
@@ -886,11 +892,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         } catch (e) {
                           setS(() {
                             saving = false;
-                            err = _friendly(e);
+                            err = _friendly(e, l10n);
                           });
                         }
                       },
-                child: saving ? _spinner() : const Text('确认出库'),
+                child: saving ? _spinner() : Text(l10n.invDetailConfirmStockOut),
               ),
             ],
           );
@@ -908,6 +914,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
   // ── 库存调整（4种模式：按总数量 / 按箱规 / 仅箱数 / SKU更正） ──
   Future<void> _showAdjustDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     // 'qty' | 'boxes_only' | 'configs' | 'sku_correct'
     String adjustMode = _configs.isNotEmpty ? 'configs' : 'qty';
 
@@ -1003,7 +1010,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           Text('${widget.skuCode}  @  ${widget.locationCode}',
                               style: const TextStyle(
                                   fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text('当前库存: $_qtyLabel',
+                          Text(l10n.invDetailCurrentStock(_qtyLabel(l10n)),
                               style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.orange.shade700)),
@@ -1021,17 +1028,17 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   TextField(
                     controller: qtyCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '调整后总件数 *',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.invDetailAdjustedTotalLabel,
+                      border: const OutlineInputBorder(),
                       isDense: true,
-                      suffixText: '件',
+                      suffixText: l10n.invDetailPieceSuffix,
                     ),
                     onChanged: (_) => setS(() {}),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '适用场景：盘点差异、货损等，直接修正总件数。',
+                    l10n.invDetailAdjustQtyHelp,
                     style: TextStyle(
                         fontSize: 12, color: Colors.grey.shade600),
                   ),
@@ -1045,7 +1052,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '每箱件数保持不变，仅修改各规格箱数：',
+                    l10n.invDetailBoxesOnlyPanelHelp,
                     style: TextStyle(
                         fontSize: 12, color: Colors.grey.shade600),
                   ),
@@ -1077,7 +1084,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                     style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold)),
-                                Text('件/箱',
+                                Text(l10n.invDetailUnitsPerBoxSuffix,
                                     style: TextStyle(
                                         fontSize: 10,
                                         color: Colors.grey.shade500)),
@@ -1090,11 +1097,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             child: TextField(
                               controller: ctrl,
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '箱数',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                labelText: l10n.invDetailBoxesAdjustLabel,
+                                border: const OutlineInputBorder(),
                                 isDense: true,
-                                suffixText: '箱',
+                                suffixText: l10n.invDetailBoxesSuffix,
                               ),
                               onChanged: (_) => setS(() {}),
                             ),
@@ -1104,7 +1111,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           SizedBox(
                             width: 48,
                             child: Text(
-                              '=${b * u}件',
+                              l10n.invDetailSubtotalPcs(b * u),
                               style: TextStyle(
                                   color: Colors.grey.shade500,
                                   fontSize: 11),
@@ -1126,17 +1133,17 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
-                        child: Text('各箱规库存（最多3组）:',
-                            style: TextStyle(
+                      Expanded(
+                        child: Text(l10n.invDetailCartonGroupsLabel,
+                            style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600)),
                       ),
                       if (configRows.length < 3)
                         TextButton.icon(
                           icon: const Icon(Icons.add, size: 15),
-                          label: const Text('新增箱规',
-                              style: TextStyle(fontSize: 12)),
+                          label: Text(l10n.invDetailAddCarton,
+                              style: const TextStyle(fontSize: 12)),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
@@ -1152,7 +1159,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   if (configRows.isEmpty)
                     TextButton.icon(
                       icon: const Icon(Icons.add_box_outlined),
-                      label: const Text('添加第一组箱规'),
+                      label: Text(l10n.invDetailAddFirstCarton),
                       onPressed: () => addConfigRow(setS),
                     )
                   else
@@ -1190,11 +1197,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               child: TextField(
                                 controller: row['units'],
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: '件/箱',
-                                  border: OutlineInputBorder(),
+                                decoration: InputDecoration(
+                                  labelText: l10n.invDetailUnitsPerBoxLabel,
+                                  border: const OutlineInputBorder(),
                                   isDense: true,
-                                  suffixText: '件',
+                                  suffixText: l10n.invDetailPieceSuffix,
                                 ),
                                 onChanged: (_) => setS(() {}),
                               ),
@@ -1205,11 +1212,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               child: TextField(
                                 controller: row['boxes'],
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: '箱数',
-                                  border: OutlineInputBorder(),
+                                decoration: InputDecoration(
+                                  labelText: l10n.invDetailBoxesAdjustLabel,
+                                  border: const OutlineInputBorder(),
                                   isDense: true,
-                                  suffixText: '箱',
+                                  suffixText: l10n.invDetailBoxesSuffix,
                                 ),
                                 onChanged: (_) => setS(() {}),
                               ),
@@ -1219,7 +1226,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             SizedBox(
                               width: 44,
                               child: Text(
-                                '=${b * u}件',
+                                l10n.invDetailSubtotalPcs(b * u),
                                 style: TextStyle(
                                     color: Colors.grey.shade500,
                                     fontSize: 11),
@@ -1264,7 +1271,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     ),
                     child: Row(
                       children: [
-                        Text('当前：',
+                        Text(l10n.invDetailSkuCorrectCurrent,
                             style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600)),
@@ -1277,7 +1284,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             color: Colors.purple.shade400),
                         const SizedBox(width: 8),
                         Text(
-                          selectedCorrectSku?.sku ?? '（请从下方选择）',
+                          selectedCorrectSku?.sku ?? l10n.invDetailSkuCorrectSelectHint,
                           style: TextStyle(
                             fontWeight: selectedCorrectSku != null
                                 ? FontWeight.bold
@@ -1298,7 +1305,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   const SizedBox(height: 10),
                   // SKU search
                   _SkuSearchField(
-                    labelText: '搜索新 SKU 编码或名称',
+                    labelText: l10n.invDetailSkuCorrectSearch,
                     excludeSkuCode: widget.skuCode,
                     onSelected: (sku) => setS(() => selectedCorrectSku = sku),
                   ),
@@ -1316,7 +1323,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         Icon(Icons.inventory_2_outlined,
                             size: 14, color: Colors.grey.shade500),
                         const SizedBox(width: 6),
-                        Text('库存数量 $_qtyLabel 将保留不变',
+                        Text(l10n.invDetailQtyRetained(_qtyLabel(l10n)),
                             style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600)),
@@ -1327,7 +1334,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               );
 
           return AlertDialog(
-            title: const Text('库存调整'),
+            title: Text(l10n.invDetailAdjustTitle),
             contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             content: SizedBox(
               width: 360,
@@ -1346,26 +1353,26 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         style: SegmentedButton.styleFrom(
                           textStyle: const TextStyle(fontSize: 11),
                         ),
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: 'qty',
-                            label: Text('总数量'),
-                            icon: Icon(Icons.numbers, size: 14),
+                            label: Text(l10n.invDetailAdjustModeQty),
+                            icon: const Icon(Icons.numbers, size: 14),
                           ),
                           ButtonSegment(
                             value: 'boxes_only',
-                            label: Text('仅箱数'),
-                            icon: Icon(Icons.view_column, size: 14),
+                            label: Text(l10n.invDetailAdjustModeBoxesOnly),
+                            icon: const Icon(Icons.view_column, size: 14),
                           ),
                           ButtonSegment(
                             value: 'configs',
-                            label: Text('按箱规'),
-                            icon: Icon(Icons.view_list, size: 14),
+                            label: Text(l10n.invDetailAdjustModeCarton),
+                            icon: const Icon(Icons.view_list, size: 14),
                           ),
                           ButtonSegment(
                             value: 'sku_correct',
-                            label: Text('SKU更正'),
-                            icon: Icon(Icons.find_replace, size: 14),
+                            label: Text(l10n.invDetailAdjustModeSkuCorrect),
+                            icon: const Icon(Icons.find_replace, size: 14),
                           ),
                         ],
                         selected: {adjustMode},
@@ -1392,13 +1399,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       maxLines: 2,
                       decoration: InputDecoration(
                         labelText: adjustMode == 'sku_correct'
-                            ? '更正原因 *（必填）'
-                            : '调整原因 *（必填）',
+                            ? l10n.invDetailReasonSkuCorrect
+                            : l10n.invDetailReasonAdjust,
                         border: const OutlineInputBorder(),
                         isDense: true,
                         helperText: adjustMode == 'sku_correct'
-                            ? '例：录错货号、暂存转正式SKU'
-                            : '例：盘点差异、货损、退货补库',
+                            ? l10n.invDetailReasonSkuCorrectHint
+                            : l10n.invDetailReasonAdjustHint,
                       ),
                     ),
 
@@ -1416,7 +1423,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
             actions: [
               TextButton(
                   onPressed: () => ctx.pop(),
-                  child: const Text('取消')),
+                  child: Text(l10n.cancel)),
               FilledButton(
                 style: FilledButton.styleFrom(
                     backgroundColor: adjustMode == 'sku_correct'
@@ -1427,23 +1434,23 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     : () async {
                         final note = noteCtrl.text.trim();
                         if (note.isEmpty) {
-                          setS(() => err = '请填写原因（必填）');
+                          setS(() => err = l10n.invDetailErrReasonRequired);
                           return;
                         }
 
                         // ── SKU更正 submit ──
                         if (adjustMode == 'sku_correct') {
                           if (selectedCorrectSku == null) {
-                            setS(() => err = '请从下拉列表中选择新 SKU');
+                            setS(() => err = l10n.invDetailErrSelectNewSku);
                             return;
                           }
                           if (selectedCorrectSku!.sku.toUpperCase() ==
                               widget.skuCode.toUpperCase()) {
-                            setS(() => err = '新旧 SKU 不能相同');
+                            setS(() => err = l10n.invDetailErrSameSkuNotAllowed);
                             return;
                           }
                           if (widget.inventoryRecordId == null) {
-                            setS(() => err = '无法获取库存记录 ID，请关闭后重试');
+                            setS(() => err = l10n.invDetailErrNoInventoryId);
                             return;
                           }
                           setS(() { saving = true; err = null; });
@@ -1467,18 +1474,18 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               final confirm = await showDialog<bool>(
                                 context: ctx,
                                 builder: (c) => AlertDialog(
-                                  title: const Text('目标SKU已有库存'),
+                                  title: Text(l10n.invDetailMergeConfirmTitle),
                                   content: Text(msg),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(c, false),
-                                      child: const Text('取消'),
+                                      child: Text(l10n.cancel),
                                     ),
                                     FilledButton(
                                       style: FilledButton.styleFrom(
                                           backgroundColor: Colors.orange),
                                       onPressed: () => Navigator.pop(c, true),
-                                      child: const Text('确认合并'),
+                                      child: Text(l10n.invDetailMergeConfirm),
                                     ),
                                   ],
                                 ),
@@ -1497,10 +1504,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                 widget.onChanged?.call();
                                 _load();
                               } catch (e2) {
-                                setS(() { saving = false; err = _friendly(e2); });
+                                setS(() { saving = false; err = _friendly(e2, l10n); });
                               }
                             } else {
-                              setS(() => err = _friendly(e));
+                              setS(() => err = _friendly(e, l10n));
                             }
                           }
                           return;
@@ -1519,7 +1526,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             };
                           }).toList();
                           if (configs.every((c) => c['boxes']! <= 0)) {
-                            setS(() => err = '至少填写一组的箱数（> 0）');
+                            setS(() => err = l10n.invDetailErrAtLeastOneBoxesGroup);
                             return;
                           }
                           // Filter out zero-box specs
@@ -1543,7 +1550,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           } catch (e) {
                             setS(() {
                               saving = false;
-                              err = _friendly(e);
+                              err = _friendly(e, l10n);
                             });
                           }
                           return;
@@ -1552,7 +1559,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         // ── 按箱规 submit ──
                         if (adjustMode == 'configs') {
                           if (configRows.isEmpty) {
-                            setS(() => err = '至少需要一组箱规');
+                            setS(() => err = l10n.invDetailErrAtLeastOneCartonGroup);
                             return;
                           }
                           final configs = configRows.map((row) {
@@ -1562,7 +1569,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           }).toList();
                           if (configs.any(
                               (c) => c['boxes']! <= 0 || c['unitsPerBox']! <= 0)) {
-                            setS(() => err = '请输入有效的箱数和每箱件数（均需 > 0）');
+                            setS(() => err = l10n.invDetailErrValidCartonGroup);
                             return;
                           }
                           setS(() { saving = true; err = null; });
@@ -1578,7 +1585,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
-                            setS(() { saving = false; err = _friendly(e); });
+                            setS(() { saving = false; err = _friendly(e, l10n); });
                           }
                           return;
                         }
@@ -1586,7 +1593,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         // ── 按总数量 submit ──
                         final qty = int.tryParse(qtyCtrl.text);
                         if (qty == null || qty < 0) {
-                          setS(() => err = '请输入有效件数（≥ 0）');
+                          setS(() => err = l10n.invDetailErrValidQtyGte0);
                           return;
                         }
                         setS(() { saving = true; err = null; });
@@ -1602,16 +1609,16 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           widget.onChanged?.call();
                           _load();
                         } catch (e) {
-                          setS(() { saving = false; err = _friendly(e); });
+                          setS(() { saving = false; err = _friendly(e, l10n); });
                         }
                       },
                 child: saving
                     ? _spinner()
                     : Text(adjustMode == 'sku_correct'
-                        ? '确认更正'
+                        ? l10n.invDetailConfirmSkuCorrect
                         : adjustMode == 'boxes_only'
-                            ? '确认箱数调整'
-                            : '确认调整'),
+                            ? l10n.invDetailConfirmBoxesAdjust
+                            : l10n.invDetailConfirmAdjust),
               ),
             ],
           );
@@ -1639,11 +1646,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: Colors.orange.shade200),
         ),
-        child: Row(
+        child: Builder(builder: (context) {
+          final l10n = AppLocalizations.of(context)!;
+          return Row(
           children: [
-            const Text('调整后总库存: ', style: TextStyle(fontSize: 13)),
+            Text(l10n.invDetailAdjustedTotalRow, style: const TextStyle(fontSize: 13)),
             Text(
-              '$previewTotal 件',
+              '$previewTotal ${l10n.invDetailPieceSuffix}',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
@@ -1663,21 +1672,23 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               ),
             ],
           ],
-        ),
+          );
+        }),
       );
 
   // ── 共用 helper widgets ──
   Widget _qtyRow(TextEditingController boxesCtrl, TextEditingController unitsCtrl,
       {VoidCallback? onChanged}) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
         Expanded(
           child: TextField(
             controller: boxesCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: '箱数 *', border: OutlineInputBorder(),
-              isDense: true, suffixText: '箱',
+            decoration: InputDecoration(
+              labelText: l10n.invDetailBoxesLabelStar, border: const OutlineInputBorder(),
+              isDense: true, suffixText: l10n.invDetailBoxesSuffix,
             ),
             onChanged: onChanged != null ? (_) => onChanged() : null,
           ),
@@ -1687,9 +1698,9 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
           child: TextField(
             controller: unitsCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: '每箱件数 *', border: OutlineInputBorder(),
-              isDense: true, suffixText: '件/箱',
+            decoration: InputDecoration(
+              labelText: l10n.invDetailUnitsLabelStar, border: const OutlineInputBorder(),
+              isDense: true, suffixText: l10n.invDetailUnitsPerBoxSuffix,
             ),
             onChanged: onChanged != null ? (_) => onChanged() : null,
           ),
@@ -1698,12 +1709,15 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     );
   }
 
-  Widget _noteField(TextEditingController ctrl) => TextField(
-        controller: ctrl,
-        decoration: const InputDecoration(
-          labelText: '备注（可选）', border: OutlineInputBorder(), isDense: true,
-        ),
-      );
+  Widget _noteField(TextEditingController ctrl) {
+    final l10n = AppLocalizations.of(context)!;
+    return TextField(
+      controller: ctrl,
+      decoration: InputDecoration(
+        labelText: l10n.invDetailNoteOptional, border: const OutlineInputBorder(), isDense: true,
+      ),
+    );
+  }
 
 
   Widget _spinner() => const SizedBox(
@@ -1713,6 +1727,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -1774,14 +1789,14 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       const SizedBox(height: 2),
                       Text(
                         _quantityUnknown
-                            ? '待补充库存信息'
+                            ? l10n.invDetailQtyUnknownHeader
                             : (_configs.isEmpty
                                 ? (_boxesOnlyMode
-                                    ? '$_boxes箱 · 箱规待确认'
-                                    : '$_boxes箱 · $_qty件')
+                                    ? l10n.invDetailBoxesOnlyHeader(_boxes)
+                                    : l10n.invDetailBoxesAndPcs(_boxes, _qty))
                                 : _configs
                                     .map((c) =>
-                                        '${c.boxes}箱 · ${c.qty}件')
+                                        l10n.invDetailBoxesAndPcs(c.boxes, c.qty))
                                     .join('  ·  ')),
                         style: const TextStyle(
                             color: Color(0xFF8E8E9A), fontSize: 12),
@@ -1803,7 +1818,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 children: [
                   if (_canStockIn) ...[
                     _FigmaActionBtn(
-                      label: '入库',
+                      label: l10n.invDetailStockIn,
                       icon: Icons.south_outlined,
                       bg: const Color(0xFFEEF6EF),
                       border: const Color(0xFFD4E8D8),
@@ -1815,7 +1830,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     const SizedBox(width: 10),
                   if (_canStockOut) ...[
                     _FigmaActionBtn(
-                      label: '出库',
+                      label: l10n.invDetailStockOut,
                       icon: Icons.north_outlined,
                       bg: const Color(0xFFFEF2F2),
                       border: const Color(0xFFF0D4D4),
@@ -1826,7 +1841,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   if (_canStockOut && _canAdjust) const SizedBox(width: 10),
                   if (_canAdjust) ...[
                     _FigmaActionBtn(
-                      label: '库存调整',
+                      label: l10n.invDetailAdjust,
                       icon: Icons.tune,
                       bg: const Color(0xFFFDF5E8),
                       border: const Color(0xFFEDDCB8),
@@ -1848,8 +1863,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.check_circle_outline,
                           size: 15, color: Colors.teal),
-                      label: const Text('确认为正式',
-                          style: TextStyle(color: Colors.teal, fontSize: 12)),
+                      label: Text(l10n.invDetailConfirmPendingLabel,
+                          style: const TextStyle(color: Colors.teal, fontSize: 12)),
                       style: OutlinedButton.styleFrom(
                         side:
                             BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
@@ -1863,9 +1878,9 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.call_split,
                           size: 15, color: Colors.deepPurple),
-                      label: const Text('拆分为正式SKU',
+                      label: Text(l10n.invDetailSplitPendingLabel,
                           style:
-                              TextStyle(color: Colors.deepPurple, fontSize: 12)),
+                              const TextStyle(color: Colors.deepPurple, fontSize: 12)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
                             color: Colors.deepPurple.withValues(alpha: 0.5)),
@@ -1895,7 +1910,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           color: const Color(0xFF4A6CF7).withValues(alpha: 0.7)),
                       const SizedBox(width: 4),
                       Text(
-                        'SKU 详情',
+                        l10n.invDetailSkuDetail,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -1923,7 +1938,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           color: const Color(0xFF4A6CF7).withValues(alpha: 0.7)),
                       const SizedBox(width: 4),
                       Text(
-                        '库位详情',
+                        l10n.invDetailLocDetail,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -1947,15 +1962,15 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
             padding: const EdgeInsets.fromLTRB(24, 17, 24, 0),
             child: Row(
               children: [
-                const Text(
-                  '最近操作',
-                  style: TextStyle(fontSize: 11, color: Color(0xFFB5B5C0)),
+                Text(
+                  l10n.invDetailRecentOps,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFFB5B5C0)),
                 ),
                 const Spacer(),
                 GestureDetector(
                   onTap: _viewAllHistory,
                   child: Text(
-                    '查看全部记录',
+                    l10n.invDetailViewAll,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
@@ -1975,20 +1990,20 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     ? Center(
                         child: TextButton.icon(
                           icon: const Icon(Icons.refresh),
-                          label: const Text('加载失败，点击重试'),
+                          label: Text(l10n.invDetailLoadFailed),
                           onPressed: _load,
                         ))
                     : (_recentRecords == null || _recentRecords!.isEmpty)
-                        ? const Center(
+                        ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.history_outlined,
+                                const Icon(Icons.history_outlined,
                                     size: 24, color: Color(0xFFC5C5CE)),
-                                SizedBox(height: 8),
+                                const SizedBox(height: 8),
                                 Text(
-                                  '暂无操作记录',
-                                  style: TextStyle(
+                                  l10n.invDetailNoRecords,
+                                  style: const TextStyle(
                                       color: Color(0xFFC5C5CE),
                                       fontSize: 12),
                                 ),
@@ -2008,7 +2023,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                   child: OutlinedButton.icon(
                                     icon: const Icon(Icons.history,
                                         size: 16),
-                                    label: const Text('查看全部记录'),
+                                    label: Text(l10n.invDetailViewAll),
                                     onPressed: _viewAllHistory,
                                   ),
                                 );
@@ -2026,6 +2041,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
   // ── 确认为正式 ──
   Future<void> _showConfirmPendingDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     final noteCtrl = TextEditingController();
     bool changeSku = false;
     Sku? selectedNewSku;
@@ -2036,7 +2052,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: const Text('确认为正式库存'),
+          title: Text(l10n.invDetailConfirmOfficialTitle),
           content: SizedBox(
             width: 340,
             child: SingleChildScrollView(
@@ -2064,8 +2080,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             style: TextStyle(
                                 fontSize: 12, color: Colors.grey.shade600)),
                         const SizedBox(height: 2),
-                        const Text('暂存 → 正式库存',
-                            style: TextStyle(
+                        Text(l10n.invDetailPendingToOfficial,
+                            style: const TextStyle(
                                 fontSize: 11, color: Colors.teal,
                                 fontWeight: FontWeight.w500)),
                       ],
@@ -2084,13 +2100,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         }),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      const Text('同时更正SKU编码', style: TextStyle(fontSize: 13)),
+                      Text(l10n.invDetailCorrectSkuCode, style: const TextStyle(fontSize: 13)),
                     ],
                   ),
                   if (changeSku) ...[
                     const SizedBox(height: 6),
                     _SkuSearchField(
-                      labelText: '搜索新 SKU 编码或名称',
+                      labelText: l10n.invDetailSearchNewSku,
                       excludeSkuCode: widget.skuCode,
                       onSelected: (sku) => setS(() {
                         selectedNewSku = sku;
@@ -2105,10 +2121,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   TextField(
                     controller: noteCtrl,
                     maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: '原因 *',
-                      hintText: '请说明确认原因',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.invDetailConfirmReasonLabel,
+                      hintText: l10n.invDetailConfirmReasonHint,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     onChanged: (_) => setS(() => err = null),
@@ -2126,7 +2142,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
           actions: [
             TextButton(
               onPressed: saving ? null : () => Navigator.pop(ctx),
-              child: const Text('取消'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: saving
@@ -2134,11 +2150,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   : () async {
                       final note = noteCtrl.text.trim();
                       if (note.isEmpty) {
-                        setS(() => err = '请填写原因');
+                        setS(() => err = l10n.invDetailErrReasonEmpty);
                         return;
                       }
                       if (changeSku && selectedNewSku == null) {
-                        setS(() => err = '请从下拉列表中选择新SKU编码');
+                        setS(() => err = l10n.invDetailErrSelectNewSkuCode);
                         return;
                       }
 
@@ -2155,12 +2171,12 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           await _load();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('已确认为正式库存')),
+                              SnackBar(content: Text(l10n.invDetailConfirmedOfficial)),
                             );
                           }
                         }
                       } catch (e) {
-                        setS(() { saving = false; err = _friendly(e); });
+                        setS(() { saving = false; err = _friendly(e, l10n); });
                       }
                     },
               style: FilledButton.styleFrom(backgroundColor: Colors.teal),
@@ -2169,7 +2185,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       width: 16, height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2,
                           color: Colors.white))
-                  : const Text('确认转正式'),
+                  : Text(l10n.invDetailConfirmToOfficial),
             ),
           ],
         ),
@@ -2180,18 +2196,19 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
   // ── 拆分为多个正式SKU ──
   Future<void> _showSplitPendingDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     final noteCtrl = TextEditingController();
 
     // ── Source metadata ───────────────────────────────────────────────────────
     // Infer source recording mode from the live record state.
     final validateInBoxes = _boxesOnlyMode; // box-space vs piece-space balance
     final originalAmount  = validateInBoxes ? _boxes : _qty;
-    final amountUnit      = validateInBoxes ? '箱' : '件';
+    final amountUnit      = validateInBoxes ? l10n.invDetailBoxesSuffix : l10n.invDetailPieceSuffix;
     final sourceLabel     = _boxesOnlyMode
-        ? '仅箱数'
+        ? l10n.invDetailSourceModeBoxesOnly
         : (_configs.isEmpty && _boxes <= 1 && _qty > 0)
-            ? '按总数量'
-            : '按箱规';
+            ? l10n.invDetailSourceModeQty
+            : l10n.invDetailSourceModeCarton;
     // Default mode for each split target mirrors the source recording mode.
     final defaultMode = _boxesOnlyMode
         ? 'boxesOnly'
@@ -2244,7 +2261,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
           final balanced = total == originalAmount;
 
           return AlertDialog(
-            title: const Text('拆分为正式SKU'),
+            title: Text(l10n.invDetailSplitTitle),
             content: SizedBox(
               width: 380,
               child: SingleChildScrollView(
@@ -2270,18 +2287,18 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('原暂存: ${widget.skuCode}',
+                                Text(l10n.invDetailSplitSource(widget.skuCode),
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13)),
                                 Text(
-                                  '${widget.locationCode}  ·  录入方式：$sourceLabel',
+                                  l10n.invDetailSplitSourceInfo(widget.locationCode, sourceLabel),
                                   style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.grey.shade600),
                                 ),
                                 Text(
-                                  '总量 $originalAmount $amountUnit  ·  按$amountUnit守恒',
+                                  l10n.invDetailSplitTotalConserve(originalAmount, amountUnit),
                                   style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.deepPurple.shade600,
@@ -2305,8 +2322,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             ),
                             child: Text(
                               balanced
-                                  ? '✓ 已平衡'
-                                  : '已分 $total / $originalAmount',
+                                  ? l10n.invDetailSplitBalanced
+                                  : l10n.invDetailSplitProgress(total, originalAmount),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: balanced
@@ -2361,7 +2378,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                     selectedSku != null
                                         ? '${selectedSku.sku}'
                                             '${selectedSku.name != null ? "  ${selectedSku.name}" : ""}'
-                                        : '未选择SKU',
+                                        : l10n.invDetailSplitNoSku,
                                     style: TextStyle(
                                       fontWeight: selectedSku != null
                                           ? FontWeight.w600
@@ -2391,23 +2408,23 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
                             // Mode selector (per entry, independently switchable)
                             SegmentedButton<String>(
-                              segments: const [
+                              segments: [
                                 ButtonSegment(
                                     value: 'carton',
-                                    label: Text('按箱规',
-                                        style: TextStyle(fontSize: 11)),
-                                    icon: Icon(Icons.view_list, size: 13)),
+                                    label: Text(l10n.invDetailSplitModeByCarton,
+                                        style: const TextStyle(fontSize: 11)),
+                                    icon: const Icon(Icons.view_list, size: 13)),
                                 ButtonSegment(
                                     value: 'boxesOnly',
-                                    label: Text('仅箱数',
-                                        style: TextStyle(fontSize: 11)),
-                                    icon: Icon(Icons.inventory_2_outlined,
+                                    label: Text(l10n.invDetailSplitModeBoxesOnly,
+                                        style: const TextStyle(fontSize: 11)),
+                                    icon: const Icon(Icons.inventory_2_outlined,
                                         size: 13)),
                                 ButtonSegment(
                                     value: 'qty',
-                                    label: Text('按总数量',
-                                        style: TextStyle(fontSize: 11)),
-                                    icon: Icon(Icons.numbers, size: 13)),
+                                    label: Text(l10n.invDetailSplitModeByQty,
+                                        style: const TextStyle(fontSize: 11)),
+                                    icon: const Icon(Icons.numbers, size: 13)),
                               ],
                               selected: {entryMode},
                               onSelectionChanged: (v) =>
@@ -2422,7 +2439,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
                             // SKU picker
                             _SkuSearchField(
-                              labelText: '搜索 SKU',
+                              labelText: l10n.invDetailSplitSearchSku,
                               onSelected: (sku) =>
                                   setS(() => s['sku'] = sku),
                             ),
@@ -2436,11 +2453,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                     child: TextField(
                                       controller: s['boxes']
                                           as TextEditingController,
-                                      decoration: const InputDecoration(
-                                        labelText: '箱数',
-                                        border: OutlineInputBorder(),
+                                      decoration: InputDecoration(
+                                        labelText: l10n.invDetailSplitBoxesLabel,
+                                        border: const OutlineInputBorder(),
                                         isDense: true,
-                                        suffixText: '箱',
+                                        suffixText: l10n.invDetailSplitBoxesSuffix,
                                       ),
                                       keyboardType: TextInputType.number,
                                       onChanged: (_) => setS(() {}),
@@ -2458,11 +2475,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                     child: TextField(
                                       controller: s['units']
                                           as TextEditingController,
-                                      decoration: const InputDecoration(
-                                        labelText: '件/箱',
-                                        border: OutlineInputBorder(),
+                                      decoration: InputDecoration(
+                                        labelText: l10n.invDetailSplitUnitsLabel,
+                                        border: const OutlineInputBorder(),
                                         isDense: true,
-                                        suffixText: '件/箱',
+                                        suffixText: l10n.invDetailSplitUnitsSuffix,
                                       ),
                                       keyboardType: TextInputType.number,
                                       onChanged: (_) => setS(() {}),
@@ -2470,7 +2487,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '= ${(int.tryParse((s['boxes'] as TextEditingController).text) ?? 0) * (int.tryParse((s['units'] as TextEditingController).text) ?? 0)} 件',
+                                    l10n.invDetailSplitCalcPcs((int.tryParse((s['boxes'] as TextEditingController).text) ?? 0) * (int.tryParse((s['units'] as TextEditingController).text) ?? 0)),
                                     style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey.shade600),
@@ -2484,18 +2501,18 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                     child: TextField(
                                       controller: s['boxes']
                                           as TextEditingController,
-                                      decoration: const InputDecoration(
-                                        labelText: '箱数',
-                                        border: OutlineInputBorder(),
+                                      decoration: InputDecoration(
+                                        labelText: l10n.invDetailSplitBoxesLabel,
+                                        border: const OutlineInputBorder(),
                                         isDense: true,
-                                        suffixText: '箱',
+                                        suffixText: l10n.invDetailSplitBoxesSuffix,
                                       ),
                                       keyboardType: TextInputType.number,
                                       onChanged: (_) => setS(() {}),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text('· 箱规待确认',
+                                  Text(l10n.invDetailSplitCartonTBD,
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.blue.shade600)),
@@ -2506,11 +2523,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               TextField(
                                 controller: s['totalQty']
                                     as TextEditingController,
-                                decoration: const InputDecoration(
-                                  labelText: '总件数',
-                                  border: OutlineInputBorder(),
+                                decoration: InputDecoration(
+                                  labelText: l10n.invDetailSplitTotalQtyLabel,
+                                  border: const OutlineInputBorder(),
                                   isDense: true,
-                                  suffixText: '件',
+                                  suffixText: l10n.invDetailSplitTotalQtySuffix,
                                 ),
                                 keyboardType: TextInputType.number,
                                 onChanged: (_) => setS(() {}),
@@ -2524,8 +2541,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     // Add split button
                     TextButton.icon(
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('添加拆分目标',
-                          style: TextStyle(fontSize: 13)),
+                      label: Text(l10n.invDetailAddSplitTarget,
+                          style: const TextStyle(fontSize: 13)),
                       onPressed: () => setS(() => splits.add(newEntry())),
                     ),
 
@@ -2535,10 +2552,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     TextField(
                       controller: noteCtrl,
                       maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: '拆分原因 *',
-                        hintText: '请说明拆分原因',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.invDetailSplitReasonLabel,
+                        hintText: l10n.invDetailSplitReasonHint,
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                       onChanged: (_) => setS(() => err = null),
@@ -2564,7 +2581,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         }
                         Navigator.pop(ctx);
                       },
-                child: const Text('取消'),
+                child: Text(l10n.cancel),
               ),
               FilledButton(
                 onPressed: saving
@@ -2572,7 +2589,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     : () async {
                         final note = noteCtrl.text.trim();
                         if (note.isEmpty) {
-                          setS(() => err = '请填写拆分原因');
+                          setS(() => err = l10n.invDetailErrSplitReasonEmpty);
                           return;
                         }
                         // Per-entry validation
@@ -2581,26 +2598,26 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           final mode = s['mode'] as String;
                           if (s['sku'] == null) {
                             setS(() =>
-                                err = '第 ${i + 1} 条：请从下拉列表中选择SKU');
+                                err = l10n.invDetailErrSplitSelectSku(i + 1));
                             return;
                           }
                           if (mode == 'carton') {
                             if ((int.tryParse((s['boxes'] as TextEditingController).text) ?? 0) <= 0) {
-                              setS(() => err = '第 ${i + 1} 条箱数必须大于0');
+                              setS(() => err = l10n.invDetailErrSplitBoxesMustBePositive(i + 1));
                               return;
                             }
                             if ((int.tryParse((s['units'] as TextEditingController).text) ?? 0) <= 0) {
-                              setS(() => err = '第 ${i + 1} 条件/箱必须大于0');
+                              setS(() => err = l10n.invDetailErrSplitUnitsMustBePositive(i + 1));
                               return;
                             }
                           } else if (mode == 'boxesOnly') {
                             if ((int.tryParse((s['boxes'] as TextEditingController).text) ?? 0) <= 0) {
-                              setS(() => err = '第 ${i + 1} 条箱数必须大于0');
+                              setS(() => err = l10n.invDetailErrSplitBoxesMustBePositive(i + 1));
                               return;
                             }
                           } else {
                             if ((int.tryParse((s['totalQty'] as TextEditingController).text) ?? 0) <= 0) {
-                              setS(() => err = '第 ${i + 1} 条总件数必须大于0');
+                              setS(() => err = l10n.invDetailErrSplitTotalQtyMustBePositive(i + 1));
                               return;
                             }
                           }
@@ -2609,7 +2626,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         final total = splitContrib(splits);
                         if (total != originalAmount) {
                           setS(() => err =
-                              '拆分总量 $total $amountUnit ≠ 原暂存 $originalAmount $amountUnit，请调整');
+                              l10n.invDetailErrSplitUnbalanced(total, originalAmount, amountUnit));
                           return;
                         }
                         // Build payload
@@ -2654,13 +2671,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             await _load();
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                     content:
-                                        Text('拆分成功，正式SKU已创建')));
+                                        Text(l10n.invDetailSplitSuccess)));
                             }
                           }
                         } catch (e) {
-                          setS(() { saving = false; err = _friendly(e); });
+                          setS(() { saving = false; err = _friendly(e, l10n); });
                         }
                       },
                 style: FilledButton.styleFrom(
@@ -2671,7 +2688,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                         height: 16,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
-                    : const Text('确认拆分'),
+                    : Text(l10n.invDetailConfirmSplit),
               ),
             ],
           );
@@ -2775,7 +2792,8 @@ class _AuditCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final time = DateFormat('MM-dd HH:mm').format(record.createdAt.toLocal());
     final color = _color;
-    final action = record.businessAction ?? '操作';
+    final l10n = AppLocalizations.of(context)!;
+    final action = record.businessAction ?? l10n.invDetailDefaultAction;
     final detail = _extractDetail();
 
     return Padding(
@@ -2946,7 +2964,7 @@ class _SkuSearchFieldState extends State<_SkuSearchField> {
             focusNode: _focusNode,
             decoration: InputDecoration(
               labelText: widget.labelText,
-              hintText: '输入编码或品名搜索',
+              hintText: AppLocalizations.of(context)!.invDetailSkuSearchHint,
               border: const OutlineInputBorder(),
               isDense: true,
               suffixIcon: _searching
@@ -2985,7 +3003,7 @@ class _SkuSearchFieldState extends State<_SkuSearchField> {
               child: _results.isEmpty
                   ? Padding(
                       padding: const EdgeInsets.all(12),
-                      child: Text('未找到匹配的SKU',
+                      child: Text(AppLocalizations.of(context)!.invDetailSkuNotFound,
                           style: TextStyle(
                               color: Colors.grey.shade500, fontSize: 13)),
                     )
@@ -3028,7 +3046,7 @@ class _SkuSearchFieldState extends State<_SkuSearchField> {
                                       color: Colors.grey.shade200,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: Text('已停用',
+                                    child: Text(AppLocalizations.of(context)!.invDetailSkuArchived,
                                         style: TextStyle(
                                             fontSize: 10,
                                             color: Colors.grey.shade500)),

@@ -58,7 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final msg = e.response?.data?['message'];
       setState(() => _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.loginFailedNetwork));
     } catch (e) {
-      setState(() => _error = '登录失败: $e');
+      setState(() => _error = AppLocalizations.of(context)!.loginFailedNetwork);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
