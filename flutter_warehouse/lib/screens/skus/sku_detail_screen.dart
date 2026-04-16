@@ -1308,7 +1308,7 @@ class _LocationCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        record.qtyDisplay,
+                        record.qtyDisplayL10n(l10n),
                         style: const TextStyle(fontSize: 12, color: _mutedColor),
                       ),
                     ],

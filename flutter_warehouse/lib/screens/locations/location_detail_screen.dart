@@ -1474,7 +1474,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                               ),
                             ),
                             Text(
-                              r.qtyDisplay,
+                              r.qtyDisplayL10n(l10n),
                               style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -1828,7 +1828,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                     spacing: 4,
                     children: noConflict
                         .map((r) => Chip(
-                              label: Text('${r.skuCode} · ${r.qtyDisplay}',
+                              label: Text('${r.skuCode} · ${r.qtyDisplayL10n(l10n)}',
                                   style:
                                       const TextStyle(fontSize: 11)),
                               visualDensity: VisualDensity.compact,

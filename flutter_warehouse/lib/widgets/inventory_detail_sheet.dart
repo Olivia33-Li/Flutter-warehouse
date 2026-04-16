@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/audit_log_detail_sheet.dart';
 import '../services/history_service.dart';
 import '../services/inventory_service.dart';
 import '../services/sku_service.dart';
@@ -2793,7 +2794,10 @@ class _AuditCard extends StatelessWidget {
     final time = DateFormat('MM-dd HH:mm').format(record.createdAt.toLocal());
     final color = _color;
     final l10n = AppLocalizations.of(context)!;
-    final action = record.businessAction ?? l10n.invDetailDefaultAction;
+    final action = AuditLogDetailSheet.translateAction(record.businessAction, l10n)
+        .isNotEmpty
+        ? AuditLogDetailSheet.translateAction(record.businessAction, l10n)
+        : l10n.invDetailDefaultAction;
     final detail = _extractDetail();
 
     return Padding(

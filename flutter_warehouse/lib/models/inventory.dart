@@ -1,3 +1,4 @@
+import '../l10n/app_localizations.dart';
 import 'location.dart';
 
 class InventoryConfig {
@@ -61,7 +62,21 @@ class InventoryRecord {
       ? configurations.fold(0, (s, c) => s + c.boxes)
       : boxes;
 
-  /// Human-readable quantity string. Use this for display instead of totalQty directly.
+  /// Human-readable quantity string with localization support.
+  String qtyDisplayL10n(AppLocalizations l10n) {
+    final box = l10n.unitBox;
+    final pcs = l10n.unitPiece;
+    if (quantityUnknown) return l10n.skuDetailQtyLinePending;
+    if (boxesOnlyMode) return '$totalBoxes $box';
+    if (configurations.length > 1) {
+      final parts = configurations.map((c) => '${c.boxes}$box·${c.unitsPerBox}$pcs/$box').join(' + ');
+      return '$parts = $totalQty $pcs';
+    }
+    if (unitsPerBox > 1) return '$totalBoxes$box · $totalQty$pcs';
+    return '$totalQty $pcs';
+  }
+
+  /// Human-readable quantity string (Chinese fallback, kept for compatibility).
   String get qtyDisplay {
     if (quantityUnknown) return '待清点';
     if (boxesOnlyMode) return '$totalBoxes 箱';
