@@ -2779,14 +2779,38 @@ class _AuditCard extends StatelessWidget {
   Color get _color =>
       _actionColor[record.businessAction ?? ''] ?? Colors.grey.shade500;
 
-  String _extractDetail() {
-    final desc = record.description;
-    final atIdx = desc.indexOf(' @ ');
-    if (atIdx == -1) return desc;
-    final afterAt = atIdx + 3;
-    final spaceAfterLoc = desc.indexOf(' ', afterAt);
-    if (spaceAfterLoc == -1) return '';
-    return desc.substring(spaceAfterLoc + 1).trim();
+  String _buildDetail(AppLocalizations l10n) {
+    final d = record.details;
+    final ba = record.businessAction;
+    final pcs = l10n.unitPiece;
+    if (d == null || ba == null) return '';
+    switch (ba) {
+      case '入库':
+        return '+${d['addedQty'] ?? 0}$pcs';
+      case '出库':
+        return '-${d['reducedQty'] ?? 0}$pcs';
+      case '调整':
+        final before = d['beforeQty'] ?? 0;
+        final after = d['afterQty'] ?? 0;
+        final note = d['note'];
+        final noteStr = (note != null && note.toString().isNotEmpty) ? '  ${l10n.auditNote}: $note' : '';
+        return '$before→$after$pcs$noteStr';
+      case '录入':
+        return '${d['quantity'] ?? 0}$pcs';
+      case '删除库存':
+        return '${d['quantity'] ?? 0}$pcs';
+      case '批量转移':
+      case '批量复制':
+        return '${d['sourceCode']} → ${d['targetCode']}';
+      case '标记已检查':
+      case '取消已检查':
+      case '新建库位':
+      case '编辑库位':
+      case '删除库位':
+        return d['locationCode']?.toString() ?? '';
+      default:
+        return '';
+    }
   }
 
   @override
@@ -2798,7 +2822,7 @@ class _AuditCard extends StatelessWidget {
         .isNotEmpty
         ? AuditLogDetailSheet.translateAction(record.businessAction, l10n)
         : l10n.invDetailDefaultAction;
-    final detail = _extractDetail();
+    final detail = _buildDetail(l10n);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
