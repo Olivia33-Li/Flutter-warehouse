@@ -1,0 +1,239 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Warehouse Management",
+
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "save": "Save",
+  "retry": "Retry",
+  "close": "Close",
+  "continue_": "Continue",
+
+  "loginUsername": "Username",
+  "loginPassword": "Password",
+  "loginRememberMe": "Remember me",
+  "loginForgotPassword": "Forgot password?",
+  "loginButton": "Log In",
+  "loginNoAccount": "Don't have an account?",
+  "loginRegister": "Register",
+  "loginEmptyError": "Please enter username and password",
+  "loginFailedNetwork": "Login failed, please check your network",
+  "loginRecentTitle": "Recent Accounts",
+  "loginClearAll": "Clear All",
+  "loginClearAllTitle": "Clear Records",
+  "loginClearAllContent": "Remove all saved accounts on this device?",
+  "loginUseOtherAccount": "Use another account",
+
+  "registerTitle": "Create Account",
+  "registerSubtitle": "Register to use the Warehouse Management System",
+  "registerName": "Name / Display Name",
+  "registerConfirmPassword": "Confirm Password",
+  "registerButton": "Register",
+  "registerHaveAccount": "Already have an account?",
+  "registerValidation": "Please fill in all fields, password must be at least 6 characters",
+  "registerPasswordMismatch": "Passwords do not match",
+  "registerFailed": "Registration failed",
+  "passwordRuleLength": "6–20 characters",
+  "passwordRuleLowercase": "Contains lowercase letters",
+  "passwordRuleDigit": "Contains digits",
+  "passwordRuleAlnum": "Lowercase letters and digits only",
+
+  "forgotTitle": "Forgot Password",
+  "forgotSubtitle": "Contact your admin to reset your password.\nFill in your username and submit a request.",
+  "forgotAdminContact": "Contact Admin",
+  "forgotAdminDesc": "Passwords are managed by the administrator. Please contact your warehouse supervisor or system admin, provide your username, and ask them to reset your password.",
+  "forgotNote": "Note (optional) — e.g. contact info / details",
+  "forgotSubmit": "Submit Request",
+  "forgotDismiss": "Got it",
+  "forgotSuccessTitle": "Request Submitted",
+  "forgotSuccessDesc": "The admin will reset your password after reviewing your request.\nPlease wait for notification.",
+  "forgotBackToLogin": "Back to Login",
+  "forgotEmptyError": "Please enter your username",
+  "forgotSubmitFailed": "Submission failed, please try again",
+
+  "forceChangeTitle": "Change Password Required",
+  "forceChangeNotice": "Your password has been reset by the admin. Please change it before continuing.",
+  "forceChangeOldPassword": "Current Password (temporary)",
+  "forceChangeNewPassword": "New Password (min. 6 characters)",
+  "forceChangeConfirmPassword": "Confirm New Password",
+  "forceChangeButton": "Confirm Change",
+  "forceChangeEmptyError": "Please fill in all fields",
+  "forceChangeShortError": "New password must be at least 6 characters",
+  "forceChangeMismatchError": "New passwords do not match",
+  "forceChangeSameError": "New password cannot be the same as current password",
+  "forceChangeFailed": "Change failed, please try again",
+
+  "navSku": "SKU",
+  "navLocation": "Location",
+  "navScanner": "Scan",
+  "navHistory": "History",
+  "navSettings": "Settings",
+
+  "skuScreenTitle": "SKU Search",
+  "skuSearchHint": "Search SKU / name / barcode...",
+  "skuFilterActive": "Active",
+  "skuFilterAll": "Include Archived",
+  "skuFilterArchived": "Archived Only",
+  "skuEmptyArchived": "No archived SKUs",
+  "skuEmpty": "No SKUs",
+  "skuNoResult": "No results for \"{query}\"",
+  "@skuNoResult": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "skuSearchTip": "Try a shorter keyword or ignore separators",
+  "skuNoStock": "No stock",
+  "unitBox": "box",
+  "unitPiece": "pcs",
+  "skuTotalQty": "{qty} {unit} total",
+  "@skuTotalQty": {
+    "placeholders": {
+      "qty": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+
+  "locationScreenTitle": "Location Search",
+  "locationSearchHint": "Search location code or description...",
+  "locationEmpty": "No locations",
+  "locationNoResult": "No matching locations",
+  "locationNewButton": "New Location",
+  "locationNoStock": "No stock",
+  "locationTotalQty": "{qty} pcs total",
+  "@locationTotalQty": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+
+  "scannerTitle": "Barcode Scanner",
+  "scannerHint": "Point the barcode/QR code at the frame",
+  "scannerViewDetail": "View Details",
+  "scannerStockLocations": "Stock Locations:",
+  "scannerOutOfStock": "Out of Stock",
+  "scannerAllZero": "All locations have 0 stock",
+  "scannerRestock": "Restock",
+  "scannerContinue": "Continue Scanning",
+  "scannerNotFound": "Product Not Found",
+  "scannerBarcode": "Barcode: {code}",
+  "@scannerBarcode": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "scannerAddProduct": "Add Product",
+  "scannerMultipleFound": "Multiple Matches Found",
+  "scannerTotalStock": "Total Stock: {qty} boxes",
+  "@scannerTotalStock": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "scannerQtyPiece": "{qty} pcs",
+  "@scannerQtyPiece": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+
+  "historyTitle": "Operation History",
+  "historyAllUsers": "All Users",
+  "historyEmpty": "No records",
+  "historyFilterDate": "Date",
+  "historyFilterAction": "Action",
+  "historyFilterAll": "All",
+  "historyToday": "Today",
+  "historyThisWeek": "This Week",
+  "historyThisMonth": "This Month",
+  "historyCustom": "Custom",
+
+  "settingsTitle": "Settings",
+  "settingsEditProfile": "Edit Profile",
+  "settingsDisplayName": "Display Name",
+  "settingsNameEmpty": "Name cannot be empty",
+  "settingsProfileUpdated": "Profile updated",
+  "settingsUpdateFailed": "Update failed",
+  "settingsChangePassword": "Change Password",
+  "settingsOldPassword": "Current Password",
+  "settingsNewPassword": "New Password (min. 6 characters)",
+  "settingsPasswordChanged": "Password changed successfully",
+  "settingsPasswordChangeFailed": "Change failed",
+  "settingsSwitchAccount": "Switch Account",
+  "settingsSwitchAccountSubtitle": "Log out and return to login page",
+  "settingsSectionManage": "Management",
+  "settingsUserManagement": "User Management",
+  "settingsUserManagementSubtitle": "Create accounts / assign roles / disable accounts",
+  "settingsPasswordResetRequests": "Password Reset Requests",
+  "settingsPasswordResetRequestsSubtitle": "Handle forgot password requests",
+  "settingsSectionData": "Data",
+  "settingsDataImport": "Import Data",
+  "settingsDataImportSubtitle": "SKU master / Location master / Inventory details",
+  "settingsExportExcel": "Export Excel",
+  "settingsExportExcelSubtitle": "Export all SKUs, locations, inventory and transactions",
+  "settingsExporting": "Generating Excel, please wait...",
+  "settingsExportDone": "Downloaded: {filename}",
+  "@settingsExportDone": {
+    "placeholders": {
+      "filename": { "type": "String" }
+    }
+  },
+  "settingsSectionDanger": "Danger Zone",
+  "settingsClearAllData": "Clear All Business Data",
+  "settingsClearAllDataSubtitle": "Clear inventory, SKU, location, transactions, logs and import records. User accounts are kept.",
+  "settingsClearDataTitle": "Dangerous Operation",
+  "settingsClearDataContent": "This will permanently delete:\n\n• All inventory records\n• All SKU master data\n• All location master data\n• All transactions\n• All audit logs\n• All import records\n\nUser accounts will be kept.\n\nThis action cannot be undone!",
+  "settingsSecondConfirmTitle": "Second Confirmation",
+  "settingsSecondConfirmContent": "Type \"CLEAR DATA\" to confirm:",
+  "settingsClearDataHint": "CLEAR DATA",
+  "settingsInputIncorrect": "Incorrect input",
+  "settingsConfirmClear": "Confirm Clear",
+  "settingsLogout": "Log Out",
+  "settingsLanguage": "Language",
+  "settingsLanguageSubtitle": "Change the display language",
+  "settingsSectionDisplay": "Display",
+
+  "langZh": "中文",
+  "langEn": "English",
+  "langSystem": "System Default",
+  "langSelectTitle": "Select Language",
+
+  "skuFormTitle": "SKU Info",
+  "skuFormSkuCode": "SKU Code",
+  "skuFormName": "Name (optional)",
+  "skuFormBarcode": "Barcode (optional)",
+  "skuFormCartonQty": "Carton Qty (pcs/box, optional)",
+  "skuFormSkuEmpty": "SKU code cannot be empty",
+  "skuFormSaveSuccess": "Saved successfully",
+  "skuFormArchive": "Archive",
+  "skuFormUnarchive": "Unarchive",
+  "skuFormDelete": "Delete",
+  "skuFormConfirmArchive": "Confirm archiving this SKU?",
+  "skuFormConfirmUnarchive": "Confirm unarchiving this SKU?",
+  "skuFormConfirmDelete": "Confirm deleting this SKU? This cannot be undone.",
+
+  "inventoryAddTitle": "Inventory Operation",
+  "inventoryTabIn": "Stock In",
+  "inventoryTabOut": "Stock Out",
+  "inventoryTabAdjust": "Adjust",
+  "inventorySearchSku": "Search SKU...",
+  "inventorySearchLocation": "Search location...",
+  "inventoryQty": "Quantity",
+  "inventoryNote": "Note (optional)",
+  "inventorySubmit": "Submit",
+  "inventorySuccess": "Operation successful",
+  "inventoryNewSku": "New SKU",
+  "inventoryNewLocation": "New Location",
+  "inventorySelectSku": "Please select a SKU",
+  "inventorySelectLocation": "Please select a location",
+  "inventoryQtyError": "Please enter a valid quantity",
+
+  "errorRetry": "Retry",
+  "operationFailed": "Operation failed: {error}",
+  "@operationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  }
+}

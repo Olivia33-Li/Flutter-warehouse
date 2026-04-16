@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/sku_service.dart';
 import '../../models/sku.dart';
 import '../../utils/search_utils.dart';
@@ -121,11 +122,11 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Title ──────────────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 28, 20, 0),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
               child: Text(
-                'SKU 搜索',
-                style: TextStyle(
+                AppLocalizations.of(context)!.skuScreenTitle,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
                   color: _titleColor,
@@ -150,19 +151,19 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
               child: Row(
                 children: [
                   _FilterTab(
-                    label: '在用',
+                    label: AppLocalizations.of(context)!.skuFilterActive,
                     selected: _statusFilter == 'active',
                     onTap: () => _setStatusFilter('active'),
                   ),
                   const SizedBox(width: 8),
                   _FilterTab(
-                    label: '含已归档',
+                    label: AppLocalizations.of(context)!.skuFilterAll,
                     selected: _statusFilter == 'all',
                     onTap: () => _setStatusFilter('all'),
                   ),
                   const SizedBox(width: 8),
                   _FilterTab(
-                    label: '仅归档',
+                    label: AppLocalizations.of(context)!.skuFilterArchived,
                     selected: _statusFilter == 'archived',
                     onTap: () => _setStatusFilter('archived'),
                   ),
@@ -201,7 +202,9 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
     if (_query.isEmpty) {
       return Center(
         child: Text(
-          _statusFilter == 'archived' ? '暂无归档 SKU' : '暂无 SKU',
+          _statusFilter == 'archived'
+              ? AppLocalizations.of(context)!.skuEmptyArchived
+              : AppLocalizations.of(context)!.skuEmpty,
           style: const TextStyle(color: _mutedColor),
         ),
       );
@@ -212,10 +215,10 @@ class _SkusScreenState extends ConsumerState<SkusScreen> {
         children: [
           Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 12),
-          Text('未找到 "$_query"',
+          Text(AppLocalizations.of(context)!.skuNoResult(_query),
               style: const TextStyle(color: _mutedColor, fontSize: 15)),
           const SizedBox(height: 4),
-          Text('尝试缩短关键词，或忽略分隔符搜索',
+          Text(AppLocalizations.of(context)!.skuSearchTip,
               style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
         ],
       ),
@@ -257,8 +260,8 @@ class _SearchBar extends StatelessWidget {
               controller: controller,
               onChanged: onChanged,
               style: const TextStyle(fontSize: 14, color: _titleColor),
-              decoration: const InputDecoration(
-                hintText: '搜索 SKU / 名称 / 条码...',
+              decoration: InputDecoration(
+                hintText: AppLocalizations.of(context)!.skuSearchHint,
                 hintStyle: TextStyle(fontSize: 14, color: _hintColor),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
@@ -477,8 +480,8 @@ class _SkuCard extends StatelessWidget {
               ),
             ] else if (!hasStock) ...[
               const SizedBox(height: 4),
-              const Text('暂无库存',
-                  style: TextStyle(color: _hintColor, fontSize: 12)),
+              Text(AppLocalizations.of(context)!.skuNoStock,
+                  style: const TextStyle(color: _hintColor, fontSize: 12)),
             ],
           ],
         ),
@@ -498,7 +501,8 @@ class _StockLabel extends StatelessWidget {
     final qty  = sku.allBoxesOnly
         ? sku.locations.fold(0, (s, l) => s + l.boxes)
         : sku.totalQty;
-    final unit = sku.allBoxesOnly ? '箱' : '件';
+    final l10n = AppLocalizations.of(context)!;
+    final unit = sku.allBoxesOnly ? l10n.unitBox : l10n.unitPiece;
     final min  = sku.minStock;
 
     Color color;
@@ -523,7 +527,7 @@ class _StockLabel extends StatelessWidget {
           const SizedBox(width: 2),
         ],
         Text(
-          '共 $qty $unit',
+          l10n.skuTotalQty(qty, unit),
           style: TextStyle(
             fontSize: 13,
             color: color,
@@ -545,10 +549,11 @@ class _LocChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final text = label ??
         (loc!.boxesOnly
-            ? '${loc!.locationCode} · ${loc!.boxes}箱'
-            : '${loc!.locationCode} · ${loc!.totalQty}件');
+            ? '${loc!.locationCode} · ${loc!.boxes}${l10n.unitBox}'
+            : '${loc!.locationCode} · ${loc!.totalQty}${l10n.unitPiece}');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

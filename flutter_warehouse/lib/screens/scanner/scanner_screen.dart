@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/sku.dart';
 import '../../services/sku_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -43,7 +44,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('查询失败: $e')));
+          SnackBar(content: Text('${AppLocalizations.of(context)!.navScanner}: $e')));
         _lastCode = null;
       }
     } finally {
@@ -99,7 +100,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                       context.push('/skus/${sku.id}');
                       _lastCode = null;
                     },
-                    child: const Text('查看详情'),
+                    child: Text(AppLocalizations.of(context)!.scannerViewDetail),
                   ),
                 ],
               ),
@@ -118,7 +119,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                             children: [
                               const Icon(Icons.inventory_2, color: Colors.green),
                               const SizedBox(width: 8),
-                              Text('总库存: ${sku.totalQty} 箱',
+                              Text(AppLocalizations.of(context)!.scannerTotalStock(sku.totalQty),
                                   style: const TextStyle(
                                       color: Colors.green,
                                       fontWeight: FontWeight.bold,
@@ -126,8 +127,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
                             ],
                           ),
                         ),
-                        const Text('库存位置:',
-                            style: TextStyle(
+                        Text(AppLocalizations.of(context)!.scannerStockLocations,
+                            style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 14)),
                         const SizedBox(height: 8),
                         ...sku.locations.map((loc) => Card(
@@ -136,7 +137,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                                 title: Text(loc.locationCode,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600)),
-                                trailing: Text('${loc.totalQty} 件',
+                                trailing: Text(AppLocalizations.of(context)!.scannerQtyPiece(loc.totalQty),
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 15)),
@@ -156,11 +157,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
                           Icon(Icons.warning_amber_rounded,
                               size: 64, color: Colors.orange.shade400),
                           const SizedBox(height: 12),
-                          const Text('该商品已断货',
-                              style: TextStyle(
+                          Text(AppLocalizations.of(context)!.scannerOutOfStock,
+                              style: const TextStyle(
                                   fontSize: 20, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('所有位置库存为 0',
+                          Text(AppLocalizations.of(context)!.scannerAllZero,
                               style: TextStyle(color: Colors.grey.shade600)),
                           const SizedBox(height: 20),
                           FilledButton.icon(
@@ -170,7 +171,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                               _lastCode = null;
                             },
                             icon: const Icon(Icons.edit),
-                            label: const Text('去补货'),
+                            label: Text(AppLocalizations.of(context)!.scannerRestock),
                           ),
                         ],
                       ),
@@ -185,7 +186,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                     ctx.pop();
                     _lastCode = null;
                   },
-                  child: const Text('继续扫码'),
+                  child: Text(AppLocalizations.of(context)!.scannerContinue),
                 ),
               ),
             ),
@@ -208,10 +209,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
           children: [
             const Icon(Icons.search_off, size: 56, color: Colors.grey),
             const SizedBox(height: 12),
-            const Text('未找到该商品',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(AppLocalizations.of(context)!.scannerNotFound,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text('条码: $code', style: const TextStyle(color: Colors.grey)),
+            Text(AppLocalizations.of(context)!.scannerBarcode(code),
+                style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -221,7 +223,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                       ctx.pop();
                       _lastCode = null;
                     },
-                    child: const Text('继续扫码'),
+                    child: Text(AppLocalizations.of(context)!.scannerContinue),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -233,7 +235,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                       _lastCode = null;
                     },
                     icon: const Icon(Icons.add),
-                    label: const Text('新增商品'),
+                    label: Text(AppLocalizations.of(context)!.scannerAddProduct),
                   ),
                 ),
               ],
@@ -248,7 +250,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('找到多个匹配'),
+        title: Text(AppLocalizations.of(context)!.scannerMultipleFound),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: skus
@@ -270,7 +272,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('扫码查询'),
+        title: Text(AppLocalizations.of(context)!.scannerTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.flash_on),
@@ -305,9 +307,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
             child: Container(
               color: Colors.black54,
               padding: const EdgeInsets.all(16),
-              child: const Text(
-                '将条码/二维码对准框内',
-                style: TextStyle(color: Colors.white),
+              child: Text(
+                AppLocalizations.of(context)!.scannerHint,
+                style: const TextStyle(color: Colors.white),
               ),
             ),
           ),

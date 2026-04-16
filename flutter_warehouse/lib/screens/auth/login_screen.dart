@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
+import '../../l10n/app_localizations.dart';
 
 // ── Figma design tokens ───────────────────────────────────────────────────────
 const _bgColor       = Color(0xFFF5F3F0);
@@ -42,7 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final username = _usernameCtrl.text.trim();
     final password = _passwordCtrl.text;
     if (username.isEmpty || password.isEmpty) {
-      setState(() => _error = '请输入用户名和密码');
+      setState(() => _error = AppLocalizations.of(context)!.loginEmptyError);
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -55,7 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref.read(recentAccountsProvider.notifier).refresh();
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
-      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? '登录失败，请检查网络'));
+      setState(() => _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.loginFailedNetwork));
     } catch (e) {
       setState(() => _error = '登录失败: $e');
     } finally {
@@ -96,9 +97,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: const Icon(Icons.warehouse_rounded, size: 26, color: _primary),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  '仓库管理系统',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.appTitle,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w500,
                     color: _titleColor,
@@ -119,11 +120,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       final ok = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('清空记录'),
-                          content: const Text('确定清除本设备所有已记住的账号？'),
+                          title: Text(AppLocalizations.of(ctx)!.loginClearAllTitle),
+                          content: Text(AppLocalizations.of(ctx)!.loginClearAllContent),
                           actions: [
-                            TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
-                            FilledButton(onPressed: () => ctx.pop(true), child: const Text('确定')),
+                            TextButton(onPressed: () => ctx.pop(false), child: Text(AppLocalizations.of(ctx)!.cancel)),
+                            FilledButton(onPressed: () => ctx.pop(true), child: Text(AppLocalizations.of(ctx)!.confirm)),
                           ],
                         ),
                       );
@@ -135,10 +136,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 20),
                   Row(children: [
                     Expanded(child: Divider(color: _checkBorder.withValues(alpha: 0.8))),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('使用其他账号登录',
-                          style: TextStyle(color: _mutedColor, fontSize: 12)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(AppLocalizations.of(context)!.loginUseOtherAccount,
+                          style: const TextStyle(color: _mutedColor, fontSize: 12)),
                     ),
                     Expanded(child: Divider(color: _checkBorder.withValues(alpha: 0.8))),
                   ]),
@@ -158,7 +159,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           textInputAction: TextInputAction.next,
                           onChanged: (_) => setState(() {}),
                           style: const TextStyle(fontSize: 14, color: _titleColor),
-                          decoration: _inputDeco('用户名',
+                          decoration: _inputDeco(AppLocalizations.of(context)!.loginUsername,
                             suffix: _usernameCtrl.text.isNotEmpty
                                 ? _ClearButton(onTap: () => setState(() => _usernameCtrl.clear()))
                                 : null,
@@ -186,7 +187,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           onSubmitted: (_) => _login(),
                           onChanged: (_) => setState(() {}),
                           style: const TextStyle(fontSize: 14, color: _titleColor),
-                          decoration: _inputDeco('密码',
+                          decoration: _inputDeco(AppLocalizations.of(context)!.loginPassword,
                             suffix: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -226,9 +227,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         children: [
                           _Checkbox(checked: _rememberMe),
                           const SizedBox(width: 8),
-                          const Text(
-                            '记住我',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context)!.loginRememberMe,
+                            style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                               color: _titleColor,
@@ -239,9 +240,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     GestureDetector(
                       onTap: () => context.go('/forgot-password'),
-                      child: const Text(
-                        '忘记密码？',
-                        style: TextStyle(
+                      child: Text(
+                        AppLocalizations.of(context)!.loginForgotPassword,
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: _mutedColor,
@@ -293,9 +294,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2, color: Colors.white),
                                 )
-                              : const Text(
-                                  '登录',
-                                  style: TextStyle(
+                              : Text(
+                                  AppLocalizations.of(context)!.loginButton,
+                                  style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
                                     color: Colors.white,
@@ -312,14 +313,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      '还没有账号？',
-                      style: TextStyle(fontSize: 13, color: _mutedColor),
+                    Text(
+                      AppLocalizations.of(context)!.loginNoAccount,
+                      style: const TextStyle(fontSize: 13, color: _mutedColor),
                     ),
                     GestureDetector(
                       onTap: () => context.go('/register'),
                       child: Text(
-                        '注册',
+                        AppLocalizations.of(context)!.loginRegister,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -443,9 +444,9 @@ class _RecentAccountsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text(
-              '最近登录',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context)!.loginRecentTitle,
+              style: const TextStyle(
                 color: _mutedColor,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -454,9 +455,9 @@ class _RecentAccountsSection extends StatelessWidget {
             const Spacer(),
             GestureDetector(
               onTap: onClearAll,
-              child: const Text(
-                '清除全部',
-                style: TextStyle(color: _mutedColor, fontSize: 12),
+              child: Text(
+                AppLocalizations.of(context)!.loginClearAll,
+                style: const TextStyle(color: _mutedColor, fontSize: 12),
               ),
             ),
           ],

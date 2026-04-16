@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../l10n/app_localizations.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const _bgColor       = Color(0xFFF5F3F0);
@@ -77,11 +78,11 @@ class _BottomNav extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _NavItem(icon: Icons.grid_view_rounded,       label: 'SKU',  index: 0, selected: selectedIndex == 0, onTap: onTap),
-            _NavItem(icon: Icons.location_on_outlined,    label: '位置', index: 1, selected: selectedIndex == 1, onTap: onTap),
-            _NavItem(icon: Icons.qr_code_scanner_rounded, label: '扫码', index: 2, selected: selectedIndex == 2, onTap: onTap),
-            _NavItem(icon: Icons.history_rounded,         label: '记录', index: 3, selected: selectedIndex == 3, onTap: onTap),
-            _NavItem(icon: Icons.settings_outlined,       label: '设置', index: 4, selected: selectedIndex == 4, onTap: onTap),
+            _NavItem(icon: Icons.grid_view_rounded,       label: AppLocalizations.of(context)!.navSku,      index: 0, selected: selectedIndex == 0, onTap: onTap),
+            _NavItem(icon: Icons.location_on_outlined,    label: AppLocalizations.of(context)!.navLocation, index: 1, selected: selectedIndex == 1, onTap: onTap),
+            _NavItem(icon: Icons.qr_code_scanner_rounded, label: AppLocalizations.of(context)!.navScanner,  index: 2, selected: selectedIndex == 2, onTap: onTap),
+            _NavItem(icon: Icons.history_rounded,         label: AppLocalizations.of(context)!.navHistory,  index: 3, selected: selectedIndex == 3, onTap: onTap),
+            _NavItem(icon: Icons.settings_outlined,       label: AppLocalizations.of(context)!.navSettings, index: 4, selected: selectedIndex == 4, onTap: onTap),
           ],
         ),
       ),

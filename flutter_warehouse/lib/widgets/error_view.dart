@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class ErrorView extends StatelessWidget {
   final String message;
@@ -22,7 +23,7 @@ class ErrorView extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
+                label: Text(AppLocalizations.of(context)!.retry),
               ),
             ]
           ],

@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # State management
   flutter_riverpod: ^2.5.1
@@ -26,7 +28,7 @@ dependencies:
   hive_flutter: ^1.1.0
 
   # Barcode scanner
-  mobile_scanner: ^5.1.1
+  mobile_scanner: ^7.0.0
 
   # File picker (CSV import)
   file_picker: ^8.0.3
@@ -39,7 +41,7 @@ dependencies:
   web: ^0.5.1
 
   # UI utilities
-  intl: ^0.19.0
+  intl: ^0.20.2
   flutter_slidable: ^3.1.0
 
 dev_dependencies:
@@ -61,3 +63,4 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  generate: true

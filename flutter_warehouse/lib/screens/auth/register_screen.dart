@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../providers/auth_provider.dart';
+import '../../l10n/app_localizations.dart';
 
 // ── Design tokens (shared with login) ────────────────────────────────────────
 const _bgColor     = Color(0xFFF5F3F0);
@@ -45,11 +46,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (_usernameCtrl.text.trim().isEmpty ||
         _nameCtrl.text.trim().isEmpty ||
         _passwordCtrl.text.length < 6) {
-      setState(() => _error = '请填写完整信息，密码至少6位');
+      setState(() => _error = AppLocalizations.of(context)!.registerValidation);
       return;
     }
     if (_passwordCtrl.text != _confirmPasswordCtrl.text) {
-      setState(() => _error = '两次输入的密码不一致');
+      setState(() => _error = AppLocalizations.of(context)!.registerPasswordMismatch);
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -62,7 +63,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     } on DioException catch (e) {
       final msg = e.response?.data?['message'];
       setState(() {
-        _error = msg is List ? msg.join(', ') : (msg ?? '注册失败');
+        _error = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(context)!.registerFailed);
       });
     } catch (e) {
       setState(() => _error = '注册失败: $e');
@@ -139,9 +140,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text(
-                      '注册账号',
-                      style: TextStyle(
+                    Text(
+                      AppLocalizations.of(context)!.registerTitle,
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w500,
                         color: _titleColor,
@@ -149,9 +150,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      '创建账号后即可使用仓库管理系统',
-                      style: TextStyle(
+                    Text(
+                      AppLocalizations.of(context)!.registerSubtitle,
+                      style: const TextStyle(
                         fontSize: 13,
                         color: _mutedColor,
                       ),
@@ -162,7 +163,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     _InputCard(
                       child: _InputRow(
                         controller: _usernameCtrl,
-                        hint: '用户名',
+                        hint: AppLocalizations.of(context)!.loginUsername,
                         icon: Icons.person_outline_rounded,
                         textInputAction: TextInputAction.next,
                         onChanged: (_) => setState(() {}),
@@ -175,7 +176,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     _InputCard(
                       child: _InputRow(
                         controller: _nameCtrl,
-                        hint: '姓名 / 显示名',
+                        hint: AppLocalizations.of(context)!.registerName,
                         icon: Icons.badge_outlined,
                         textInputAction: TextInputAction.next,
                         onChanged: (_) => setState(() {}),
@@ -188,7 +189,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     _InputCard(
                       child: _InputRow(
                         controller: _passwordCtrl,
-                        hint: '密码',
+                        hint: AppLocalizations.of(context)!.loginPassword,
                         icon: Icons.lock_outline_rounded,
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.next,
@@ -218,7 +219,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     _InputCard(
                       child: _InputRow(
                         controller: _confirmPasswordCtrl,
-                        hint: '确认密码',
+                        hint: AppLocalizations.of(context)!.registerConfirmPassword,
                         icon: Icons.lock_outline_rounded,
                         obscureText: _obscureConfirm,
                         textInputAction: TextInputAction.done,
@@ -253,10 +254,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     // ── Password rules ────────────────────────────────────
                     _PasswordRules(
                       rules: [
-                        _PasswordRule('6–20 位字符',       _ruleLength),
-                        _PasswordRule('包含小写字母',       _ruleLowercase),
-                        _PasswordRule('包含数字',           _ruleDigit),
-                        _PasswordRule('仅限小写字母和数字', _ruleOnlyAlnum),
+                        _PasswordRule(AppLocalizations.of(context)!.passwordRuleLength,   _ruleLength),
+                        _PasswordRule(AppLocalizations.of(context)!.passwordRuleLowercase, _ruleLowercase),
+                        _PasswordRule(AppLocalizations.of(context)!.passwordRuleDigit,     _ruleDigit),
+                        _PasswordRule(AppLocalizations.of(context)!.passwordRuleAlnum,     _ruleOnlyAlnum),
                       ],
                       show: _passwordCtrl.text.isNotEmpty,
                     ),
@@ -307,9 +308,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                           strokeWidth: 2,
                                           color: Colors.white),
                                     )
-                                  : const Text(
-                                      '注册',
-                                      style: TextStyle(
+                                  : Text(
+                                      AppLocalizations.of(context)!.registerButton,
+                                      style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                         color: Colors.white,
@@ -326,14 +327,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          '已有账号？',
-                          style: TextStyle(fontSize: 13, color: _mutedColor),
+                        Text(
+                          AppLocalizations.of(context)!.registerHaveAccount,
+                          style: const TextStyle(fontSize: 13, color: _mutedColor),
                         ),
                         GestureDetector(
                           onTap: () => context.go('/login'),
                           child: Text(
-                            '登录',
+                            AppLocalizations.of(context)!.loginButton,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,

@@ -11,9 +11,11 @@ import '../../utils/web_download_stub.dart'
     if (dart.library.js_interop) '../../utils/web_download_web.dart';
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/inventory_service.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const _bg            = Color(0xFFF5F3F0);
@@ -53,8 +55,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('编辑个人信息',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
+                Text(AppLocalizations.of(context)!.settingsEditProfile,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
                 const SizedBox(height: 20),
                 // Floating label input
                 Stack(
@@ -81,8 +83,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: Container(
                         color: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: const Text('显示名称',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF8E8E9A))),
+                        child: Text(AppLocalizations.of(context)!.settingsDisplayName,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF8E8E9A))),
                       ),
                     ),
                   ],
@@ -93,14 +95,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     TextButton(
                       onPressed: () => ctx.pop(),
-                      child: const Text('取消', style: TextStyle(color: Color(0xFF6E6E80))),
+                      child: Text(AppLocalizations.of(ctx)!.cancel, style: const TextStyle(color: Color(0xFF6E6E80))),
                     ),
                     const SizedBox(width: 8),
                     _PrimaryButton(
-                      label: '保存',
+                      label: AppLocalizations.of(ctx)!.save,
                       onPressed: () async {
                         if (nameCtrl.text.trim().isEmpty) {
-                          setS(() => err = '名称不能为空');
+                          setS(() => err = AppLocalizations.of(ctx)!.settingsNameEmpty);
                           return;
                         }
                         try {
@@ -110,11 +112,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (ctx.mounted) ctx.pop();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('个人信息已更新')));
+                              SnackBar(content: Text(AppLocalizations.of(context)!.settingsProfileUpdated)));
                           }
                         } on DioException catch (e) {
                           final msg = e.response?.data?['message'];
-                          setS(() => err = msg is List ? msg.join(', ') : (msg ?? '更新失败'));
+                          setS(() => err = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(ctx)!.settingsUpdateFailed));
                         }
                       },
                     ),
@@ -145,12 +147,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('修改密码',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
+                Text(AppLocalizations.of(context)!.settingsChangePassword,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
                 const SizedBox(height: 16),
-                _RoundedInput(controller: oldCtrl, hint: '原密码', obscure: true),
+                _RoundedInput(controller: oldCtrl, hint: AppLocalizations.of(context)!.settingsOldPassword, obscure: true),
                 const SizedBox(height: 16),
-                _RoundedInput(controller: newCtrl, hint: '新密码（至少6位）', obscure: true),
+                _RoundedInput(controller: newCtrl, hint: AppLocalizations.of(context)!.settingsNewPassword, obscure: true),
                 if (err != null) ...[
                   const SizedBox(height: 8),
                   Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -161,11 +163,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     TextButton(
                       onPressed: () => ctx.pop(),
-                      child: const Text('取消', style: TextStyle(color: Color(0xFF6E6E80))),
+                      child: Text(AppLocalizations.of(ctx)!.cancel, style: const TextStyle(color: Color(0xFF6E6E80))),
                     ),
                     const SizedBox(width: 8),
                     _PrimaryButton(
-                      label: '确认',
+                      label: AppLocalizations.of(ctx)!.confirm,
                       onPressed: () async {
                         try {
                           await AuthService().changePassword(
@@ -175,11 +177,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (ctx.mounted) ctx.pop();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('密码修改成功')));
+                              SnackBar(content: Text(AppLocalizations.of(context)!.settingsPasswordChanged)));
                           }
                         } on DioException catch (e) {
                           final msg = e.response?.data?['message'];
-                          setS(() => err = msg is List ? msg.join(', ') : (msg ?? '修改失败'));
+                          setS(() => err = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(ctx)!.settingsPasswordChangeFailed));
                         }
                       },
                     ),
@@ -198,7 +200,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _exportExcel() async {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('正在生成 Excel，请稍候...')));
+      SnackBar(content: Text(AppLocalizations.of(context)!.settingsExporting)));
     try {
       String token = AuthTokenCache.token ?? '';
       if (token.isEmpty) {
@@ -232,13 +234,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已下载: $filename')));
+          SnackBar(content: Text(AppLocalizations.of(context)!.settingsExportDone(filename))));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: $e'), backgroundColor: Colors.red));
+          SnackBar(content: Text('${AppLocalizations.of(context)!.settingsExportExcel}: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -265,28 +267,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirm1 = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
-          SizedBox(width: 8),
-          Text('危险操作'),
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
+          const SizedBox(width: 8),
+          Text(AppLocalizations.of(ctx)!.settingsClearDataTitle),
         ]),
-        content: const Text(
-          '此操作将清空以下所有数据：\n\n'
-          '• 全部库存记录\n'
-          '• 全部 SKU 主档\n'
-          '• 全部库位主档\n'
-          '• 全部出入库流水\n'
-          '• 全部操作日志\n'
-          '• 全部导入记录\n\n'
-          '仅保留用户账号。\n\n'
-          '此操作不可恢复！',
-        ),
+        content: Text(AppLocalizations.of(ctx)!.settingsClearDataContent),
         actions: [
-          TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+          TextButton(onPressed: () => ctx.pop(false), child: Text(AppLocalizations.of(ctx)!.cancel)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => ctx.pop(true),
-            child: const Text('继续'),
+            child: Text(AppLocalizations.of(ctx)!.continue_),
           ),
         ],
       ),
@@ -299,18 +291,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: const Text('二次确认'),
+          title: Text(AppLocalizations.of(ctx)!.settingsSecondConfirmTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('请输入"清空数据"以确认操作：'),
+              Text(AppLocalizations.of(ctx)!.settingsSecondConfirmContent),
               const SizedBox(height: 10),
               TextField(
                 controller: confirmCtrl,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  hintText: '清空数据',
+                  hintText: AppLocalizations.of(ctx)!.settingsClearDataHint,
                   errorText: confirmErr,
                 ),
                 autofocus: true,
@@ -318,17 +310,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => ctx.pop(false), child: const Text('取消')),
+            TextButton(onPressed: () => ctx.pop(false), child: Text(AppLocalizations.of(ctx)!.cancel)),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
-                if (confirmCtrl.text.trim() != '清空数据') {
-                  setS(() => confirmErr = '输入不正确');
+                if (confirmCtrl.text.trim() != AppLocalizations.of(ctx)!.settingsClearDataHint) {
+                  setS(() => confirmErr = AppLocalizations.of(ctx)!.settingsInputIncorrect);
                   return;
                 }
                 ctx.pop(true);
               },
-              child: const Text('确认清空'),
+              child: Text(AppLocalizations.of(ctx)!.settingsConfirmClear),
             ),
           ],
         ),
@@ -372,8 +364,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           padding: const EdgeInsets.fromLTRB(20, 32, 20, 100),
           children: [
             // ── Title ──────────────────────────────────────────────────
-            const Text('设置',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _primary)),
+            Text(AppLocalizations.of(context)!.settingsTitle,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _primary)),
             const SizedBox(height: 22),
 
             // ── User card ───────────────────────────────────────────────
@@ -432,14 +424,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   _CardItem(
                     icon: Icons.lock_outline,
-                    label: '修改密码',
+                    label: AppLocalizations.of(context)!.settingsChangePassword,
                     onTap: _showChangePasswordDialog,
                   ),
                   const Divider(height: 1, color: _divider),
                   _CardItemSub(
                     icon: Icons.swap_horiz_outlined,
-                    label: '切换账号',
-                    subtitle: '退出当前账号并返回登录页',
+                    label: AppLocalizations.of(context)!.settingsSwitchAccount,
+                    subtitle: AppLocalizations.of(context)!.settingsSwitchAccountSubtitle,
                     onTap: _switchAccount,
                   ),
                 ],
@@ -447,8 +439,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 20),
 
+            // ── 显示 section ────────────────────────────────────────────
+            _SectionLabel(AppLocalizations.of(context)!.settingsSectionDisplay),
+            const SizedBox(height: 12),
+            Container(
+              decoration: _cardDecoration,
+              child: _LanguageTile(l10n: AppLocalizations.of(context)!),
+            ),
+            const SizedBox(height: 20),
+
             // ── 管理 section ────────────────────────────────────────────
-            const _SectionLabel('管理'),
+            _SectionLabel(AppLocalizations.of(context)!.settingsSectionManage),
             const SizedBox(height: 12),
             Container(
               decoration: _cardDecoration,
@@ -457,16 +458,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (user?.canManageUsers == true)
                     _CardItemSub(
                       icon: Icons.people_outline,
-                      label: '用户管理',
-                      subtitle: '创建账号 / 分配角色 / 停用账号',
+                      label: AppLocalizations.of(context)!.settingsUserManagement,
+                      subtitle: AppLocalizations.of(context)!.settingsUserManagementSubtitle,
                       onTap: _showUsersDialog,
                     ),
                   if (user?.canManageUsers == true)
                     const Divider(height: 1, color: _divider),
                   _CardItemSub(
                     icon: Icons.vpn_key_outlined,
-                    label: '密码重置申请',
-                    subtitle: '处理用户的忘记密码申请',
+                    label: AppLocalizations.of(context)!.settingsPasswordResetRequests,
+                    subtitle: AppLocalizations.of(context)!.settingsPasswordResetRequestsSubtitle,
                     onTap: () => context.push('/password-reset-requests'),
                   ),
                 ],
@@ -475,7 +476,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 20),
 
             // ── 数据 section ────────────────────────────────────────────
-            const _SectionLabel('数据'),
+            _SectionLabel(AppLocalizations.of(context)!.settingsSectionData),
             const SizedBox(height: 12),
             Container(
               decoration: _cardDecoration,
@@ -484,8 +485,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (user?.canImport == true)
                     _CardItemSub(
                       icon: Icons.upload_file_outlined,
-                      label: '数据导入',
-                      subtitle: 'SKU 主档 / 库位主档 / 库存明细',
+                      label: AppLocalizations.of(context)!.settingsDataImport,
+                      subtitle: AppLocalizations.of(context)!.settingsDataImportSubtitle,
                       onTap: () => context.push('/import'),
                     ),
                   if (user?.canImport == true)
@@ -493,8 +494,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (user?.canExport == true)
                     _CardItemSub(
                       icon: Icons.download_outlined,
-                      label: '导出 Excel',
-                      subtitle: '导出全部 SKU、库位、库存及流水记录',
+                      label: AppLocalizations.of(context)!.settingsExportExcel,
+                      subtitle: AppLocalizations.of(context)!.settingsExportExcelSubtitle,
                       onTap: _exportExcel,
                     ),
                 ],
@@ -504,7 +505,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             // ── 危险区域 section ────────────────────────────────────────
             if (user?.canHighRisk == true) ...[
-              const _SectionLabel('危险区域', danger: true),
+              _SectionLabel(AppLocalizations.of(context)!.settingsSectionDanger, danger: true),
               const SizedBox(height: 12),
               Container(
                 decoration: _cardDecoration,
@@ -517,15 +518,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         const Icon(Icons.delete_outline, size: 16, color: _dangerText),
                         const SizedBox(width: 14),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('清空所有业务数据',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _dangerText)),
-                              SizedBox(height: 2),
-                              Text('清空库存、SKU、库位、流水、日志及导入记录，仅保留用户账号',
-                                  style: TextStyle(fontSize: 11, color: _muted),
+                              Text(AppLocalizations.of(context)!.settingsClearAllData,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _dangerText)),
+                              const SizedBox(height: 2),
+                              Text(AppLocalizations.of(context)!.settingsClearAllDataSubtitle,
+                                  style: const TextStyle(fontSize: 11, color: _muted),
                                   maxLines: 2),
                             ],
                           ),
@@ -546,8 +547,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (mounted) context.go('/login');
                 },
                 icon: const Icon(Icons.logout, size: 16, color: _dangerText),
-                label: const Text('退出登录',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _dangerText)),
+                label: Text(AppLocalizations.of(context)!.settingsLogout,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _dangerText)),
               ),
             ),
           ],
@@ -684,6 +685,108 @@ class _RoundedInput extends StatelessWidget {
           borderSide: BorderSide(color: Color(0xFF8090A8), width: 1.2),
         ),
       ),
+    );
+  }
+}
+
+// ── Language Tile ─────────────────────────────────────────────────────────────
+
+class _LanguageTile extends ConsumerWidget {
+  final AppLocalizations l10n;
+  const _LanguageTile({required this.l10n});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider);
+
+    String currentLabel;
+    if (locale == null) {
+      currentLabel = l10n.langSystem;
+    } else if (locale.languageCode == 'zh') {
+      currentLabel = l10n.langZh;
+    } else {
+      currentLabel = l10n.langEn;
+    }
+
+    return InkWell(
+      onTap: () => _showLanguagePicker(context, ref, locale),
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 53,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              const Icon(Icons.language_outlined, size: 17, color: _primary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(l10n.settingsLanguage,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _primary)),
+              ),
+              Text(currentLabel, style: const TextStyle(fontSize: 13, color: _muted)),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, size: 14, color: _muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLanguagePicker(BuildContext context, WidgetRef ref, Locale? current) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.langSelectTitle),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _LangOption(
+              label: l10n.langSystem,
+              selected: current == null,
+              onTap: () {
+                ref.read(localeProvider.notifier).setLocale(null);
+                ctx.pop();
+              },
+            ),
+            _LangOption(
+              label: l10n.langZh,
+              selected: current?.languageCode == 'zh',
+              onTap: () {
+                ref.read(localeProvider.notifier).setLocale(const Locale('zh'));
+                ctx.pop();
+              },
+            ),
+            _LangOption(
+              label: l10n.langEn,
+              selected: current?.languageCode == 'en',
+              onTap: () {
+                ref.read(localeProvider.notifier).setLocale(const Locale('en'));
+                ctx.pop();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LangOption extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LangOption({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(label),
+      trailing: selected ? const Icon(Icons.check, color: _primary) : null,
+      onTap: onTap,
     );
   }
 }
