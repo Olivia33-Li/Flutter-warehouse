@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../services/history_service.dart';
 import '../../models/change_record.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/audit_log_detail_sheet.dart';
 
 class InventoryHistoryScreen extends StatefulWidget {
   final String skuCode;
@@ -403,10 +404,36 @@ class _HistoryTileState extends State<_HistoryTile> {
   }
 
   /// 取 "@ LOC " 之后的部分作为摘要行
-  String _extractSummary() {
+  String _buildSummary(AppLocalizations l10n) {
+    final d = widget.record.details;
+    final ba = widget.record.businessAction;
+    final pcs = l10n.unitPiece;
+    if (d != null && ba != null) {
+      switch (ba) {
+        case '入库':
+          return '+${d['addedQty'] ?? 0}$pcs';
+        case '出库':
+          return '-${d['reducedQty'] ?? 0}$pcs';
+        case '调整':
+          final note = d['note'];
+          final noteStr = (note != null && note.toString().isNotEmpty) ? '  ${l10n.auditNote}: $note' : '';
+          return '${d['beforeQty'] ?? 0}→${d['afterQty'] ?? 0}$pcs$noteStr';
+        case '录入':
+          return '${d['quantity'] ?? 0}$pcs';
+        case '删除库存':
+          return '${d['quantity'] ?? 0}$pcs';
+        case '批量转移':
+        case '批量复制':
+          return '${d['sourceCode']} → ${d['targetCode']}';
+        case '标记已检查':
+        case '取消已检查':
+          return d['locationCode']?.toString() ?? '';
+      }
+    }
+    // fallback: strip leading "action @ loc " prefix from server description
     final desc = widget.record.description;
     final atIdx = desc.indexOf(' @ ');
-    if (atIdx == -1) return desc;
+    if (atIdx == -1) return '';
     final afterAt = atIdx + 3;
     final spaceAfterLoc = desc.indexOf(' ', afterAt);
     if (spaceAfterLoc == -1) return '';
@@ -531,8 +558,10 @@ class _HistoryTileState extends State<_HistoryTile> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final color = _color;
-    final action = widget.record.businessAction ?? l10n.invDetailDefaultAction;
-    final summary = _extractSummary();
+    final action = AuditLogDetailSheet.translateAction(widget.record.businessAction, l10n).isNotEmpty
+        ? AuditLogDetailSheet.translateAction(widget.record.businessAction, l10n)
+        : l10n.invDetailDefaultAction;
+    final summary = _buildSummary(l10n);
     final fmt = DateFormat('yyyy-MM-dd HH:mm');
 
     return InkWell(

@@ -303,7 +303,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   static String listSummary(ChangeRecord r, AppLocalizations l10n) {
     final d = r.details;
     final ba = r.businessAction;
-    if (d == null || ba == null) return r.description;
+    if (d == null || ba == null) {
+      // Strip Chinese action prefix (e.g. "入库: SKU @ LOC detail" → "SKU @ LOC detail")
+      final desc = r.description;
+      final colonIdx = desc.indexOf(': ');
+      return colonIdx != -1 ? desc.substring(colonIdx + 2).trim() : desc;
+    }
     final pcs = l10n.unitPiece;
     switch (ba) {
       case '入库':
