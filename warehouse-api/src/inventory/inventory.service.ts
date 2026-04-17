@@ -358,6 +358,7 @@ export class InventoryService {
     }
 
     const inDelta = this.describeInDelta(dto.boxes, dto.unitsPerBox ?? 1, dto.boxesOnlyMode);
+    const addedQty = dto.boxes * (dto.unitsPerBox ?? 1);
     await this.historyService.log({
       userId: user._id.toString(),
       userName: user.name,
@@ -365,6 +366,13 @@ export class InventoryService {
       entity: 'inventory',
       businessAction: '入库',
       description: `入库: ${sku.sku} @ ${location.code} ${inDelta}`,
+      details: {
+        skuCode: sku.sku,
+        locationCode: location.code,
+        addedQty,
+        boxes: dto.boxes,
+        unitsPerBox: dto.unitsPerBox ?? 1,
+      },
     });
 
     await this.txModel.create({
@@ -454,6 +462,13 @@ export class InventoryService {
       entity: 'inventory',
       businessAction: '出库',
       description: `出库: ${sku.sku} @ ${location.code} ${outDelta}`,
+      details: {
+        skuCode: sku.sku,
+        locationCode: location.code,
+        reducedQty: dto.quantity,
+        remainingQty: record.quantity,
+        configurations: dto.configurations,
+      },
     });
 
     await this.txModel.create({
@@ -532,6 +547,13 @@ export class InventoryService {
       entity: 'inventory',
       businessAction: '调整',
       description: `${modeLabel}: ${sku.sku} @ ${location.code} [调前:${beforeDesc}] → [调后:${afterDesc}] 原因:${dto.note}`,
+      details: {
+        skuCode: sku.sku,
+        locationCode: location.code,
+        beforeQty: before.quantity,
+        afterQty: record.quantity,
+        note: dto.note,
+      },
     });
 
     await this.txModel.create({
