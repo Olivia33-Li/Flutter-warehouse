@@ -286,10 +286,17 @@ export class InventoryService {
   async stockIn(dto: {
     skuCode: string;
     locationId: string;
-    boxes: number;
+    // Mode A: by carton(s) — single spec
+    boxes?: number;
     unitsPerBox?: number;
-    note?: string;
+    // Mode A (multi-spec): by mixed configurations
+    configurations?: { boxes: number; unitsPerBox: number }[];
+    // Mode B: boxes only — carton count known, pcs/carton unknown
     boxesOnlyMode?: boolean;
+    // Mode C: by total qty — piece count only, no carton structure
+    addQuantity?: number;
+    // Common
+    note?: string;
     pendingCount?: boolean;
   }, user: any) {
     const sku = await this.skuModel.findOne({ sku: dto.skuCode.toUpperCase() });
@@ -303,6 +310,43 @@ export class InventoryService {
 
     const stockStatus = dto.pendingCount ? 'pending_count' : 'confirmed';
 
+    // ── Normalise input into canonical form ──────────────────────────────────
+    // inConfigs: Mode A — one or more {boxes, unitsPerBox} specs to merge in
+    // inBoxesOnly: Mode B — plain carton count, no pcs/carton
+    // addQty: Mode C — piece count delta, no carton structure
+    let inConfigs: { boxes: number; unitsPerBox: number }[] | null = null;
+    let inBoxesOnly: number | null = null;
+    let addQty: number | null = null;
+
+    if (dto.configurations && dto.configurations.length > 0) {
+      inConfigs = dto.configurations;
+    } else if (dto.boxesOnlyMode) {
+      inBoxesOnly = dto.boxes ?? 0;
+    } else if (dto.addQuantity !== undefined && dto.addQuantity > 0) {
+      addQty = dto.addQuantity;
+    } else if (dto.boxes !== undefined && dto.boxes > 0) {
+      inConfigs = [{ boxes: dto.boxes, unitsPerBox: dto.unitsPerBox ?? 1 }];
+    } else {
+      throw new BadRequestException('入库数量不能为零');
+    }
+
+    // ── Merge helper: merge inConfigs into an existing configs array ─────────
+    const mergeConfigs = (
+      existing: { boxes: number; unitsPerBox: number }[],
+      incoming: { boxes: number; unitsPerBox: number }[],
+    ): { boxes: number; unitsPerBox: number }[] => {
+      const result = [...existing];
+      for (const spec of incoming) {
+        const idx = result.findIndex(c => c.unitsPerBox === spec.unitsPerBox);
+        if (idx >= 0) {
+          result[idx] = { boxes: result[idx].boxes + spec.boxes, unitsPerBox: spec.unitsPerBox };
+        } else {
+          result.push({ ...spec });
+        }
+      }
+      return result;
+    };
+
     const existing = await this.inventoryModel.findOne({
       skuId: sku._id,
       locationId: new Types.ObjectId(dto.locationId),
@@ -310,42 +354,74 @@ export class InventoryService {
     });
 
     if (existing) {
-      if (existing.configurations && existing.configurations.length > 0) {
-        // Record has multi-spec configs — merge new stock into matching spec or add a new entry
-        const newUnitsPerBox = dto.unitsPerBox ?? 1;
-        const matchIdx = existing.configurations.findIndex(c => c.unitsPerBox === newUnitsPerBox);
-        if (matchIdx >= 0) {
-          existing.configurations = existing.configurations.map((c, i) =>
-            i === matchIdx ? { boxes: c.boxes + dto.boxes, unitsPerBox: c.unitsPerBox } : c
-          );
-        } else {
-          existing.configurations = [...existing.configurations, { boxes: dto.boxes, unitsPerBox: newUnitsPerBox }];
-        }
+      if (inConfigs) {
+        // ── Mode A: merge configs ────────────────────────────────────────────
+        // Upgrade flat record to configurations if needed
+        const base: { boxes: number; unitsPerBox: number }[] =
+          existing.configurations?.length > 0
+            ? existing.configurations
+            : (existing.boxes > 0
+                ? [{ boxes: existing.boxes, unitsPerBox: existing.unitsPerBox ?? 1 }]
+                : []);
+        existing.configurations = mergeConfigs(base, inConfigs);
         existing.markModified('configurations');
         existing.boxes = existing.configurations.reduce((s, c) => s + c.boxes, 0);
-      } else {
-        // Flat model — just add boxes
-        existing.boxes = (existing.boxes ?? 0) + dto.boxes;
-        if (dto.unitsPerBox) existing.unitsPerBox = dto.unitsPerBox;
+        existing.boxesOnlyMode = false;
+      } else if (inBoxesOnly !== null) {
+        // ── Mode B: boxes-only ───────────────────────────────────────────────
+        existing.boxes = (existing.boxes ?? 0) + inBoxesOnly;
+        existing.boxesOnlyMode = true;
+      } else if (addQty !== null) {
+        // ── Mode C: qty delta ────────────────────────────────────────────────
+        // Add to quantity; recalculate boxes using existing unitsPerBox
+        const newQty = (existing.quantity ?? 0) + addQty;
+        const upb = (existing.unitsPerBox > 0 ? existing.unitsPerBox : 1);
+        existing.quantity = newQty;
+        existing.boxes = Math.floor(newQty / upb);
+        // Clear configurations — quantity is now tracked directly
+        existing.configurations = [];
+        existing.markModified('configurations');
+        existing.boxesOnlyMode = false;
       }
-      if (dto.boxesOnlyMode !== undefined) existing.boxesOnlyMode = dto.boxesOnlyMode;
       existing.stockStatus = stockStatus;
       existing.quantityUnknown = false;
-      existing.quantity = this.computeQuantity(existing);
+      if (inConfigs || inBoxesOnly !== null) {
+        existing.quantity = this.computeQuantity(existing);
+      }
       await existing.save();
     } else {
-      // Remove any stale completed_* tombstone before creating a fresh record
+      // ── New record ───────────────────────────────────────────────────────────
       await this.inventoryModel.deleteMany({
         skuId: sku._id,
         locationId: new Types.ObjectId(dto.locationId),
         stockStatus: { $in: ['completed_merge', 'completed_split'] },
       });
-      const partial = {
-        boxes: dto.boxes,
-        unitsPerBox: dto.unitsPerBox ?? 1,
-        quantityUnknown: false,
-        boxesOnlyMode: dto.boxesOnlyMode ?? false,
-      };
+
+      let partial: Partial<Inventory>;
+      if (inConfigs) {
+        partial = {
+          configurations: inConfigs,
+          boxes: inConfigs.reduce((s, c) => s + c.boxes, 0),
+          unitsPerBox: inConfigs.length === 1 ? inConfigs[0].unitsPerBox : 1,
+          quantityUnknown: false,
+          boxesOnlyMode: false,
+        };
+      } else if (inBoxesOnly !== null) {
+        partial = {
+          boxes: inBoxesOnly,
+          unitsPerBox: 1,
+          quantityUnknown: false,
+          boxesOnlyMode: true,
+        };
+      } else {
+        // addQty: create a plain qty record
+        partial = {
+          boxes: addQty!,
+          unitsPerBox: 1,
+          quantityUnknown: false,
+          boxesOnlyMode: false,
+        };
+      }
       await this.inventoryModel.create({
         skuId: sku._id,
         skuCode: sku.sku,
@@ -357,8 +433,32 @@ export class InventoryService {
       });
     }
 
-    const inDelta = this.describeInDelta(dto.boxes, dto.unitsPerBox ?? 1, dto.boxesOnlyMode);
-    const addedQty = dto.boxes * (dto.unitsPerBox ?? 1);
+    // ── Audit log ────────────────────────────────────────────────────────────
+    let inDelta: string;
+    let addedQty: number;
+    let logBoxes: number;
+    let logUnits: number;
+
+    if (inConfigs) {
+      const parts = inConfigs.map(c => `+${c.boxes}箱×${c.unitsPerBox}件/箱`).join('+');
+      addedQty = inConfigs.reduce((s, c) => s + c.boxes * c.unitsPerBox, 0);
+      inDelta = inConfigs.length === 1
+        ? this.describeInDelta(inConfigs[0].boxes, inConfigs[0].unitsPerBox)
+        : `${parts}=+${addedQty}件`;
+      logBoxes = inConfigs.reduce((s, c) => s + c.boxes, 0);
+      logUnits = inConfigs.length === 1 ? inConfigs[0].unitsPerBox : 1;
+    } else if (inBoxesOnly !== null) {
+      inDelta = this.describeInDelta(inBoxesOnly, 1, true);
+      addedQty = 0;
+      logBoxes = inBoxesOnly;
+      logUnits = 1;
+    } else {
+      inDelta = `+${addQty!}件`;
+      addedQty = addQty!;
+      logBoxes = addQty!;
+      logUnits = 1;
+    }
+
     await this.historyService.log({
       userId: user._id.toString(),
       userName: user.name,
@@ -370,8 +470,10 @@ export class InventoryService {
         skuCode: sku.sku,
         locationCode: location.code,
         addedQty,
-        boxes: dto.boxes,
-        unitsPerBox: dto.unitsPerBox ?? 1,
+        boxes: logBoxes,
+        unitsPerBox: logUnits,
+        configurations: inConfigs ?? undefined,
+        ...(inBoxesOnly !== null ? { boxesOnlyMode: true } : {}),
       },
     });
 
@@ -380,9 +482,9 @@ export class InventoryService {
       locationId: new Types.ObjectId(dto.locationId),
       locationCode: location.code,
       type: 'IN',
-      quantity: dto.boxes * (dto.unitsPerBox ?? 1),
-      boxes: dto.boxes,
-      unitsPerBox: dto.unitsPerBox ?? 1,
+      quantity: addedQty,
+      boxes: logBoxes,
+      unitsPerBox: logUnits,
       note: dto.note,
       businessAction: '入库',
       operatorId: new Types.ObjectId(user._id.toString()),
