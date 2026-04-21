@@ -593,7 +593,8 @@ export class InventoryService {
     locationId: string;
     quantity?: number;
     configurations?: { boxes: number; unitsPerBox: number }[];
-    adjustMode?: 'qty' | 'configs' | 'boxes_only'; // for audit description clarity
+    loosePcs?: number;   // pcs not in any carton spec (mixed mode)
+    adjustMode?: 'qty' | 'configs' | 'boxes_only' | 'mixed';
     note?: string;
   }, user: any) {
     if (!dto.note || dto.note.trim() === '') {
@@ -621,11 +622,16 @@ export class InventoryService {
       configurations: JSON.stringify(record.configurations ?? []),
     };
 
-    if (dto.configurations && dto.configurations.length > 0) {
-      record.configurations = dto.configurations;
+    const configs = dto.configurations ?? [];
+    const loose = dto.loosePcs ?? 0;
+
+    if (configs.length > 0 || loose > 0) {
+      // mixed mode: carton specs + optional loose pcs
+      record.configurations = configs;
       record.markModified('configurations');
-      record.boxes = dto.configurations.reduce((s, c) => s + c.boxes, 0);
-      record.quantity = this.computeQuantity({ configurations: dto.configurations });
+      record.boxes = configs.reduce((s, c) => s + c.boxes, 0);
+      record.quantity = configs.reduce((s, c) => s + c.boxes * c.unitsPerBox, 0) + loose;
+      record.boxesOnlyMode = false;
     } else if (dto.quantity !== undefined) {
       record.quantity = dto.quantity;
       record.boxes = record.unitsPerBox > 0 ? Math.floor(dto.quantity / record.unitsPerBox) : 0;
@@ -637,7 +643,8 @@ export class InventoryService {
     if (dto.note) record.note = dto.note;
     await record.save();
 
-    const modeLabel = dto.adjustMode === 'configs' ? '箱规调整'
+    const modeLabel = dto.adjustMode === 'mixed' ? '结构调整'
+      : dto.adjustMode === 'configs' ? '箱规调整'
       : dto.adjustMode === 'boxes_only' ? '箱数调整'
       : '数量调整';
     const afterDesc = this.describeQty(record);
