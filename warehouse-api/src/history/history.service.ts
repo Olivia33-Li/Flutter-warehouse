@@ -23,6 +23,11 @@ export class HistoryService {
     @InjectModel(ChangeRecord.name) private changeModel: Model<ChangeRecordDocument>,
   ) {}
 
+  async clearAll(): Promise<number> {
+    const result = await this.changeModel.deleteMany({});
+    return result.deletedCount ?? 0;
+  }
+
   async log(params: LogParams) {
     return this.changeModel.create({
       ...params,

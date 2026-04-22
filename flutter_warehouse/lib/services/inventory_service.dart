@@ -48,35 +48,50 @@ class InventoryService {
   Future<void> stockIn({
     required String skuCode,
     required String locationId,
-    required int boxes,
+    // Mode A – single carton spec
+    int? boxes,
     int? unitsPerBox,
-    String? note,
+    // Mode A (multi-spec) – mixed configurations
+    List<Map<String, int>>? configurations,
+    // Mode B – boxes only, pcs/carton unknown
     bool boxesOnlyMode = false,
+    // Mode C – piece count delta, no carton structure
+    int? addQuantity,
+    // Common
+    String? note,
     bool pendingCount = false,
   }) async {
     await _api.post('/transactions/in', data: {
       'skuCode': skuCode,
       'locationId': locationId,
-      'boxes': boxes,
-      if (unitsPerBox != null) 'unitsPerBox': unitsPerBox,
-      if (note != null && note.isNotEmpty) 'note': note,
+      if (configurations != null && configurations.isNotEmpty)
+        'configurations': configurations
+      else if (boxes != null) ...{
+        'boxes': boxes,
+        if (unitsPerBox != null) 'unitsPerBox': unitsPerBox,
+      },
+      if (addQuantity != null) 'addQuantity': addQuantity,
       if (boxesOnlyMode) 'boxesOnlyMode': true,
       if (pendingCount) 'pendingCount': true,
+      if (note != null && note.isNotEmpty) 'note': note,
     });
   }
 
   Future<void> stockOut({
     required String skuCode,
     required String locationId,
-    required int quantity,
-    List<Map<String, int>>? configurations, // per-spec removal for 按箱规 mode
+    int? quantity,              // by-qty: deduct from loosePcs
+    List<Map<String, int>>? configurations, // by-carton: deduct from configurations
+    int? unconfiguredCartons,   // cartons-only: deduct from unconfiguredCartons
     String? note,
   }) async {
     await _api.post('/transactions/out', data: {
       'skuCode': skuCode,
       'locationId': locationId,
-      'quantity': quantity,
+      if (quantity != null) 'quantity': quantity,
       if (configurations != null && configurations.isNotEmpty) 'configurations': configurations,
+      if (unconfiguredCartons != null && unconfiguredCartons > 0)
+        'unconfiguredCartons': unconfiguredCartons,
       if (note != null && note.isNotEmpty) 'note': note,
     });
   }
@@ -86,14 +101,16 @@ class InventoryService {
     required String locationId,
     int? quantity,
     List<Map<String, int>>? configurations,
-    String adjustMode = 'qty', // 'qty' | 'configs' | 'boxes_only'
+    int loosePcs = 0,  // pcs not in any carton spec
+    String adjustMode = 'qty', // 'qty' | 'mixed'
     String? note,
   }) async {
     await _api.post('/transactions/adjust', data: {
       'skuCode': skuCode,
       'locationId': locationId,
       if (quantity != null) 'quantity': quantity,
-      if (configurations != null) 'configurations': configurations,
+      if (configurations != null && configurations.isNotEmpty) 'configurations': configurations,
+      if (loosePcs > 0) 'loosePcs': loosePcs,
       'adjustMode': adjustMode,
       if (note != null && note.isNotEmpty) 'note': note,
     });

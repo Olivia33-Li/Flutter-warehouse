@@ -79,19 +79,42 @@ export class InventoryService {
     return (inv.boxes ?? 0) * (inv.unitsPerBox ?? 1);
   }
 
+  /**
+   * Compute quantity for the new stock model:
+   *   quantity = loosePcs + sum(configs.boxes * configs.unitsPerBox)
+   * unconfiguredCartons are NOT counted in quantity.
+   */
+  private computeQtyFromStructure(fields: {
+    loosePcs?: number;
+    configurations?: { boxes: number; unitsPerBox: number }[];
+  }): number {
+    return (fields.loosePcs ?? 0) +
+      (fields.configurations ?? []).reduce((s, c) => s + c.boxes * c.unitsPerBox, 0);
+  }
+
+  /**
+   * Compute total carton count:
+   *   totalCartons = unconfiguredCartons + sum(configs.boxes)
+   * Stored in the `boxes` field for backward compatibility.
+   */
+  private computeTotalCartons(fields: {
+    configurations?: { boxes: number; unitsPerBox: number }[];
+    unconfiguredCartons?: number;
+  }): number {
+    return (fields.unconfiguredCartons ?? 0) +
+      (fields.configurations ?? []).reduce((s, c) => s + c.boxes, 0);
+  }
+
   private formatRecord(r: any) {
     const sku = r.skuId as any;
     const skuCode = r.skuCode || sku?.sku || '';
-    const boxes = (r.boxes ?? 0) > 0 ? r.boxes : (r.quantity ?? 0);
-    const unitsPerBox = r.unitsPerBox ?? 1;
     return {
       ...r,
       skuCode,
       skuId: sku?._id?.toString() ?? r.skuId?.toString(),
       skuName: sku?.name,
-      boxes,
-      unitsPerBox,
-      quantity: r.quantity ?? boxes * unitsPerBox,
+      loosePcs: r.loosePcs ?? 0,
+      unconfiguredCartons: r.unconfiguredCartons ?? 0,
     };
   }
 
@@ -274,11 +297,24 @@ export class InventoryService {
   }
 
   async clearAllData(user: any) {
-    await this.inventoryModel.deleteMany({});
-    await this.skuModel.deleteMany({});
-    await this.locationModel.deleteMany({});
-    await this.importLogModel.deleteMany({});
-    return { message: '所有业务数据已清空' };
+    const [invRes, skuRes, locRes, txRes, importRes, auditLogs] = await Promise.all([
+      this.inventoryModel.deleteMany({}),
+      this.skuModel.deleteMany({}),
+      this.locationModel.deleteMany({}),
+      this.txModel.deleteMany({}),
+      this.importLogModel.deleteMany({}),
+      this.historyService.clearAll(),
+    ]);
+    return {
+      deleted: {
+        inventories: invRes.deletedCount ?? 0,
+        skus: skuRes.deletedCount ?? 0,
+        locations: locRes.deletedCount ?? 0,
+        transactions: txRes.deletedCount ?? 0,
+        importLogs: importRes.deletedCount ?? 0,
+        auditLogs,
+      },
+    };
   }
 
   // ─── Transactions ─────────────────────────────────────────────────────────────
@@ -286,16 +322,16 @@ export class InventoryService {
   async stockIn(dto: {
     skuCode: string;
     locationId: string;
-    // Mode A: by carton(s) — single spec
+    // by-carton single spec
     boxes?: number;
     unitsPerBox?: number;
-    // Mode A (multi-spec): by mixed configurations
+    // by-carton multi-spec
     configurations?: { boxes: number; unitsPerBox: number }[];
-    // Mode B: boxes only — carton count known, pcs/carton unknown
+    // cartons-only (no unitsPerBox) → unconfiguredCartons
     boxesOnlyMode?: boolean;
-    // Mode C: by total qty — piece count only, no carton structure
+    // by-qty (loose pieces) → loosePcs
     addQuantity?: number;
-    // Common
+    // common
     note?: string;
     pendingCount?: boolean;
   }, user: any) {
@@ -310,27 +346,37 @@ export class InventoryService {
 
     const stockStatus = dto.pendingCount ? 'pending_count' : 'confirmed';
 
-    // ── Normalise input into canonical form ──────────────────────────────────
-    // inConfigs: Mode A — one or more {boxes, unitsPerBox} specs to merge in
-    // inBoxesOnly: Mode B — plain carton count, no pcs/carton
-    // addQty: Mode C — piece count delta, no carton structure
+    // ── Mode detection ────────────────────────────────────────────────────────
+    // inConfigs  → by-carton: merge into configurations, counts toward quantity
+    // inBoxesOnly → cartons-only: add to unconfiguredCartons, NOT in quantity
+    // addQty     → by-qty: add to loosePcs, counts toward quantity
+    // No unitsPerBox default. Missing unitsPerBox with boxes → cartons-only.
     let inConfigs: { boxes: number; unitsPerBox: number }[] | null = null;
     let inBoxesOnly: number | null = null;
     let addQty: number | null = null;
 
     if (dto.configurations && dto.configurations.length > 0) {
+      for (const c of dto.configurations) {
+        if (c.boxes <= 0) throw new BadRequestException('入库箱数不能为零或负数');
+        if (c.unitsPerBox <= 0) throw new BadRequestException('箱规必须大于零');
+      }
       inConfigs = dto.configurations;
-    } else if (dto.boxesOnlyMode) {
-      inBoxesOnly = dto.boxes ?? 0;
-    } else if (dto.addQuantity !== undefined && dto.addQuantity > 0) {
+    } else if (!dto.boxesOnlyMode && dto.boxes !== undefined && dto.unitsPerBox !== undefined && dto.unitsPerBox > 0) {
+      if (dto.boxes <= 0) throw new BadRequestException('入库箱数不能为零或负数');
+      inConfigs = [{ boxes: dto.boxes, unitsPerBox: dto.unitsPerBox }];
+    } else if (dto.boxesOnlyMode || (dto.boxes !== undefined && !dto.unitsPerBox)) {
+      // No unitsPerBox → unconfiguredCartons. Never default unitsPerBox to 1.
+      const n = dto.boxes ?? 0;
+      if (n <= 0) throw new BadRequestException('入库箱数不能为零或负数');
+      inBoxesOnly = n;
+    } else if (dto.addQuantity !== undefined) {
+      if (dto.addQuantity <= 0) throw new BadRequestException('入库件数不能为零或负数');
       addQty = dto.addQuantity;
-    } else if (dto.boxes !== undefined && dto.boxes > 0) {
-      inConfigs = [{ boxes: dto.boxes, unitsPerBox: dto.unitsPerBox ?? 1 }];
     } else {
       throw new BadRequestException('入库数量不能为零');
     }
 
-    // ── Merge helper: merge inConfigs into an existing configs array ─────────
+    // ── Merge configs helper ─────────────────────────────────────────────────
     const mergeConfigs = (
       existing: { boxes: number; unitsPerBox: number }[],
       incoming: { boxes: number; unitsPerBox: number }[],
@@ -355,39 +401,28 @@ export class InventoryService {
 
     if (existing) {
       if (inConfigs) {
-        // ── Mode A: merge configs ────────────────────────────────────────────
-        // Upgrade flat record to configurations if needed
-        const base: { boxes: number; unitsPerBox: number }[] =
-          existing.configurations?.length > 0
-            ? existing.configurations
-            : (existing.boxes > 0
-                ? [{ boxes: existing.boxes, unitsPerBox: existing.unitsPerBox ?? 1 }]
-                : []);
-        existing.configurations = mergeConfigs(base, inConfigs);
+        // by-carton: merge into configurations (existing loosePcs / unconfiguredCartons untouched)
+        existing.configurations = mergeConfigs(existing.configurations ?? [], inConfigs);
         existing.markModified('configurations');
-        existing.boxes = existing.configurations.reduce((s, c) => s + c.boxes, 0);
         existing.boxesOnlyMode = false;
       } else if (inBoxesOnly !== null) {
-        // ── Mode B: boxes-only ───────────────────────────────────────────────
-        existing.boxes = (existing.boxes ?? 0) + inBoxesOnly;
-        existing.boxesOnlyMode = true;
+        // cartons-only: accumulate in unconfiguredCartons only, never touch quantity
+        existing.unconfiguredCartons = (existing.unconfiguredCartons ?? 0) + inBoxesOnly;
+        // boxesOnlyMode = true only when record has nothing else
+        existing.boxesOnlyMode =
+          (existing.configurations ?? []).length === 0 && (existing.loosePcs ?? 0) === 0;
       } else if (addQty !== null) {
-        // ── Mode C: qty delta ────────────────────────────────────────────────
-        // Add to quantity; recalculate boxes using existing unitsPerBox
-        const newQty = (existing.quantity ?? 0) + addQty;
-        const upb = (existing.unitsPerBox > 0 ? existing.unitsPerBox : 1);
-        existing.quantity = newQty;
-        existing.boxes = Math.floor(newQty / upb);
-        // Clear configurations — quantity is now tracked directly
-        existing.configurations = [];
-        existing.markModified('configurations');
+        // by-qty: accumulate in loosePcs
+        existing.loosePcs = (existing.loosePcs ?? 0) + addQty;
         existing.boxesOnlyMode = false;
       }
       existing.stockStatus = stockStatus;
       existing.quantityUnknown = false;
-      if (inConfigs || inBoxesOnly !== null) {
-        existing.quantity = this.computeQuantity(existing);
-      }
+      // Recompute derived summary fields
+      existing.quantity = this.computeQtyFromStructure(existing);
+      existing.boxes    = this.computeTotalCartons(existing);
+      const cfgs = existing.configurations ?? [];
+      existing.unitsPerBox = cfgs.length === 1 ? cfgs[0].unitsPerBox : 0;
       await existing.save();
     } else {
       // ── New record ───────────────────────────────────────────────────────────
@@ -397,37 +432,22 @@ export class InventoryService {
         stockStatus: { $in: ['completed_merge', 'completed_split'] },
       });
 
-      let partial: Partial<Inventory>;
-      if (inConfigs) {
-        partial = {
-          configurations: inConfigs,
-          boxes: inConfigs.reduce((s, c) => s + c.boxes, 0),
-          unitsPerBox: inConfigs.length === 1 ? inConfigs[0].unitsPerBox : 1,
-          quantityUnknown: false,
-          boxesOnlyMode: false,
-        };
-      } else if (inBoxesOnly !== null) {
-        partial = {
-          boxes: inBoxesOnly,
-          unitsPerBox: 1,
-          quantityUnknown: false,
-          boxesOnlyMode: true,
-        };
-      } else {
-        // addQty: create a plain qty record
-        partial = {
-          boxes: addQty!,
-          unitsPerBox: 1,
-          quantityUnknown: false,
-          boxesOnlyMode: false,
-        };
-      }
+      const configurations = inConfigs ?? [];
+      const loosePcs       = addQty ?? 0;
+      const unconfiguredCartons = inBoxesOnly ?? 0;
+
       await this.inventoryModel.create({
         skuId: sku._id,
         skuCode: sku.sku,
         locationId: new Types.ObjectId(dto.locationId),
-        ...partial,
-        quantity: this.computeQuantity(partial),
+        configurations,
+        loosePcs,
+        unconfiguredCartons,
+        boxes: this.computeTotalCartons({ configurations, unconfiguredCartons }),
+        unitsPerBox: configurations.length === 1 ? configurations[0].unitsPerBox : 0,
+        quantity: this.computeQtyFromStructure({ loosePcs, configurations }),
+        boxesOnlyMode: inBoxesOnly !== null && inConfigs === null && addQty === null,
+        quantityUnknown: false,
         stockStatus,
         note: dto.note,
       });
@@ -437,26 +457,24 @@ export class InventoryService {
     let inDelta: string;
     let addedQty: number;
     let logBoxes: number;
-    let logUnits: number;
 
     if (inConfigs) {
-      const parts = inConfigs.map(c => `+${c.boxes}箱×${c.unitsPerBox}件/箱`).join('+');
       addedQty = inConfigs.reduce((s, c) => s + c.boxes * c.unitsPerBox, 0);
-      inDelta = inConfigs.length === 1
-        ? this.describeInDelta(inConfigs[0].boxes, inConfigs[0].unitsPerBox)
-        : `${parts}=+${addedQty}件`;
-      logBoxes = inConfigs.reduce((s, c) => s + c.boxes, 0);
-      logUnits = inConfigs.length === 1 ? inConfigs[0].unitsPerBox : 1;
+      logBoxes  = inConfigs.reduce((s, c) => s + c.boxes, 0);
+      if (inConfigs.length === 1) {
+        inDelta = `+${inConfigs[0].boxes}箱×${inConfigs[0].unitsPerBox}件/箱=+${addedQty}件`;
+      } else {
+        const parts = inConfigs.map(c => `+${c.boxes}箱×${c.unitsPerBox}件/箱`).join('+');
+        inDelta = `${parts}=+${addedQty}件`;
+      }
     } else if (inBoxesOnly !== null) {
-      inDelta = this.describeInDelta(inBoxesOnly, 1, true);
+      inDelta  = `+${inBoxesOnly}箱（无箱规）`;
       addedQty = 0;
-      logBoxes = inBoxesOnly;
-      logUnits = 1;
+      logBoxes  = inBoxesOnly;
     } else {
-      inDelta = `+${addQty!}件`;
+      inDelta  = `+${addQty!}件`;
       addedQty = addQty!;
-      logBoxes = addQty!;
-      logUnits = 1;
+      logBoxes  = 0;
     }
 
     await this.historyService.log({
@@ -471,9 +489,9 @@ export class InventoryService {
         locationCode: location.code,
         addedQty,
         boxes: logBoxes,
-        unitsPerBox: logUnits,
         configurations: inConfigs ?? undefined,
-        ...(inBoxesOnly !== null ? { boxesOnlyMode: true } : {}),
+        ...(inBoxesOnly !== null ? { boxesOnlyMode: true, unconfiguredCartons: inBoxesOnly } : {}),
+        ...(addQty !== null ? { loosePcs: addQty } : {}),
       },
     });
 
@@ -484,7 +502,7 @@ export class InventoryService {
       type: 'IN',
       quantity: addedQty,
       boxes: logBoxes,
-      unitsPerBox: logUnits,
+      unitsPerBox: inConfigs?.length === 1 ? inConfigs[0].unitsPerBox : undefined,
       note: dto.note,
       businessAction: '入库',
       operatorId: new Types.ObjectId(user._id.toString()),
@@ -497,8 +515,9 @@ export class InventoryService {
   async stockOut(dto: {
     skuCode: string;
     locationId: string;
-    quantity: number;
-    configurations?: { boxes: number; unitsPerBox: number }[]; // per-spec removal (按箱规 mode)
+    quantity?: number;              // by-qty: deduct from loosePcs only
+    configurations?: { boxes: number; unitsPerBox: number }[];  // by-carton: deduct from configurations
+    unconfiguredCartons?: number;   // cartons-only: deduct from unconfiguredCartons
     note?: string;
   }, user: any) {
     const sku = await this.skuModel.findOne({ sku: dto.skuCode.toUpperCase() });
@@ -513,63 +532,85 @@ export class InventoryService {
     });
     if (!record) throw new NotFoundException('库存记录不存在');
 
-    if (dto.configurations && dto.configurations.length > 0) {
-      // 按箱规出库: build the source configs (prefer record.configurations, fall back to record.boxes/unitsPerBox)
-      const sourceConfigs: { boxes: number; unitsPerBox: number }[] =
-        record.configurations?.length > 0
-          ? record.configurations
-          : (record.boxes > 0 ? [{ boxes: record.boxes, unitsPerBox: record.unitsPerBox ?? 1 }] : []);
+    let outDeltaStr: string;
+    let reducedQty = 0;
 
-      // validate each spec before subtracting
+    if (dto.configurations && dto.configurations.length > 0) {
+      // ── by-carton: deduct from configurations ────────────────────────────────
+      const sourceConfigs = record.configurations ?? [];
       for (const toRemove of dto.configurations) {
-        const existing = sourceConfigs.find(c => c.unitsPerBox === toRemove.unitsPerBox);
-        const available = existing?.boxes ?? 0;
+        if (toRemove.boxes <= 0) throw new BadRequestException('出库箱数不能为零或负数');
+        const found = sourceConfigs.find(c => c.unitsPerBox === toRemove.unitsPerBox);
+        const available = found?.boxes ?? 0;
         if (toRemove.boxes > available) {
           throw new BadRequestException(
-            `库存不足：${toRemove.unitsPerBox}件/箱 当前 ${available} 箱，出库 ${toRemove.boxes} 箱`
+            `库存不足：${toRemove.unitsPerBox}件/箱 当前 ${available} 箱，出库 ${toRemove.boxes} 箱`,
           );
         }
       }
-
-      // subtract
-      const updated = sourceConfigs
-        .map(existing => {
-          const toRemove = dto.configurations!.find(c => c.unitsPerBox === existing.unitsPerBox);
-          return { boxes: existing.boxes - (toRemove?.boxes ?? 0), unitsPerBox: existing.unitsPerBox };
+      record.configurations = sourceConfigs
+        .map(c => {
+          const toRemove = dto.configurations!.find(r => r.unitsPerBox === c.unitsPerBox);
+          return { boxes: c.boxes - (toRemove?.boxes ?? 0), unitsPerBox: c.unitsPerBox };
         })
         .filter(c => c.boxes > 0);
-      record.configurations = updated;
       record.markModified('configurations');
-      record.boxes = updated.reduce((s, c) => s + c.boxes, 0);
-      record.quantity = this.computeQuantity(record);
-    } else {
-      // 按总数量出库: validate against total quantity first
-      if (record.quantity < dto.quantity) {
-        throw new BadRequestException(`库存不足：当前 ${record.quantity} 件，出库 ${dto.quantity} 件`);
+      reducedQty = dto.configurations.reduce((s, c) => s + c.boxes * c.unitsPerBox, 0);
+      const parts = dto.configurations.map(c => `${c.boxes}箱×${c.unitsPerBox}件/箱`).join('+');
+      outDeltaStr = `-${parts}=-${reducedQty}件`;
+
+    } else if (dto.unconfiguredCartons !== undefined && dto.unconfiguredCartons > 0) {
+      // ── cartons-only: deduct from unconfiguredCartons (does NOT affect quantity) ──
+      const available = record.unconfiguredCartons ?? 0;
+      if (dto.unconfiguredCartons > available) {
+        throw new BadRequestException(
+          `无箱规库存不足：当前 ${available} 箱，出库 ${dto.unconfiguredCartons} 箱`,
+        );
       }
-      const newQty = Math.max(0, record.quantity - dto.quantity);
-      const newBoxes = record.unitsPerBox > 0 ? Math.floor(newQty / record.unitsPerBox) : 0;
-      record.configurations = [];
-      record.markModified('configurations');
-      record.boxes = newBoxes;
-      record.quantity = newQty;
+      record.unconfiguredCartons = available - dto.unconfiguredCartons;
+      reducedQty = 0; // unconfiguredCartons never contribute to quantity
+      outDeltaStr = `-${dto.unconfiguredCartons}箱（无箱规）`;
+
+    } else if (dto.quantity !== undefined && dto.quantity > 0) {
+      // ── by-qty: deduct from loosePcs only. Never cross-deduct from configurations.
+      const available = record.loosePcs ?? 0;
+      if (dto.quantity > available) {
+        throw new BadRequestException(
+          `散件库存不足：当前 ${available} 件，出库 ${dto.quantity} 件`,
+        );
+      }
+      record.loosePcs = available - dto.quantity;
+      reducedQty = dto.quantity;
+      outDeltaStr = `-${dto.quantity}件`;
+
+    } else {
+      throw new BadRequestException('出库数量不能为零');
     }
+
+    // Recompute derived summary fields
+    record.quantity = this.computeQtyFromStructure(record);
+    record.boxes    = this.computeTotalCartons(record);
+    const cfgs = record.configurations ?? [];
+    record.unitsPerBox = cfgs.length === 1 ? cfgs[0].unitsPerBox : 0;
+    // boxesOnlyMode stays true only when record has only unconfiguredCartons
+    if ((record.loosePcs ?? 0) > 0 || cfgs.length > 0) record.boxesOnlyMode = false;
+
     await record.save();
 
-    const outDelta = this.describeOutDelta(dto.quantity, dto.configurations);
     await this.historyService.log({
       userId: user._id.toString(),
       userName: user.name,
       action: 'edit',
       entity: 'inventory',
       businessAction: '出库',
-      description: `出库: ${sku.sku} @ ${location.code} ${outDelta}`,
+      description: `出库: ${sku.sku} @ ${location.code} ${outDeltaStr}`,
       details: {
         skuCode: sku.sku,
         locationCode: location.code,
-        reducedQty: dto.quantity,
+        reducedQty,
         remainingQty: record.quantity,
         configurations: dto.configurations,
+        ...(dto.unconfiguredCartons ? { unconfiguredCartons: dto.unconfiguredCartons } : {}),
       },
     });
 
@@ -578,7 +619,7 @@ export class InventoryService {
       locationId: new Types.ObjectId(dto.locationId),
       locationCode: location.code,
       type: 'OUT',
-      quantity: dto.quantity,
+      quantity: reducedQty,
       note: dto.note,
       businessAction: '出库',
       operatorId: new Types.ObjectId(user._id.toString()),

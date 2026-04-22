@@ -331,17 +331,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final result = await InventoryService().clearAllData();
       if (!mounted) return;
-      final deleted = result['deleted'] as Map<String, dynamic>? ?? {};
+      final raw = result['deleted'];
+      final deleted = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
       final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           l10n.clearDoneMsg(
-            deleted['inventories'],
-            deleted['skus'],
-            deleted['locations'],
-            deleted['transactions'],
-            deleted['auditLogs'],
-            deleted['importLogs'],
+            deleted['inventories'] ?? 0,
+            deleted['skus'] ?? 0,
+            deleted['locations'] ?? 0,
+            deleted['transactions'] ?? 0,
+            deleted['auditLogs'] ?? 0,
+            deleted['importLogs'] ?? 0,
           ),
         ),
         duration: const Duration(seconds: 6),

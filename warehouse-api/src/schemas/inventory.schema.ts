@@ -17,11 +17,19 @@ export class Inventory {
   @Prop({ type: Number, default: 0, min: 0 })
   boxes: number;
 
-  @Prop({ type: Number, default: 1, min: 1 })
+  @Prop({ type: Number, default: 0, min: 0 })
   unitsPerBox: number;
 
   @Prop({ type: [{ boxes: Number, unitsPerBox: Number, _id: false }], default: [] })
   configurations: { boxes: number; unitsPerBox: number }[];
+
+  /** Pieces not belonging to any carton spec (by-qty stockIn). */
+  @Prop({ type: Number, default: 0, min: 0 })
+  loosePcs: number;
+
+  /** Cartons with no known pcs/carton (boxes-only stockIn). Do NOT count toward quantity. */
+  @Prop({ type: Number, default: 0, min: 0 })
+  unconfiguredCartons: number;
 
   @Prop({ type: Number, default: 0, min: 0 })
   quantity: number;
