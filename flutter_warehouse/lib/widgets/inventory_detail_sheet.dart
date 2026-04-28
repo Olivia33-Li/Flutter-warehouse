@@ -108,13 +108,43 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   int get _units => _invRecord?.unitsPerBox ?? widget.unitsPerBox;
   bool get _quantityUnknown => _invRecord?.quantityUnknown ?? widget.quantityUnknown;
   bool get _boxesOnlyMode => _invRecord?.boxesOnlyMode ?? false;
-  String _qtyLabel(AppLocalizations l10n) => _quantityUnknown
-      ? l10n.invDetailQtyUnknown
-      : (_boxesOnlyMode
-          ? l10n.invDetailBoxesValue(_boxes)
-          : '$_qty ${l10n.invDetailPieceSuffix}');
+  String _qtyLabel(AppLocalizations l10n) {
+    if (_quantityUnknown) return l10n.invDetailQtyUnknown;
+    if (_boxesOnlyMode) return l10n.invDetailBoxesValue(_boxes);
+    final pcsStr = '$_qty ${l10n.invDetailPieceSuffix}';
+    if (_boxes > 0) return '$pcsStr · $_boxes ${l10n.invDetailBoxesSuffix}';
+    return pcsStr;
+  }
   List<InventoryConfig> get _configs =>
       _invRecord != null ? _invRecord!.configurations : widget.configurations;
+
+  /// Builds the spec subtitle shown in the sheet header.
+  /// Shows each carton spec as "N ctn × M pcs/ctn", then unconfigured cartons,
+  /// then loose pcs — clearly separated with " + ".
+  String _buildSpecSubtitle(AppLocalizations l10n) {
+    if (_quantityUnknown) return l10n.invDetailQtyUnknownHeader;
+
+    final parts = <String>[];
+
+    // Each carton spec with a known unitsPerBox
+    for (final c in _configs) {
+      parts.add(l10n.locDetailConfigCarton(c.boxes, c.unitsPerBox));
+    }
+
+    // Cartons without a per-box spec
+    final noSpec = _invRecord?.unconfiguredCartons ?? 0;
+    if (noSpec > 0) parts.add('$noSpec ${l10n.unitBox} ${l10n.skuNoSpec}');
+
+    // Loose pieces
+    final loose = _invRecord?.loosePcs ?? 0;
+    if (loose > 0) parts.add('$loose ${l10n.unitPiece}');
+
+    if (parts.isNotEmpty) return parts.join('\n');
+
+    // Fallback for legacy records (flat boxes/unitsPerBox, no configurations)
+    if (_boxesOnlyMode) return l10n.invDetailBoxesOnlyHeader(_boxes);
+    return l10n.invDetailBoxesAndPcs(_boxes, _qty);
+  }
 
   @override
   void initState() {
@@ -165,8 +195,14 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   // ── 入库 ──
   Future<void> _showStockInDialog() async {
     final l10n = AppLocalizations.of(context)!;
-    final boxesCtrl = TextEditingController();
-    final unitsCtrl = TextEditingController();
+
+    // Mode A: multi-row config list (up to 3 specs)
+    // Pre-fill pcs/carton with existing inventory value if available
+    final existingUnits = _units > 0 ? _units.toString() : '';
+    final List<Map<String, TextEditingController>> configRows = [
+      {'boxes': TextEditingController(), 'units': TextEditingController(text: existingUnits)},
+    ];
+    final boxesOnlyCtrl = TextEditingController();
     final qtyCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     String stockInMode = 'carton'; // 'carton' | 'boxesOnly' | 'qty'
@@ -178,264 +214,249 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final previewQty = (stockInMode == 'carton' && !isPending)
-              ? (int.tryParse(boxesCtrl.text) ?? 0) * (int.tryParse(unitsCtrl.text) ?? 0)
-              : (stockInMode == 'qty' && !isPending)
+          // Total qty from all config rows
+          int configsTotal = 0;
+          for (final row in configRows) {
+            final b = int.tryParse(row['boxes']!.text) ?? 0;
+            final u = int.tryParse(row['units']!.text) ?? 0;
+            configsTotal += b * u;
+          }
+
+          final previewQty = stockInMode == 'carton' && !isPending
+              ? configsTotal
+              : stockInMode == 'qty' && !isPending
                   ? (int.tryParse(qtyCtrl.text) ?? 0)
                   : 0;
           final previewBoxes = stockInMode == 'boxesOnly'
-              ? (int.tryParse(boxesCtrl.text) ?? 0)
+              ? (int.tryParse(boxesOnlyCtrl.text) ?? 0)
               : 0;
 
-          return AlertDialog(
-            title: Text(l10n.invDetailStockInTitle),
-            content: SizedBox(
-              width: 340,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isPending
-                            ? Colors.orange.shade50
-                            : Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${widget.skuCode}  @  ${widget.locationCode}',
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text(
-                            _invRecord?.pendingCount == true
-                                ? l10n.invDetailCurrentStatusPending
-                                : l10n.invDetailCurrentStock(_qtyLabel(l10n)),
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: isPending
-                                    ? Colors.orange.shade700
-                                    : Colors.green.shade700),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+          final accentColor =
+              isPending ? Colors.orange.shade600 : Colors.green.shade600;
 
-                    // 待清点 toggle
-                    CheckboxListTile(
-                      value: isPending,
-                      onChanged: (v) => setS(() => isPending = v ?? false),
-                      title: Text(l10n.inventoryPendingTitle,
-                          style: const TextStyle(fontSize: 14)),
-                      subtitle: Text(l10n.inventoryPendingSubtitle,
-                          style: const TextStyle(fontSize: 12)),
-                      secondary: Icon(Icons.pending_actions_outlined,
-                          color: isPending ? Colors.orange : Colors.grey,
-                          size: 20),
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      dense: true,
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Mode selector — always visible
-                    SegmentedButton<String>(
-                      segments: [
-                        ButtonSegment(
-                            value: 'carton',
-                            label: Text(l10n.invDetailModeByCarton),
-                            icon: const Icon(Icons.view_list, size: 16)),
-                        ButtonSegment(
-                            value: 'boxesOnly',
-                            label: Text(l10n.invDetailModeBoxesOnly),
-                            icon: const Icon(Icons.inventory_2_outlined, size: 16)),
-                        ButtonSegment(
-                            value: 'qty',
-                            label: Text(l10n.invDetailModeByQty),
-                            icon: const Icon(Icons.numbers, size: 16)),
-                      ],
-                      selected: {stockInMode},
-                      onSelectionChanged: (v) =>
-                          setS(() { stockInMode = v.first; err = null; }),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Input area
-                    if (stockInMode == 'boxesOnly') ...[
-                      TextField(
-                        controller: boxesCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: l10n.invDetailBoxesLabel,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          suffixText: l10n.invDetailBoxesSuffix,
-                        ),
-                        onChanged: (_) => setS(() {}),
-                      ),
-                      if (previewBoxes > 0) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isPending
-                                ? Colors.orange.shade50
-                                : Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: isPending
-                                    ? Colors.orange.shade200
-                                    : Colors.green.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(isPending ? l10n.invDetailPendingBoxes : l10n.invDetailStockInBoxes,
-                                  style: const TextStyle(fontSize: 13)),
-                              Text(l10n.invDetailBoxesValue(previewBoxes),
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: isPending
-                                          ? Colors.orange.shade700
-                                          : Colors.green.shade700)),
-                              Text(l10n.invDetailCartonTBD,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade500)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ] else if (stockInMode == 'carton' && !isPending) ...[
-                      _qtyRow(boxesCtrl, unitsCtrl,
-                          onChanged: () => setS(() {})),
-                      if (previewQty > 0) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.green.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(l10n.invDetailStockInTotal,
-                                  style: const TextStyle(fontSize: 13)),
-                              Text(l10n.invDetailAddQty(previewQty),
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: Colors.green.shade700)),
-                              Text(l10n.invDetailNewTotal(_qty + previewQty),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade500)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ] else if (stockInMode == 'qty' && !isPending) ...[
-                      TextField(
-                        controller: qtyCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: l10n.invDetailStockInQtyLabel,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          suffixText: l10n.invDetailPieceSuffix,
-                        ),
-                        onChanged: (_) => setS(() {}),
-                      ),
-                      if (previewQty > 0) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.green.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(l10n.invDetailStockInTotal,
-                                  style: const TextStyle(fontSize: 13)),
-                              Text(l10n.invDetailAddQty(previewQty),
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: Colors.green.shade700)),
-                              Text(l10n.invDetailNewTotal(_qty + previewQty),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade500)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ] else ...[
-                      // isPending + carton or qty: just mark record as pending
+          Widget inputArea() {
+            if (stockInMode == 'boxesOnly') {
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                TextField(
+                  controller: boxesOnlyCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: _roundedDec(l10n.invDetailBoxesLabel,
+                      suffix: l10n.invDetailBoxesSuffix),
+                  onChanged: (_) => setS(() {}),
+                ),
+                if (previewBoxes > 0) ...[
+                  const SizedBox(height: 10),
+                  _previewCard(
+                    isPending ? l10n.invDetailPendingBoxes : l10n.invDetailStockInBoxes,
+                    l10n.invDetailBoxesValue(previewBoxes),
+                    accentColor,
+                    sub: l10n.invDetailCartonTBD,
+                  ),
+                ],
+              ]);
+            } else if (stockInMode == 'carton' && !isPending) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // Multi-spec rows
+                ...configRows.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final row = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                      // Row number badge
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                        width: 24,
+                        height: 24,
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          border: Border.all(color: Colors.orange.shade200),
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.green.shade600,
+                          shape: BoxShape.circle,
                         ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline,
-                                size: 16, color: Colors.orange.shade700),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                l10n.invDetailPendingMarkNote,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.orange.shade800),
-                              ),
-                            ),
-                          ],
+                        alignment: Alignment.center,
+                        child: Text('${idx + 1}',
+                            style: const TextStyle(color: Colors.white, fontSize: 12,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      // Cartons field
+                      Expanded(
+                        child: TextField(
+                          controller: row['boxes'],
+                          keyboardType: TextInputType.number,
+                          decoration: _roundedDec(l10n.invDetailBoxesLabel,
+                              suffix: l10n.invDetailBoxesSuffix),
+                          onChanged: (_) => setS(() {}),
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 10),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Text('×', style: TextStyle(fontSize: 16,
+                            color: Colors.grey)),
+                      ),
+                      // Pcs/carton field
+                      Expanded(
+                        child: TextField(
+                          controller: row['units'],
+                          keyboardType: TextInputType.number,
+                          decoration: _roundedDec(l10n.invDetailUnitsPerBoxLabel,
+                              suffix: l10n.invDetailUnitsPerBoxSuffix),
+                          onChanged: (_) => setS(() {}),
+                        ),
+                      ),
+                      // Remove row button (only when >1 row)
+                      if (configRows.length > 1)
+                        GestureDetector(
+                          onTap: () => setS(() {
+                            row['boxes']!.dispose();
+                            row['units']!.dispose();
+                            configRows.removeAt(idx);
+                          }),
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: Icon(Icons.remove_circle_outline,
+                                size: 20, color: Colors.red.shade400),
+                          ),
+                        ),
+                    ]),
+                  );
+                }),
+                // Add spec row button (up to 3)
+                if (configRows.length < 3)
+                  TextButton.icon(
+                    onPressed: () => setS(() => configRows.add(
+                      {'boxes': TextEditingController(), 'units': TextEditingController()},
+                    )),
+                    icon: Icon(Icons.add_circle_outline,
+                        size: 16, color: Colors.green.shade600),
+                    label: Text(l10n.invDetailAddConfigRow,
+                        style: TextStyle(fontSize: 13, color: Colors.green.shade600)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                if (previewQty > 0) ...[
+                  const SizedBox(height: 10),
+                  _previewCard(
+                    l10n.invDetailStockInTotal,
+                    l10n.invDetailAddQty(previewQty),
+                    Colors.green.shade600,
+                    sub: l10n.invDetailNewTotal(_qty + previewQty),
+                  ),
+                ],
+              ]);
+            } else if (stockInMode == 'qty' && !isPending) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                TextField(
+                  controller: qtyCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: _roundedDec(l10n.invDetailStockInQtyLabel,
+                      suffix: l10n.invDetailPieceSuffix),
+                  onChanged: (_) => setS(() {}),
+                ),
+                if (previewQty > 0) ...[
+                  const SizedBox(height: 10),
+                  _previewCard(
+                    l10n.invDetailStockInTotal,
+                    l10n.invDetailAddQty(previewQty),
+                    Colors.green.shade600,
+                    sub: l10n.invDetailNewTotal(_qty + previewQty),
+                  ),
+                ],
+              ]);
+            } else {
+              // isPending + carton/qty mode: just show info
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  border: Border.all(color: Colors.orange.shade200),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.orange.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(l10n.invDetailPendingMarkNote,
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade800))),
+                ]),
+              );
+            }
+          }
 
-                    _noteField(noteCtrl),
-
-                    if (err != null) ...[
-                      const SizedBox(height: 8),
-                      Text(err!,
-                          style: const TextStyle(
-                              color: Colors.red, fontSize: 13)),
-                    ],
-                  ],
+          return _dialogWrapper(
+            ctx: ctx,
+            title: l10n.invDetailStockInTitle,
+            body: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Info header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isPending ? Colors.orange.shade50 : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${widget.skuCode}  @  ${widget.locationCode}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(
+                    _invRecord?.pendingCount == true
+                        ? l10n.invDetailCurrentStatusPending
+                        : l10n.invDetailCurrentStock(_qtyLabel(l10n)),
+                    style: TextStyle(fontSize: 12,
+                        color: isPending ? Colors.orange.shade700 : Colors.green.shade700)),
+                ]),
+              ),
+              const SizedBox(height: 14),
+              // Pending toggle
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade200),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: CheckboxListTile(
+                  value: isPending,
+                  onChanged: (v) => setS(() => isPending = v ?? false),
+                  title: Text(l10n.inventoryPendingTitle,
+                      style: const TextStyle(fontSize: 14)),
+                  subtitle: Text(l10n.inventoryPendingSubtitle,
+                      style: const TextStyle(fontSize: 12)),
+                  secondary: Icon(Icons.pending_actions_outlined,
+                      color: isPending ? Colors.orange : Colors.grey, size: 20),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => ctx.pop(), child: Text(l10n.cancel)),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                    backgroundColor: isPending
-                        ? Colors.orange.shade600
-                        : Colors.green.shade600),
+              const SizedBox(height: 14),
+              // Mode selector
+              _sectionLabel(l10n.invDetailQtyEntryMode),
+              _modeSelector(
+                ['carton', 'boxesOnly', 'qty'],
+                [l10n.invDetailModeByCarton, l10n.invDetailModeBoxesOnly, l10n.invDetailModeByQty],
+                stockInMode,
+                (v) => setS(() { stockInMode = v; err = null; }),
+              ),
+              const SizedBox(height: 14),
+              inputArea(),
+              const SizedBox(height: 12),
+              _noteField(noteCtrl),
+              if (err != null) ...[
+                const SizedBox(height: 8),
+                Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ]),
+            footer: Column(children: [
+              _dialogActionBtn(
+                label: isPending ? l10n.invDetailConfirmPendingBtn : l10n.invDetailConfirmStockIn,
+                icon: Icons.download_outlined,
+                color: accentColor,
+                loading: saving,
                 onPressed: saving
                     ? null
                     : () async {
                         if (stockInMode == 'boxesOnly') {
-                          // boxesOnly mode: add boxes, with or without pending
-                          final boxes = int.tryParse(boxesCtrl.text) ?? 0;
+                          final boxes = int.tryParse(boxesOnlyCtrl.text) ?? 0;
                           if (boxes <= 0) {
                             setS(() => err = l10n.invDetailErrInvalidBoxes);
                             return;
@@ -450,7 +471,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               pendingCount: isPending,
                               note: noteCtrl.text.trim(),
                             );
-                            if (ctx.mounted) ctx.pop();
+                            if (ctx.mounted) Navigator.of(ctx).pop();
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
@@ -459,14 +480,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           return;
                         }
                         if (isPending) {
-                          // carton or qty mode + pending: just mark existing record
                           setS(() { saving = true; err = null; });
                           try {
                             await _invService.markPending(
                               widget.inventoryRecordId!,
                               pending: true,
                             );
-                            if (ctx.mounted) ctx.pop();
+                            if (ctx.mounted) Navigator.of(ctx).pop();
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
@@ -474,51 +494,73 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           }
                           return;
                         }
-                        int boxes, units;
                         if (stockInMode == 'carton') {
-                          boxes = int.tryParse(boxesCtrl.text) ?? 0;
-                          units = int.tryParse(unitsCtrl.text) ?? 0;
-                          if (boxes <= 0 || units <= 0) {
-                            setS(() => err = l10n.invDetailErrInvalidBoxesAndUnits);
-                            return;
+                          // Build configurations list, validate all rows
+                          final configs = <Map<String, int>>[];
+                          for (final row in configRows) {
+                            final b = int.tryParse(row['boxes']!.text) ?? 0;
+                            final u = int.tryParse(row['units']!.text) ?? 0;
+                            if (b <= 0 || u <= 0) {
+                              setS(() => err = l10n.invDetailErrInvalidBoxesAndUnits);
+                              return;
+                            }
+                            configs.add({'boxes': b, 'unitsPerBox': u});
+                          }
+                          setS(() { saving = true; err = null; });
+                          try {
+                            await _invService.stockIn(
+                              skuCode: widget.skuCode,
+                              locationId: widget.locationId,
+                              configurations: configs,
+                              note: noteCtrl.text.trim(),
+                            );
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                            widget.onChanged?.call();
+                            _load();
+                          } catch (e) {
+                            setS(() { saving = false; err = _friendly(e, l10n); });
                           }
                         } else {
+                          // qty mode: send addQuantity directly
                           final qty = int.tryParse(qtyCtrl.text) ?? 0;
                           if (qty <= 0) {
                             setS(() => err = l10n.invDetailErrInvalidQty);
                             return;
                           }
-                          boxes = 1;
-                          units = qty;
-                        }
-                        setS(() { saving = true; err = null; });
-                        try {
-                          await _invService.stockIn(
-                            skuCode: widget.skuCode,
-                            locationId: widget.locationId,
-                            boxes: boxes,
-                            unitsPerBox: units,
-                            note: noteCtrl.text.trim(),
-                          );
-                          if (ctx.mounted) ctx.pop();
-                          widget.onChanged?.call();
-                          _load();
-                        } catch (e) {
-                          setS(() { saving = false; err = _friendly(e, l10n); });
+                          setS(() { saving = true; err = null; });
+                          try {
+                            await _invService.stockIn(
+                              skuCode: widget.skuCode,
+                              locationId: widget.locationId,
+                              addQuantity: qty,
+                              note: noteCtrl.text.trim(),
+                            );
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                            widget.onChanged?.call();
+                            _load();
+                          } catch (e) {
+                            setS(() { saving = false; err = _friendly(e, l10n); });
+                          }
                         }
                       },
-                child: saving
-                    ? _spinner()
-                    : Text(isPending ? l10n.invDetailConfirmPendingBtn : l10n.invDetailConfirmStockIn),
               ),
-            ],
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(l10n.cancel,
+                    style: TextStyle(color: Colors.grey.shade600)),
+              ),
+            ]),
           );
         },
       ),
     );
 
-    boxesCtrl.dispose();
-    unitsCtrl.dispose();
+    // Dispose all controllers
+    for (final row in configRows) {
+      row['boxes']!.dispose();
+      row['units']!.dispose();
+    }
+    boxesOnlyCtrl.dispose();
     qtyCtrl.dispose();
     noteCtrl.dispose();
   }
@@ -578,231 +620,157 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   ? totalOutBoxes > _boxes
                   : (_qty > 0 && previewOut > _qty);
 
-          // ── preview bar ──
-          Widget previewBar() => Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Text(l10n.invDetailOutTotal, style: const TextStyle(fontSize: 13)),
-                    Text(
-                      stockOutMode == 'boxesOnly'
-                          ? l10n.invDetailOutBoxesValue(totalOutBoxes)
-                          : l10n.invDetailOutPcsValue(previewOut),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: isOverLimit
-                            ? Colors.red.shade700
-                            : previewOut > 0 || totalOutBoxes > 0
-                                ? Colors.orange.shade700
-                                : Colors.grey.shade500,
-                      ),
-                    ),
-                    if (!isOverLimit &&
-                        (previewOut > 0 || totalOutBoxes > 0)) ...[
-                      Text(
-                        stockOutMode == 'carton'
-                            ? l10n.invDetailRemainCartonBoxes(totalAvailableBoxes - totalOutBoxes)
-                            : stockOutMode == 'boxesOnly'
-                                ? l10n.invDetailRemainBoxes(_boxes - totalOutBoxes)
-                                : l10n.invDetailRemainPcs(_qty - previewOut),
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade500),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-
-          return AlertDialog(
-            title: Text(l10n.invDetailStockOutTitle),
-            content: SizedBox(
-              width: 340,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
+          Widget inputArea() {
+            if (stockOutMode == 'carton') {
+              if (effectiveConfigs.isEmpty) {
+                return Text(l10n.invDetailNoCartonData,
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 13));
+              }
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ...List.generate(effectiveConfigs.length, (i) {
+                  final cfg = effectiveConfigs[i];
+                  final outBoxes = int.tryParse(configCtrls[i].text) ?? 0;
+                  final overLimit = outBoxes > cfg.boxes;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      // Read-only pcs/box badge
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${widget.skuCode}  @  ${widget.locationCode}',
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text(l10n.invDetailCurrentStock(_qtyLabel(l10n)),
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.red.shade700)),
+                          Text(l10n.invDetailUnitsPerBoxLabel,
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 88,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Text(
+                              '${cfg.unitsPerBox} ${l10n.invDetailPieceSuffix}',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Mode toggle — 3 options
-                    SegmentedButton<String>(
-                      segments: [
-                        ButtonSegment(
-                            value: 'carton',
-                            label: Text(l10n.invDetailModeByCarton),
-                            icon: const Icon(Icons.view_list, size: 16)),
-                        ButtonSegment(
-                            value: 'boxesOnly',
-                            label: Text(l10n.invDetailModeBoxesOnly),
-                            icon: const Icon(Icons.inventory_2_outlined, size: 16)),
-                        ButtonSegment(
-                            value: 'qty',
-                            label: Text(l10n.invDetailModeByQty),
-                            icon: const Icon(Icons.numbers, size: 16)),
-                      ],
-                      selected: {stockOutMode},
-                      onSelectionChanged: (v) =>
-                          setS(() { stockOutMode = v.first; err = null; }),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // ── 按箱规 mode ──
-                    if (stockOutMode == 'carton') ...[
-                      if (effectiveConfigs.isEmpty)
-                        Text(l10n.invDetailNoCartonData,
-                            style: TextStyle(
-                                color: Colors.grey.shade500, fontSize: 13))
-                      else ...[
-                        Text(l10n.invDetailSelectOutBoxes,
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 6),
-                        ...List.generate(effectiveConfigs.length, (i) {
-                          final cfg = effectiveConfigs[i];
-                          final outBoxes =
-                              int.tryParse(configCtrls[i].text) ?? 0;
-                          final outQty = outBoxes * cfg.unitsPerBox;
-                          final overLimit = outBoxes > cfg.boxes;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 72,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(l10n.invDetailUnitsPerBoxDisplay(cfg.unitsPerBox),
-                                          style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600)),
-                                      Text(l10n.invDetailTotalBoxesDisplay(cfg.boxes),
-                                          style: TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.grey.shade500)),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: configCtrls[i],
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      labelText: l10n.invDetailOutMaxBoxes(cfg.boxes),
-                                      border: const OutlineInputBorder(),
-                                      isDense: true,
-                                      suffixText: l10n.invDetailBoxesSuffix,
-                                      errorText: overLimit
-                                          ? l10n.invDetailExceedBoxes(cfg.boxes)
-                                          : null,
-                                    ),
-                                    onChanged: (_) => setS(() {}),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(l10n.invDetailEqPcs(outQty),
-                                    style: TextStyle(
-                                        color: overLimit
-                                            ? Colors.red
-                                            : Colors.grey.shade600,
-                                        fontSize: 12)),
-                              ],
+                      Padding(
+                        padding: const EdgeInsets.only(top: 28, left: 10, right: 10),
+                        child: Text('×',
+                            style: TextStyle(fontSize: 16, color: Colors.grey.shade500)),
+                      ),
+                      // Boxes input
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(l10n.invDetailOutBoxesColHeader,
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                            const SizedBox(height: 4),
+                            TextField(
+                              controller: configCtrls[i],
+                              keyboardType: TextInputType.number,
+                              decoration: _roundedDec(
+                                l10n.invDetailOutMaxBoxes(cfg.boxes),
+                                suffix: l10n.invDetailBoxesSuffix,
+                              ).copyWith(
+                                errorText: overLimit ? l10n.invDetailExceedBoxes(cfg.boxes) : null,
+                              ),
+                              onChanged: (_) => setS(() {}),
                             ),
-                          );
-                        }),
-                      ],
-                    ],
-
-                    // ── 仅箱数 mode ──
-                    if (stockOutMode == 'boxesOnly') ...[
-                      TextField(
-                        controller: boxesOnlyCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: l10n.invDetailOutBoxesLabel(_boxes),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          suffixText: l10n.invDetailBoxesSuffix,
+                          ],
                         ),
-                        onChanged: (_) => setS(() {}),
                       ),
-                      const SizedBox(height: 6),
-                      Text(l10n.invDetailBoxesOnlyHelp,
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600)),
-                    ],
-
-                    // ── 按总数量 mode ──
-                    if (stockOutMode == 'qty') ...[
-                      TextField(
-                        controller: qtyCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: l10n.invDetailOutQtyLabel,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          suffixText: l10n.invDetailPieceSuffix,
-                        ),
-                        onChanged: (_) => setS(() {}),
-                      ),
-                    ],
-
-                    // Preview
-                    const SizedBox(height: 8),
-                    previewBar(),
-                    const SizedBox(height: 10),
-                    _noteField(noteCtrl),
-
-                    if (err != null) ...[
-                      const SizedBox(height: 8),
-                      Text(err!,
-                          style: const TextStyle(
-                              color: Colors.red, fontSize: 13)),
-                    ],
-                  ],
+                    ]),
+                  );
+                }),
+              ]);
+            } else if (stockOutMode == 'boxesOnly') {
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                TextField(
+                  controller: boxesOnlyCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: _roundedDec(l10n.invDetailOutBoxesLabel(_boxes),
+                      suffix: l10n.invDetailBoxesSuffix),
+                  onChanged: (_) => setS(() {}),
                 ),
+                const SizedBox(height: 6),
+                Text(l10n.invDetailBoxesOnlyHelp,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              ]);
+            } else {
+              return TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: _roundedDec(l10n.invDetailOutQtyLabel,
+                    suffix: l10n.invDetailPieceSuffix),
+                onChanged: (_) => setS(() {}),
+              );
+            }
+          }
+
+          return _dialogWrapper(
+            ctx: ctx,
+            title: l10n.invDetailStockOutTitle,
+            body: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Info header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${widget.skuCode}  @  ${widget.locationCode}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(_buildSpecSubtitle(l10n),
+                      style: TextStyle(fontSize: 12, color: Colors.red.shade700)),
+                ]),
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => ctx.pop(), child: Text(l10n.cancel)),
-              FilledButton(
-                style:
-                    FilledButton.styleFrom(backgroundColor: Colors.red),
+              const SizedBox(height: 14),
+              _sectionLabel(l10n.invDetailQtyEntryMode),
+              _modeSelector(
+                ['carton', 'boxesOnly', 'qty'],
+                [l10n.invDetailModeByCarton, l10n.invDetailModeBoxesOnly, l10n.invDetailModeByQty],
+                stockOutMode,
+                (v) => setS(() { stockOutMode = v; err = null; }),
+              ),
+              const SizedBox(height: 14),
+              inputArea(),
+              const SizedBox(height: 10),
+              // Preview
+              _previewCard(
+                l10n.invDetailOutTotal,
+                stockOutMode == 'boxesOnly'
+                    ? l10n.invDetailOutBoxesValue(totalOutBoxes)
+                    : l10n.invDetailOutPcsValue(previewOut),
+                isOverLimit ? Colors.red.shade600 : (previewOut > 0 || totalOutBoxes > 0)
+                    ? Colors.orange.shade600 : Colors.grey.shade400,
+                sub: (!isOverLimit && (previewOut > 0 || totalOutBoxes > 0))
+                    ? (stockOutMode == 'carton'
+                        ? l10n.invDetailRemainCartonBoxes(totalAvailableBoxes - totalOutBoxes)
+                        : stockOutMode == 'boxesOnly'
+                            ? l10n.invDetailRemainBoxes(_boxes - totalOutBoxes)
+                            : l10n.invDetailRemainPcs(_qty - previewOut))
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              _noteField(noteCtrl),
+              if (err != null) ...[
+                const SizedBox(height: 8),
+                Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ]),
+            footer: Column(children: [
+              _dialogActionBtn(
+                label: l10n.invDetailConfirmStockOut,
+                icon: Icons.upload_outlined,
+                color: Colors.red.shade500,
+                loading: saving,
                 onPressed: saving
                     ? null
                     : () async {
@@ -811,15 +779,14 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
                         if (stockOutMode == 'carton') {
                           for (int i = 0; i < effectiveConfigs.length; i++) {
-                            final outBoxes =
-                                int.tryParse(configCtrls[i].text) ?? 0;
+                            final outBoxes = int.tryParse(configCtrls[i].text) ?? 0;
                             if (outBoxes < 0) {
                               setS(() => err = l10n.invDetailErrNegativeBoxes);
                               return;
                             }
                             if (outBoxes > effectiveConfigs[i].boxes) {
-                              setS(() => err =
-                                  l10n.invDetailErrExceedCartonBoxes(effectiveConfigs[i].unitsPerBox, effectiveConfigs[i].boxes));
+                              setS(() => err = l10n.invDetailErrExceedCartonBoxes(
+                                  effectiveConfigs[i].unitsPerBox, effectiveConfigs[i].boxes));
                               return;
                             }
                           }
@@ -829,38 +796,24 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             return;
                           }
                           if (totalOutBoxes > totalAvailableBoxes) {
-                            setS(() => err =
-                                l10n.invDetailErrExceedStockBoxes(totalAvailableBoxes));
+                            setS(() => err = l10n.invDetailErrExceedStockBoxes(totalAvailableBoxes));
                             return;
                           }
-                          removalConfigs = List.generate(
-                                  effectiveConfigs.length, (i) {
-                                final outBoxes =
-                                    int.tryParse(configCtrls[i].text) ?? 0;
-                                return {
-                                  'boxes': outBoxes,
-                                  'unitsPerBox':
-                                      effectiveConfigs[i].unitsPerBox,
-                                };
-                              })
-                              .where((c) => c['boxes']! > 0)
-                              .toList();
+                          removalConfigs = List.generate(effectiveConfigs.length, (i) {
+                            final outBoxes = int.tryParse(configCtrls[i].text) ?? 0;
+                            return {'boxes': outBoxes, 'unitsPerBox': effectiveConfigs[i].unitsPerBox};
+                          }).where((c) => c['boxes']! > 0).toList();
                         } else if (stockOutMode == 'boxesOnly') {
-                          final outBoxes =
-                              int.tryParse(boxesOnlyCtrl.text) ?? 0;
+                          final outBoxes = int.tryParse(boxesOnlyCtrl.text) ?? 0;
                           if (outBoxes <= 0) {
                             setS(() => err = l10n.invDetailErrInvalidBoxes);
                             return;
                           }
                           if (outBoxes > _boxes) {
-                            setS(() => err =
-                                l10n.invDetailErrExceedStockBoxes(_boxes));
+                            setS(() => err = l10n.invDetailErrExceedStockBoxes(_boxes));
                             return;
                           }
-                          // send as configurations so backend handles boxes correctly
-                          removalConfigs = [
-                            {'boxes': outBoxes, 'unitsPerBox': _units > 0 ? _units : 1}
-                          ];
+                          removalConfigs = [{'boxes': outBoxes, 'unitsPerBox': _units > 0 ? _units : 1}];
                           qty = outBoxes * (_units > 0 ? _units : 1);
                         } else {
                           qty = int.tryParse(qtyCtrl.text) ?? 0;
@@ -869,8 +822,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             return;
                           }
                           if (_qty > 0 && qty > _qty) {
-                            setS(() => err =
-                                l10n.invDetailErrExceedStockPcs(_qty));
+                            setS(() => err = l10n.invDetailErrExceedStockPcs(_qty));
                             return;
                           }
                         }
@@ -881,25 +833,22 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                             skuCode: widget.skuCode,
                             locationId: widget.locationId,
                             quantity: qty,
-                            configurations:
-                                removalConfigs?.isNotEmpty == true
-                                    ? removalConfigs
-                                    : null,
+                            configurations: removalConfigs?.isNotEmpty == true ? removalConfigs : null,
                             note: noteCtrl.text.trim(),
                           );
-                          if (ctx.mounted) ctx.pop();
+                          if (ctx.mounted) Navigator.of(ctx).pop();
                           widget.onChanged?.call();
                           _load();
                         } catch (e) {
-                          setS(() {
-                            saving = false;
-                            err = _friendly(e, l10n);
-                          });
+                          setS(() { saving = false; err = _friendly(e, l10n); });
                         }
                       },
-                child: saving ? _spinner() : Text(l10n.invDetailConfirmStockOut),
               ),
-            ],
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(l10n.cancel, style: TextStyle(color: Colors.grey.shade600)),
+              ),
+            ]),
           );
         },
       ),
@@ -916,47 +865,38 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
   // ── 库存调整（4种模式：按总数量 / 按箱规 / 仅箱数 / SKU更正） ──
   Future<void> _showAdjustDialog() async {
     final l10n = AppLocalizations.of(context)!;
-    // 'qty' | 'boxes_only' | 'configs' | 'sku_correct'
-    String adjustMode = _configs.isNotEmpty ? 'configs' : 'qty';
+    // 'mixed' | 'sku_correct'
+    String adjustMode = 'mixed';
 
-    // ── 按总数量 state ──
-    final qtyCtrl = TextEditingController(text: _qty.toString());
+    // ── Mixed mode state: carton specs + loose pcs + only cartons ──
+    // Initialise from live record: boxesOnlyMode → all boxes go to unconfiguredCartons
+    final _initUnconfiguredCartons =
+        _invRecord?.unconfiguredCartons ?? (_boxesOnlyMode ? _boxes : 0);
+    final unconfiguredCartonsCtrl =
+        TextEditingController(text: _initUnconfiguredCartons.toString());
 
-    // ── 按箱规 state — max 3 rows ──
+    // Build config rows from configurations array.
+    // Only fall back to a single flat-spec row for LEGACY records (unitsPerBox > 0,
+    // no unconfiguredCartons). New-model records store cartons-without-spec in
+    // unconfiguredCartons — never convert those into a carton-spec row.
     final configRows = _configs.isNotEmpty
         ? _configs
-            .take(3)
             .map((c) => <String, TextEditingController>{
                   'boxes': TextEditingController(text: c.boxes.toString()),
                   'units': TextEditingController(text: c.unitsPerBox.toString()),
                 })
             .toList()
-        : (_boxes > 0
-            ? [
-                <String, TextEditingController>{
-                  'boxes': TextEditingController(text: _boxes.toString()),
-                  'units': TextEditingController(text: _units.toString()),
-                }
-              ]
+        : (!_boxesOnlyMode && _boxes > 0 && _units > 0 && _initUnconfiguredCartons == 0
+            ? [<String, TextEditingController>{
+                'boxes': TextEditingController(text: _boxes.toString()),
+                'units': TextEditingController(text: _units.toString()),
+              }]
             : <Map<String, TextEditingController>>[]);
 
-    // ── 仅箱数 state — same specs as existing, only boxes editable ──
-    // Each entry: { unitsPerBox (readonly), boxesCtrl }
-    final boxesOnlySpecs = _configs.isNotEmpty
-        ? _configs
-            .map((c) => {
-                  'unitsPerBox': c.unitsPerBox,
-                  'ctrl': TextEditingController(text: c.boxes.toString()),
-                })
-            .toList()
-        : [
-            {
-              'unitsPerBox': _units > 0 ? _units : 1,
-              'ctrl': TextEditingController(text: _boxes.toString()),
-            }
-          ];
+    final loosePcsCtrl =
+        TextEditingController(text: (_invRecord?.loosePcs ?? 0).toString());
 
-    // ── SKU更正 state ──
+    // ── SKU correct state ──
     Sku? selectedCorrectSku;
 
     // ── shared ──
@@ -964,347 +904,237 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     String? err;
     bool saving = false;
 
-    // Helper — add empty config row (up to 3)
-    void addConfigRow(void Function(void Function()) setS) {
-      if (configRows.length >= 3) return;
-      setS(() => configRows.add({
-            'boxes': TextEditingController(text: '0'),
-            'units': TextEditingController(text: '1'),
-          }));
-    }
-
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          // ── live preview ──
-          final configsTotal = configRows.fold<int>(0, (s, row) {
+          // ── live totals (mixed mode) ──
+          int configsPcs = 0;
+          int totalCartons = 0;
+          for (final row in configRows) {
             final b = int.tryParse(row['boxes']!.text) ?? 0;
-            final u = int.tryParse(row['units']!.text) ?? 1;
-            return s + b * u;
-          });
-          final boxesOnlyTotal = boxesOnlySpecs.fold<int>(0, (s, spec) {
-            final b = int.tryParse((spec['ctrl'] as TextEditingController).text) ?? 0;
-            final u = spec['unitsPerBox'] as int;
-            return s + b * u;
-          });
-          final previewTotal = adjustMode == 'qty'
-              ? (int.tryParse(qtyCtrl.text) ?? 0)
-              : adjustMode == 'boxes_only'
-                  ? boxesOnlyTotal
-                  : configsTotal;
+            final u = int.tryParse(row['units']!.text) ?? 0;
+            configsPcs += b * u;
+            totalCartons += b;
+          }
+          final loosePcs = int.tryParse(loosePcsCtrl.text) ?? 0;
+          final unconfiguredCartonsVal = int.tryParse(unconfiguredCartonsCtrl.text) ?? 0;
+          final mixedTotal = configsPcs + loosePcs; // pcs only; unconfigured don't count
+          final totalCartonsAll = totalCartons + unconfiguredCartonsVal;
 
-          // ── header info bar ──
+          // ── header bar ──
           Widget headerBar() => Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
+                  color: adjustMode == 'sku_correct'
+                      ? Colors.purple.shade50
+                      : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: adjustMode == 'sku_correct'
+                        ? Colors.purple.shade200
+                        : Colors.orange.shade200,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${widget.skuCode}  @  ${widget.locationCode}',
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text(l10n.invDetailCurrentStock(_qtyLabel(l10n)),
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.orange.shade700)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-          // ── 按总数量 panel ──
-          Widget qtyPanel() => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: qtyCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: l10n.invDetailAdjustedTotalLabel,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                      suffixText: l10n.invDetailPieceSuffix,
-                    ),
-                    onChanged: (_) => setS(() {}),
+                child: Row(children: [
+                  Icon(
+                    adjustMode == 'sku_correct' ? Icons.find_replace : Icons.tune_outlined,
+                    size: 18,
+                    color: adjustMode == 'sku_correct'
+                        ? Colors.purple.shade600 : Colors.orange.shade700,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.invDetailAdjustQtyHelp,
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 10),
-                  _previewRow(previewTotal, _qty),
-                ],
-              );
-
-          // ── 仅箱数 panel — units readonly, only boxes editable ──
-          Widget boxesOnlyPanel() => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.invDetailBoxesOnlyPanelHelp,
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 8),
-                  ...List.generate(boxesOnlySpecs.length, (i) {
-                    final spec = boxesOnlySpecs[i];
-                    final ctrl = spec['ctrl'] as TextEditingController;
-                    final u = spec['unitsPerBox'] as int;
-                    final b = int.tryParse(ctrl.text) ?? 0;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // 每箱件数 — 只读
-                          Container(
-                            width: 80,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                  color: Colors.grey.shade300),
-                            ),
-                            child: Column(
-                              children: [
-                                Text('$u',
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold)),
-                                Text(l10n.invDetailUnitsPerBoxSuffix,
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey.shade500)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // 箱数 — 可编辑
-                          Expanded(
-                            child: TextField(
-                              controller: ctrl,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: l10n.invDetailBoxesAdjustLabel,
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                                suffixText: l10n.invDetailBoxesSuffix,
-                              ),
-                              onChanged: (_) => setS(() {}),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // 小计
-                          SizedBox(
-                            width: 48,
-                            child: Text(
-                              l10n.invDetailSubtotalPcs(b * u),
-                              style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 11),
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 8),
-                  _previewRow(boxesOnlyTotal, _qty),
-                ],
-              );
-
-          // ── 按箱规/箱数 panel ──
-          Widget configsPanel() => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(l10n.invDetailCartonGroupsLabel,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600)),
-                      ),
-                      if (configRows.length < 3)
-                        TextButton.icon(
-                          icon: const Icon(Icons.add, size: 15),
-                          label: Text(l10n.invDetailAddCarton,
-                              style: const TextStyle(fontSize: 12)),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            minimumSize: Size.zero,
-                            tapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          onPressed: () => addConfigRow(setS),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  if (configRows.isEmpty)
-                    TextButton.icon(
-                      icon: const Icon(Icons.add_box_outlined),
-                      label: Text(l10n.invDetailAddFirstCarton),
-                      onPressed: () => addConfigRow(setS),
-                    )
-                  else
-                    ...List.generate(configRows.length, (i) {
-                      final row = configRows[i];
-                      final u =
-                          int.tryParse(row['units']!.text) ?? 1;
-                      final b =
-                          int.tryParse(row['boxes']!.text) ?? 0;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // 箱规编号
-                            Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color:
-                                    Colors.orange.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Text('${i + 1}',
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange)),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            // 件/箱
-                            Expanded(
-                              child: TextField(
-                                controller: row['units'],
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: l10n.invDetailUnitsPerBoxLabel,
-                                  border: const OutlineInputBorder(),
-                                  isDense: true,
-                                  suffixText: l10n.invDetailPieceSuffix,
-                                ),
-                                onChanged: (_) => setS(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            // 箱数
-                            Expanded(
-                              child: TextField(
-                                controller: row['boxes'],
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: l10n.invDetailBoxesAdjustLabel,
-                                  border: const OutlineInputBorder(),
-                                  isDense: true,
-                                  suffixText: l10n.invDetailBoxesSuffix,
-                                ),
-                                onChanged: (_) => setS(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            // 小计
-                            SizedBox(
-                              width: 44,
-                              child: Text(
-                                l10n.invDetailSubtotalPcs(b * u),
-                                style: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontSize: 11),
-                                textAlign: TextAlign.right,
-                              ),
-                            ),
-                            // 删除按钮
-                            IconButton(
-                              icon: const Icon(Icons.close,
-                                  size: 16, color: Colors.red),
-                              onPressed: () => setS(() {
-                                final removed =
-                                    configRows.removeAt(i);
-                                removed['boxes']!.dispose();
-                                removed['units']!.dispose();
-                              }),
-                              constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(4),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  const SizedBox(height: 8),
-                  _previewRow(previewTotal, _qty),
-                ],
-              );
-
-          // ── SKU更正 panel ──
-          Widget skuCorrectPanel() => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Current SKU info
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.purple.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.purple.shade200),
-                    ),
-                    child: Row(
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(l10n.invDetailSkuCorrectCurrent,
+                        Text('${widget.skuCode}  @  ${widget.locationCode}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text(_buildSpecSubtitle(l10n),
                             style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade600)),
-                        Text(widget.skuCode,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
-                        const SizedBox(width: 8),
-                        Icon(Icons.arrow_forward, size: 14,
-                            color: Colors.purple.shade400),
-                        const SizedBox(width: 8),
-                        Text(
-                          selectedCorrectSku?.sku ?? l10n.invDetailSkuCorrectSelectHint,
-                          style: TextStyle(
-                            fontWeight: selectedCorrectSku != null
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            fontSize: 14,
-                            color: selectedCorrectSku != null
-                                ? Colors.purple.shade700
-                                : Colors.grey.shade400,
-                          ),
-                        ),
-                        if (selectedCorrectSku != null)
-                          Icon(Icons.check_circle,
-                              size: 14,
-                              color: Colors.green.shade600),
+                                color: adjustMode == 'sku_correct'
+                                    ? Colors.purple.shade600 : Colors.orange.shade700)),
                       ],
                     ),
                   ),
+                ]),
+              );
+
+          // ── Mixed panel: carton specs + loose pcs ──
+          Widget mixedPanel() => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // section label + add button
+                  Row(children: [
+                    Expanded(
+                      child: Text(l10n.invDetailCartonSpecsLabel,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.add, size: 15),
+                      label: Text(l10n.invDetailAddCarton,
+                          style: const TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () => setS(() => configRows.add({
+                        'boxes': TextEditingController(text: ''),
+                        'units': TextEditingController(text: ''),
+                      })),
+                    ),
+                  ]),
+                  const SizedBox(height: 6),
+
+                  // carton spec rows
+                  if (configRows.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        l10n.invDetailAddFirstCarton,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      ),
+                    )
+                  else
+                    ...configRows.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final row = entry.value;
+                      final b = int.tryParse(row['boxes']!.text) ?? 0;
+                      final u = int.tryParse(row['units']!.text) ?? 0;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                          // numbered badge
+                          Container(
+                            width: 24, height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text('${i + 1}',
+                                style: const TextStyle(
+                                    fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
+                          ),
+                          const SizedBox(width: 6),
+                          // pcs/carton
+                          Expanded(
+                            child: TextField(
+                              controller: row['units'],
+                              keyboardType: TextInputType.number,
+                              decoration: _roundedDec(l10n.invDetailUnitsPerBoxLabel,
+                                  suffix: l10n.invDetailPieceSuffix),
+                              onChanged: (_) => setS(() {}),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 5),
+                            child: Text('×', style: TextStyle(fontSize: 15, color: Colors.grey)),
+                          ),
+                          // cartons
+                          Expanded(
+                            child: TextField(
+                              controller: row['boxes'],
+                              keyboardType: TextInputType.number,
+                              decoration: _roundedDec(l10n.invDetailBoxesAdjustLabel,
+                                  suffix: l10n.invDetailBoxesSuffix),
+                              onChanged: (_) => setS(() {}),
+                            ),
+                          ),
+                          // subtotal
+                          if (u > 0 && b > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 5),
+                              child: Text('=${b * u}',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                            ),
+                          // remove
+                          GestureDetector(
+                            onTap: () => setS(() {
+                              final removed = configRows.removeAt(i);
+                              removed['boxes']!.dispose();
+                              removed['units']!.dispose();
+                            }),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Icon(Icons.remove_circle_outline,
+                                  size: 18, color: Colors.red.shade300),
+                            ),
+                          ),
+                        ]),
+                      );
+                    }),
+
+                  const SizedBox(height: 4),
+                  // Only cartons field (no pcs/carton spec)
+                  TextField(
+                    controller: unconfiguredCartonsCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: _roundedDec('Only cartons (no spec)',
+                        suffix: l10n.invDetailBoxesSuffix),
+                    onChanged: (_) => setS(() {}),
+                  ),
+
+                  const SizedBox(height: 4),
+                  // Loose pcs field
+                  TextField(
+                    controller: loosePcsCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: _roundedDec(l10n.invDetailLoosePcsLabel,
+                        suffix: l10n.invDetailPieceSuffix),
+                    onChanged: (_) => setS(() {}),
+                  ),
+
                   const SizedBox(height: 10),
-                  // SKU search
+                  // Summary preview
+                  _previewCard(
+                    l10n.invDetailAdjustedTotalRow,
+                    '$mixedTotal ${l10n.invDetailPieceSuffix}'
+                        '${totalCartonsAll > 0 ? '  ·  $totalCartonsAll ${l10n.invDetailBoxesSuffix}' : ''}',
+                    mixedTotal != _qty ? Colors.orange : Colors.green,
+                    sub: mixedTotal != _qty
+                        ? '(${mixedTotal > _qty ? '+' : ''}${mixedTotal - _qty})'
+                        : null,
+                  ),
+                ],
+              );
+
+          // ── SKU correct panel ──
+          Widget skuCorrectPanel() => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.purple.shade200),
+                    ),
+                    child: Row(children: [
+                      Text(l10n.invDetailSkuCorrectCurrent,
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                      Text(widget.skuCode,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(width: 8),
+                      Icon(Icons.arrow_forward, size: 14, color: Colors.purple.shade400),
+                      const SizedBox(width: 8),
+                      Text(
+                        selectedCorrectSku?.sku ?? l10n.invDetailSkuCorrectSelectHint,
+                        style: TextStyle(
+                          fontWeight: selectedCorrectSku != null ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 14,
+                          color: selectedCorrectSku != null ? Colors.purple.shade700 : Colors.grey.shade400,
+                        ),
+                      ),
+                      if (selectedCorrectSku != null)
+                        Icon(Icons.check_circle, size: 14, color: Colors.green.shade600),
+                    ]),
+                  ),
+                  const SizedBox(height: 10),
                   _SkuSearchField(
                     labelText: l10n.invDetailSkuCorrectSearch,
                     excludeSkuCode: widget.skuCode,
@@ -1312,124 +1142,77 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade200),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.inventory_2_outlined,
-                            size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 6),
-                        Text(l10n.invDetailQtyRetained(_qtyLabel(l10n)),
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600)),
-                      ],
-                    ),
+                    child: Row(children: [
+                      Icon(Icons.inventory_2_outlined, size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 6),
+                      Text(l10n.invDetailQtyRetained(_qtyLabel(l10n)),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    ]),
                   ),
                 ],
               );
 
-          return AlertDialog(
-            title: Text(l10n.invDetailAdjustTitle),
-            contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            content: SizedBox(
-              width: 360,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    headerBar(),
-                    const SizedBox(height: 10),
+          final actionColor = adjustMode == 'sku_correct' ? Colors.purple : Colors.orange;
+          final confirmLabel = adjustMode == 'sku_correct'
+              ? l10n.invDetailConfirmSkuCorrect
+              : l10n.invDetailConfirmAdjust;
 
-                    // ── 4-way mode selector ──
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SegmentedButton<String>(
-                        style: SegmentedButton.styleFrom(
-                          textStyle: const TextStyle(fontSize: 11),
-                        ),
-                        segments: [
-                          ButtonSegment(
-                            value: 'qty',
-                            label: Text(l10n.invDetailAdjustModeQty),
-                            icon: const Icon(Icons.numbers, size: 14),
-                          ),
-                          ButtonSegment(
-                            value: 'boxes_only',
-                            label: Text(l10n.invDetailAdjustModeBoxesOnly),
-                            icon: const Icon(Icons.view_column, size: 14),
-                          ),
-                          ButtonSegment(
-                            value: 'configs',
-                            label: Text(l10n.invDetailAdjustModeCarton),
-                            icon: const Icon(Icons.view_list, size: 14),
-                          ),
-                          ButtonSegment(
-                            value: 'sku_correct',
-                            label: Text(l10n.invDetailAdjustModeSkuCorrect),
-                            icon: const Icon(Icons.find_replace, size: 14),
-                          ),
-                        ],
-                        selected: {adjustMode},
-                        onSelectionChanged: (v) => setS(() {
-                          adjustMode = v.first;
-                          err = null;
-                          selectedCorrectSku = null;
-                        }),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
+          return _dialogWrapper(
+            ctx: ctx,
+            title: l10n.invDetailAdjustTitle,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                headerBar(),
+                const SizedBox(height: 14),
 
-                    // ── mode-specific panel ──
-                    if (adjustMode == 'qty') qtyPanel(),
-                    if (adjustMode == 'boxes_only') boxesOnlyPanel(),
-                    if (adjustMode == 'configs') configsPanel(),
-                    if (adjustMode == 'sku_correct') skuCorrectPanel(),
-
-                    const SizedBox(height: 12),
-
-                    // ── reason note (all modes) ──
-                    TextField(
-                      controller: noteCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: adjustMode == 'sku_correct'
-                            ? l10n.invDetailReasonSkuCorrect
-                            : l10n.invDetailReasonAdjust,
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        helperText: adjustMode == 'sku_correct'
-                            ? l10n.invDetailReasonSkuCorrectHint
-                            : l10n.invDetailReasonAdjustHint,
-                      ),
-                    ),
-
-                    if (err != null) ...[
-                      const SizedBox(height: 8),
-                      Text(err!,
-                          style: const TextStyle(
-                              color: Colors.red, fontSize: 13)),
-                    ],
-                    const SizedBox(height: 4),
+                // mode selector: Mixed / SKU Correct
+                _sectionLabel(l10n.invDetailQtyEntryMode),
+                _modeSelector(
+                  ['mixed', 'sku_correct'],
+                  [
+                    l10n.invDetailAdjustModeMixed,
+                    l10n.invDetailAdjustModeSkuCorrect,
                   ],
+                  adjustMode,
+                  (v) => setS(() { adjustMode = v; err = null; selectedCorrectSku = null; }),
                 ),
-              ),
+                const SizedBox(height: 14),
+
+                if (adjustMode == 'mixed') mixedPanel(),
+                if (adjustMode == 'sku_correct') skuCorrectPanel(),
+
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteCtrl,
+                  maxLines: 2,
+                  decoration: _roundedDec(
+                    adjustMode == 'sku_correct'
+                        ? l10n.invDetailReasonSkuCorrect
+                        : l10n.invDetailReasonAdjust,
+                    hint: adjustMode == 'sku_correct'
+                        ? l10n.invDetailReasonSkuCorrectHint
+                        : l10n.invDetailReasonAdjustHint,
+                  ),
+                ),
+                if (err != null) ...[
+                  const SizedBox(height: 8),
+                  Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ],
+              ],
             ),
-            actions: [
-              TextButton(
-                  onPressed: () => ctx.pop(),
-                  child: Text(l10n.cancel)),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                    backgroundColor: adjustMode == 'sku_correct'
-                        ? Colors.purple
-                        : Colors.orange),
+            footer: Column(children: [
+              _dialogActionBtn(
+                label: confirmLabel,
+                icon: adjustMode == 'sku_correct' ? Icons.find_replace : Icons.tune_outlined,
+                color: actionColor,
+                loading: saving,
                 onPressed: saving
                     ? null
                     : () async {
@@ -1439,14 +1222,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           return;
                         }
 
-                        // ── SKU更正 submit ──
+                        // ── SKU correct submit ──
                         if (adjustMode == 'sku_correct') {
                           if (selectedCorrectSku == null) {
                             setS(() => err = l10n.invDetailErrSelectNewSku);
                             return;
                           }
-                          if (selectedCorrectSku!.sku.toUpperCase() ==
-                              widget.skuCode.toUpperCase()) {
+                          if (selectedCorrectSku!.sku.toUpperCase() == widget.skuCode.toUpperCase()) {
                             setS(() => err = l10n.invDetailErrSameSkuNotAllowed);
                             return;
                           }
@@ -1461,12 +1243,11 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                               newSkuCode: selectedCorrectSku!.sku,
                               note: note,
                             );
-                            if (ctx.mounted) ctx.pop();
+                            if (ctx.mounted) Navigator.of(ctx).pop();
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
                             setS(() => saving = false);
-                            // 目标SKU已存在 → 弹合并确认框
                             if (e is DioException &&
                                 e.response?.data is Map &&
                                 e.response?.data['code'] == 'MERGE_REQUIRED') {
@@ -1483,8 +1264,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                       child: Text(l10n.cancel),
                                     ),
                                     FilledButton(
-                                      style: FilledButton.styleFrom(
-                                          backgroundColor: Colors.orange),
+                                      style: FilledButton.styleFrom(backgroundColor: Colors.orange),
                                       onPressed: () => Navigator.pop(c, true),
                                       child: Text(l10n.invDetailMergeConfirm),
                                     ),
@@ -1492,7 +1272,6 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                 ),
                               );
                               if (confirm != true) return;
-                              // 重提交，附带 allowMerge
                               setS(() { saving = true; err = null; });
                               try {
                                 await _invService.correctSku(
@@ -1501,7 +1280,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                                   note: note,
                                   allowMerge: true,
                                 );
-                                if (ctx.mounted) ctx.pop();
+                                if (ctx.mounted) Navigator.of(ctx).pop();
                                 widget.onChanged?.call();
                                 _load();
                               } catch (e2) {
@@ -1514,75 +1293,35 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           return;
                         }
 
-                        // ── 仅箱数 submit ──
-                        if (adjustMode == 'boxes_only') {
-                          final configs = boxesOnlySpecs.map((spec) {
-                            final b = int.tryParse(
-                                    (spec['ctrl'] as TextEditingController)
-                                        .text) ??
-                                0;
-                            return {
-                              'boxes': b,
-                              'unitsPerBox': spec['unitsPerBox'] as int,
-                            };
-                          }).toList();
-                          if (configs.every((c) => c['boxes']! <= 0)) {
-                            setS(() => err = l10n.invDetailErrAtLeastOneBoxesGroup);
-                            return;
-                          }
-                          // Filter out zero-box specs
-                          final nonZero =
-                              configs.where((c) => c['boxes']! > 0).toList();
-                          setS(() {
-                            saving = true;
-                            err = null;
-                          });
-                          try {
-                            await _invService.stockAdjust(
-                              skuCode: widget.skuCode,
-                              locationId: widget.locationId,
-                              configurations: nonZero,
-                              adjustMode: 'boxes_only',
-                              note: note,
-                            );
-                            if (ctx.mounted) ctx.pop();
-                            widget.onChanged?.call();
-                            _load();
-                          } catch (e) {
-                            setS(() {
-                              saving = false;
-                              err = _friendly(e, l10n);
-                            });
-                          }
-                          return;
-                        }
-
-                        // ── 按箱规 submit ──
-                        if (adjustMode == 'configs') {
-                          if (configRows.isEmpty) {
-                            setS(() => err = l10n.invDetailErrAtLeastOneCartonGroup);
-                            return;
-                          }
-                          final configs = configRows.map((row) {
+                        // ── Mixed submit ──
+                        if (adjustMode == 'mixed') {
+                          final loose = int.tryParse(loosePcsCtrl.text) ?? 0;
+                          final onlyCartons = int.tryParse(unconfiguredCartonsCtrl.text) ?? 0;
+                          // Validate all non-empty spec rows
+                          final configs = <Map<String, int>>[];
+                          for (final row in configRows) {
                             final b = int.tryParse(row['boxes']!.text) ?? 0;
                             final u = int.tryParse(row['units']!.text) ?? 0;
-                            return {'boxes': b, 'unitsPerBox': u};
-                          }).toList();
-                          if (configs.any(
-                              (c) => c['boxes']! <= 0 || c['unitsPerBox']! <= 0)) {
-                            setS(() => err = l10n.invDetailErrValidCartonGroup);
-                            return;
+                            if (b == 0 && u == 0) continue; // ignore blank rows
+                            if (b <= 0 || u <= 0) {
+                              setS(() => err = l10n.invDetailErrMixedInvalidSpec);
+                              return;
+                            }
+                            configs.add({'boxes': b, 'unitsPerBox': u});
                           }
+                          // all-zero is allowed: zero-out operation
                           setS(() { saving = true; err = null; });
                           try {
                             await _invService.stockAdjust(
                               skuCode: widget.skuCode,
                               locationId: widget.locationId,
-                              configurations: configs,
-                              adjustMode: 'configs',
+                              configurations: configs.isNotEmpty ? configs : null,
+                              loosePcs: loose,
+                              unconfiguredCartons: onlyCartons,
+                              adjustMode: 'mixed',
                               note: note,
                             );
-                            if (ctx.mounted) ctx.pop();
+                            if (ctx.mounted) Navigator.of(ctx).pop();
                             widget.onChanged?.call();
                             _load();
                           } catch (e) {
@@ -1591,37 +1330,14 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                           return;
                         }
 
-                        // ── 按总数量 submit ──
-                        final qty = int.tryParse(qtyCtrl.text);
-                        if (qty == null || qty < 0) {
-                          setS(() => err = l10n.invDetailErrValidQtyGte0);
-                          return;
-                        }
-                        setS(() { saving = true; err = null; });
-                        try {
-                          await _invService.stockAdjust(
-                            skuCode: widget.skuCode,
-                            locationId: widget.locationId,
-                            quantity: qty,
-                            adjustMode: 'qty',
-                            note: note,
-                          );
-                          if (ctx.mounted) ctx.pop();
-                          widget.onChanged?.call();
-                          _load();
-                        } catch (e) {
-                          setS(() { saving = false; err = _friendly(e, l10n); });
-                        }
                       },
-                child: saving
-                    ? _spinner()
-                    : Text(adjustMode == 'sku_correct'
-                        ? l10n.invDetailConfirmSkuCorrect
-                        : adjustMode == 'boxes_only'
-                            ? l10n.invDetailConfirmBoxesAdjust
-                            : l10n.invDetailConfirmAdjust),
               ),
-            ],
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(l10n.cancel,
+                    style: TextStyle(color: Colors.grey.shade600)),
+              ),
+            ]),
           );
         },
       ),
@@ -1632,99 +1348,215 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
       row['boxes']?.dispose();
       row['units']?.dispose();
     }
-    for (final spec in boxesOnlySpecs) {
-      (spec['ctrl'] as TextEditingController).dispose();
-    }
-    qtyCtrl.dispose();
+    unconfiguredCartonsCtrl.dispose();
+    loosePcsCtrl.dispose();
     noteCtrl.dispose();
   }
 
-  // ── preview total row ──
-  Widget _previewRow(int previewTotal, int currentQty) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.orange.shade200),
-        ),
-        child: Builder(builder: (context) {
-          final l10n = AppLocalizations.of(context)!;
-          return Row(
-          children: [
-            Text(l10n.invDetailAdjustedTotalRow, style: const TextStyle(fontSize: 13)),
-            Text(
-              '$previewTotal ${l10n.invDetailPieceSuffix}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: previewTotal != currentQty
-                    ? Colors.orange.shade700
-                    : Colors.green.shade700,
-              ),
-            ),
-            if (previewTotal != currentQty) ...[
-              Text(
-                '  (${previewTotal > currentQty ? '+' : ''}${previewTotal - currentQty})',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: previewTotal > currentQty
-                        ? Colors.green.shade600
-                        : Colors.red.shade600),
-              ),
-            ],
-          ],
-          );
-        }),
+  // ── 共用 helper widgets ──
+  // ── Dialog UI helpers ───────────────────────────────────────────────────────
+
+  static const _kNavy = Color(0xFF1E293B);
+
+  InputDecoration _roundedDec(String label, {String? suffix, String? hint}) =>
+      InputDecoration(
+        labelText: label,
+        hintText: hint,
+        suffixText: suffix,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: _kNavy, width: 1.5)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        filled: true,
+        fillColor: Colors.white,
       );
 
-  // ── 共用 helper widgets ──
-  Widget _qtyRow(TextEditingController boxesCtrl, TextEditingController unitsCtrl,
-      {VoidCallback? onChanged}) {
-    final l10n = AppLocalizations.of(context)!;
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: boxesCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: l10n.invDetailBoxesLabelStar, border: const OutlineInputBorder(),
-              isDense: true, suffixText: l10n.invDetailBoxesSuffix,
+  Widget _modeSelector(
+    List<String> values,
+    List<String> labels,
+    String selected,
+    void Function(String) onChange,
+  ) {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.grey.shade50),
+      child: Row(
+        children: List.generate(values.length, (i) {
+          final sel = values[i] == selected;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChange(values[i]),
+              child: Container(
+                margin: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: sel ? _kNavy : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Text(labels[i],
+                    style: TextStyle(
+                        color: sel ? Colors.white : Colors.grey.shade600,
+                        fontWeight:
+                            sel ? FontWeight.w600 : FontWeight.normal,
+                        fontSize: 13)),
+              ),
             ),
-            onChanged: onChanged != null ? (_) => onChanged() : null,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: TextField(
-            controller: unitsCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: l10n.invDetailUnitsLabelStar, border: const OutlineInputBorder(),
-              isDense: true, suffixText: l10n.invDetailUnitsPerBoxSuffix,
-            ),
-            onChanged: onChanged != null ? (_) => onChanged() : null,
-          ),
-        ),
-      ],
+          );
+        }),
+      ),
     );
   }
+
+  Widget _previewCard(String label, String value, Color color,
+      {String? sub}) =>
+      Container(
+        width: double.infinity,
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 14, color: Colors.grey.shade700)),
+            Row(children: [
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: color)),
+              if (sub != null) ...[
+                const SizedBox(width: 6),
+                Text(sub,
+                    style: TextStyle(
+                        fontSize: 12, color: Colors.grey.shade500)),
+              ],
+            ]),
+          ],
+        ),
+      );
+
+  Widget _dialogActionBtn({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onPressed,
+    bool loading = false,
+  }) =>
+      SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            disabledBackgroundColor: color.withValues(alpha: 0.5),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(26)),
+            elevation: 0,
+          ),
+          onPressed: onPressed,
+          child: loading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(icon, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text(label,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600)),
+                ]),
+        ),
+      );
+
+  Widget _dialogWrapper({
+    required BuildContext ctx,
+    required String title,
+    required Widget body,
+    required Widget footer,
+  }) =>
+      Dialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold)),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => Navigator.of(ctx).pop(),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                shape: BoxShape.circle),
+                            child: Icon(Icons.close,
+                                size: 18,
+                                color: Colors.grey.shade600),
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 16),
+                      body,
+                      const SizedBox(height: 8),
+                    ]),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: footer,
+            ),
+          ],
+        ),
+      );
+
+  Widget _sectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(text,
+            style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500)),
+      );
 
   Widget _noteField(TextEditingController ctrl) {
     final l10n = AppLocalizations.of(context)!;
     return TextField(
       controller: ctrl,
-      decoration: InputDecoration(
-        labelText: l10n.invDetailNoteOptional, border: const OutlineInputBorder(), isDense: true,
-      ),
+      decoration: _roundedDec(l10n.invDetailNoteOptional),
     );
   }
-
-
-  Widget _spinner() => const SizedBox(
-        width: 16, height: 16,
-        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-      );
 
   @override
   Widget build(BuildContext context) {
@@ -1789,18 +1621,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _quantityUnknown
-                            ? l10n.invDetailQtyUnknownHeader
-                            : (_configs.isEmpty
-                                ? (_boxesOnlyMode
-                                    ? l10n.invDetailBoxesOnlyHeader(_boxes)
-                                    : l10n.invDetailBoxesAndPcs(_boxes, _qty))
-                                : _configs
-                                    .map((c) =>
-                                        l10n.invDetailBoxesAndPcs(c.boxes, c.qty))
-                                    .join('  ·  ')),
+                        _buildSpecSubtitle(l10n),
                         style: const TextStyle(
                             color: Color(0xFF8E8E9A), fontSize: 12),
+                        maxLines: 6,
                       ),
                     ],
                   ),
@@ -2786,6 +2610,9 @@ class _AuditCard extends StatelessWidget {
     if (d == null || ba == null) return '';
     switch (ba) {
       case '入库':
+        if (d['boxesOnlyMode'] == true) {
+          return '+${d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+        }
         return '+${d['addedQty'] ?? 0}$pcs';
       case '出库':
         return '-${d['reducedQty'] ?? 0}$pcs';

@@ -432,6 +432,7 @@ class _HistoryTileState extends State<_HistoryTile> {
     }
     // fallback: strip leading "action @ loc " prefix from server description
     final desc = widget.record.description;
+    if (l10n.localeName == 'en') return AuditLogDetailSheet.cleanDesc(desc);
     final atIdx = desc.indexOf(' @ ');
     if (atIdx == -1) return '';
     final afterAt = atIdx + 3;
@@ -510,6 +511,10 @@ class _HistoryTileState extends State<_HistoryTile> {
   }
 
   Widget _buildDescriptionText(Color color) {
+    final l10n = AppLocalizations.of(context)!;
+    final desc = l10n.localeName == 'en'
+        ? AuditLogDetailSheet.cleanDesc(widget.record.description)
+        : widget.record.description;
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(10),
@@ -519,7 +524,7 @@ class _HistoryTileState extends State<_HistoryTile> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Text(
-        widget.record.description,
+        desc,
         style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.5),
       ),
     );

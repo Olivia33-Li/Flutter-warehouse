@@ -36,20 +36,26 @@ export class SkusService {
     }
 
     const inventories = await this.inventoryModel
-      .find({ skuId: { $in: skus.map((s) => s._id) } })
+      .find({
+        skuId: { $in: skus.map((s) => s._id) },
+        stockStatus: { $in: ['confirmed', 'pending_count', 'temporary'] },
+      })
       .populate('locationId', 'code')
       .lean();
 
-    const invMap = new Map<string, { locationId: string; locationCode: string; totalQty: number; boxes: number; unitsPerBox: number; boxesOnly: boolean }[]>();
+    const invMap = new Map<string, { locationId: string; locationCode: string; totalQty: number; boxes: number; unitsPerBox: number; boxesOnly: boolean; loosePcs: number; unconfiguredCartons: number }[]>();
     for (const inv of inventories) {
+      const boxes = inv.boxes ?? 0;
+      const loosePcs = (inv as any).loosePcs ?? 0;
+      const quantityUnknown = !!(inv as any).quantityUnknown;
+      // Skip zero-stock records (keep pending-count even if boxes/pcs are 0)
+      if (!quantityUnknown && boxes === 0 && loosePcs === 0) continue;
+
       const key = inv.skuId.toString();
       if (!invMap.has(key)) invMap.set(key, []);
       const loc = inv.locationId as any;
-      const boxes = inv.boxes ?? 0;
       const unitsPerBox = inv.unitsPerBox ?? 1;
-      const totalQty = (inv.quantity ?? 0) > 0
-        ? inv.quantity
-        : boxes * unitsPerBox;
+      const totalQty = inv.quantity ?? 0;
       invMap.get(key)!.push({
         locationId: loc?._id?.toString() ?? '',
         locationCode: loc?.code ?? '?',
@@ -57,6 +63,8 @@ export class SkusService {
         boxes,
         unitsPerBox,
         boxesOnly: !!(inv as any).boxesOnlyMode,
+        loosePcs,
+        unconfiguredCartons: (inv as any).unconfiguredCartons ?? 0,
       });
     }
 
@@ -77,24 +85,33 @@ export class SkusService {
     if (!sku) throw new NotFoundException('SKU 不存在');
 
     const inventory = await this.inventoryModel
-      .find({ skuId: new Types.ObjectId(id) })
+      .find({
+        skuId: new Types.ObjectId(id),
+        stockStatus: { $in: ['confirmed', 'pending_count', 'temporary'] },
+      })
       .populate('locationId', 'code description')
       .lean();
 
-    const formatted = inventory.map((r) => {
-      const loc = r.locationId as any;
-      const isBoxesOnly = !!(r as any).boxesOnlyMode;
-      const boxes = (r.boxes ?? 0) > 0 ? r.boxes : (r.quantity ?? 0);
-      const unitsPerBox = r.unitsPerBox ?? 1;
-      return {
-        ...r,
-        skuCode: r.skuCode || sku.sku,
-        locationId: loc,
-        boxes,
-        unitsPerBox,
-        quantity: isBoxesOnly ? 0 : (r.quantity ?? boxes * unitsPerBox),
-      };
-    });
+    const formatted = inventory
+      .filter((r) => {
+        // Exclude zero-stock records; keep pending-count (quantityUnknown) always
+        if ((r as any).quantityUnknown) return true;
+        return (r.boxes ?? 0) > 0 || ((r as any).loosePcs ?? 0) > 0;
+      })
+      .map((r) => {
+        const loc = r.locationId as any;
+        const isBoxesOnly = !!(r as any).boxesOnlyMode;
+        const boxes = r.boxes ?? 0;
+        const unitsPerBox = r.unitsPerBox ?? 1;
+        return {
+          ...r,
+          skuCode: r.skuCode || sku.sku,
+          locationId: loc,
+          boxes,
+          unitsPerBox,
+          quantity: isBoxesOnly ? 0 : (r.quantity ?? 0),
+        };
+      });
 
     const totalQty = formatted.reduce((sum, r) => (r as any).boxesOnlyMode ? sum : sum + (r.quantity ?? 0), 0);
     const totalBoxes = formatted.reduce((sum, r) => sum + (r.boxes ?? 0), 0);

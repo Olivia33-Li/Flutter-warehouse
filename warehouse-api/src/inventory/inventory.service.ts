@@ -159,20 +159,30 @@ export class InventoryService {
     const location = await this.locationModel.findById(dto.locationId);
     if (!location) throw new NotFoundException('库位不存在');
 
+    // Remove stale zero-stock records before the duplicate check:
+    // 1. completed_merge / completed_split tombstones (no active stock)
+    // 2. confirmed records where all quantities are 0 (left by stockAdjust-to-zero)
+    await this.inventoryModel.deleteMany({
+      skuId: sku._id,
+      locationId: new Types.ObjectId(dto.locationId),
+      $or: [
+        { stockStatus: { $in: ['completed_merge', 'completed_split'] } },
+        {
+          stockStatus: 'confirmed',
+          quantityUnknown: { $ne: true },
+          quantity: { $lte: 0 },
+          boxes: { $lte: 0 },
+          loosePcs: { $lte: 0 },
+        },
+      ],
+    });
+
     const existing = await this.inventoryModel.findOne({
       skuId: sku._id,
       locationId: new Types.ObjectId(dto.locationId),
       stockStatus: { $in: ['confirmed', 'pending_count', 'temporary'] },
     });
     if (existing) throw new BadRequestException(`${dto.skuCode} 在此库位已有库存记录`);
-
-    // Remove stale zero-qty tombstone records left by prior merge/split operations.
-    // These hold the unique index slot (skuId+locationId) but carry no active stock.
-    await this.inventoryModel.deleteMany({
-      skuId: sku._id,
-      locationId: new Types.ObjectId(dto.locationId),
-      stockStatus: { $in: ['completed_merge', 'completed_split'] },
-    });
 
     const quantityUnknown = !dto.pendingCount && !dto.boxesOnlyMode && (dto.boxes ?? 0) === 0 && !dto.unitsPerBox;
     const stockStatus = dto.pendingCount ? 'pending_count' : 'confirmed';
@@ -183,11 +193,21 @@ export class InventoryService {
       boxesOnlyMode: dto.boxesOnlyMode ?? false,
     };
 
+    // Populate new-model fields so subsequent stockIn operations work correctly.
+    const initConfigs: { boxes: number; unitsPerBox: number }[] =
+      (!dto.boxesOnlyMode && (dto.boxes ?? 0) > 0 && (dto.unitsPerBox ?? 0) > 0)
+        ? [{ boxes: dto.boxes!, unitsPerBox: dto.unitsPerBox! }]
+        : [];
+    const initUnconfiguredCartons = dto.boxesOnlyMode ? (dto.boxes ?? 0) : 0;
+
     const record = await this.inventoryModel.create({
       skuId: sku._id,
       skuCode: sku.sku,
       locationId: new Types.ObjectId(dto.locationId),
       ...partial,
+      configurations: initConfigs,
+      loosePcs: 0,
+      unconfiguredCartons: initUnconfiguredCartons,
       quantity: this.computeQuantity(partial),
       stockStatus,
       note: dto.note,
@@ -399,6 +419,10 @@ export class InventoryService {
       stockStatus: { $in: ['confirmed', 'pending_count', 'temporary'] },
     });
 
+    // Capture pre-op state for audit log before/after display
+    const beforeQty   = existing ? (existing.quantity ?? 0) : 0;
+    const beforeBoxes = existing ? (existing.boxes    ?? 0) : 0;
+
     if (existing) {
       if (inConfigs) {
         // by-carton: merge into configurations (existing loosePcs / unconfiguredCartons untouched)
@@ -490,6 +514,8 @@ export class InventoryService {
         addedQty,
         boxes: logBoxes,
         configurations: inConfigs ?? undefined,
+        beforeQty,
+        beforeBoxes,
         ...(inBoxesOnly !== null ? { boxesOnlyMode: true, unconfiguredCartons: inBoxesOnly } : {}),
         ...(addQty !== null ? { loosePcs: addQty } : {}),
       },
@@ -531,6 +557,10 @@ export class InventoryService {
       locationId: new Types.ObjectId(dto.locationId),
     });
     if (!record) throw new NotFoundException('库存记录不存在');
+
+    // Capture pre-op state for audit log before/after display
+    const outBeforeBoxes = record.boxes ?? 0;
+    const outBeforeQty   = record.quantity ?? 0;
 
     let outDeltaStr: string;
     let reducedQty = 0;
@@ -597,6 +627,17 @@ export class InventoryService {
 
     await record.save();
 
+    // If all stock is now zero, delete the record so the location slot is freed.
+    // Audit history is preserved in the history log and transaction log above.
+    if (
+      !record.quantityUnknown &&
+      (record.boxes    ?? 0) === 0 &&
+      (record.loosePcs ?? 0) === 0 &&
+      (record.quantity ?? 0) === 0
+    ) {
+      await this.inventoryModel.findByIdAndDelete(record._id);
+    }
+
     await this.historyService.log({
       userId: user._id.toString(),
       userName: user.name,
@@ -609,6 +650,9 @@ export class InventoryService {
         locationCode: location.code,
         reducedQty,
         remainingQty: record.quantity,
+        beforeBoxes: outBeforeBoxes,
+        afterBoxes:  record.boxes,
+        beforeQty:   outBeforeQty,
         configurations: dto.configurations,
         ...(dto.unconfiguredCartons ? { unconfiguredCartons: dto.unconfiguredCartons } : {}),
       },
@@ -634,7 +678,8 @@ export class InventoryService {
     locationId: string;
     quantity?: number;
     configurations?: { boxes: number; unitsPerBox: number }[];
-    loosePcs?: number;   // pcs not in any carton spec (mixed mode)
+    loosePcs?: number;            // pcs not in any carton spec (mixed mode)
+    unconfiguredCartons?: number; // cartons without a per-box spec (mixed mode)
     adjustMode?: 'qty' | 'configs' | 'boxes_only' | 'mixed';
     note?: string;
   }, user: any) {
@@ -666,23 +711,40 @@ export class InventoryService {
     const configs = dto.configurations ?? [];
     const loose = dto.loosePcs ?? 0;
 
-    if (configs.length > 0 || loose > 0) {
-      // mixed mode: carton specs + optional loose pcs
+    if (dto.adjustMode === 'mixed') {
+      // mixed mode: carton specs + optional loose pcs + optional only-cartons (no spec)
+      const unconfiguredCartons = dto.unconfiguredCartons ?? 0;
       record.configurations = configs;
       record.markModified('configurations');
-      record.boxes = configs.reduce((s, c) => s + c.boxes, 0);
+      record.loosePcs = loose;
+      record.unconfiguredCartons = unconfiguredCartons;
+      record.boxes = configs.reduce((s, c) => s + c.boxes, 0) + unconfiguredCartons;
       record.quantity = configs.reduce((s, c) => s + c.boxes * c.unitsPerBox, 0) + loose;
-      record.boxesOnlyMode = false;
+      // boxesOnlyMode: only when there's nothing but unconfigured cartons
+      record.boxesOnlyMode = configs.length === 0 && loose === 0 && unconfiguredCartons > 0;
     } else if (dto.quantity !== undefined) {
       record.quantity = dto.quantity;
       record.boxes = record.unitsPerBox > 0 ? Math.floor(dto.quantity / record.unitsPerBox) : 0;
       record.configurations = [];
       record.markModified('configurations');
+      record.loosePcs = 0;
+      record.unconfiguredCartons = 0;
     }
     record.stockStatus = 'confirmed';
     record.quantityUnknown = false;
     if (dto.note) record.note = dto.note;
     await record.save();
+
+    // If adjustment zeroes out all stock, delete the record so the location slot is freed,
+    // consistent with how stockOut handles reaching zero.
+    if (
+      (record.boxes             ?? 0) === 0 &&
+      (record.loosePcs          ?? 0) === 0 &&
+      (record.quantity          ?? 0) === 0 &&
+      (record.unconfiguredCartons ?? 0) === 0
+    ) {
+      await this.inventoryModel.findByIdAndDelete(record._id);
+    }
 
     const modeLabel = dto.adjustMode === 'mixed' ? '结构调整'
       : dto.adjustMode === 'configs' ? '箱规调整'
@@ -702,6 +764,8 @@ export class InventoryService {
         locationCode: location.code,
         beforeQty: before.quantity,
         afterQty: record.quantity,
+        beforeBoxes: before.boxes,
+        afterBoxes: record.boxes,
         note: dto.note,
       },
     });

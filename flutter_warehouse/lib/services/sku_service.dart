@@ -37,11 +37,12 @@ class SkuService {
     String? name,
     String? barcode,
     int? cartonQty,
+    bool setCartonQty = false, // when true, sends cartonQty even if null (to clear it)
   }) async {
     final response = await _api.patch('/skus/$id', data: {
       if (name != null) 'name': name,
       if (barcode != null) 'barcode': barcode,
-      if (cartonQty != null) 'cartonQty': cartonQty,
+      if (setCartonQty) 'cartonQty': cartonQty else if (cartonQty != null) 'cartonQty': cartonQty,
     });
     return Sku.fromJson(response.data);
   }

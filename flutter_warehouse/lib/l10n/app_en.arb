@@ -31,7 +31,8 @@
   "registerConfirmPassword": "Confirm Password",
   "registerButton": "Register",
   "registerHaveAccount": "Already have an account?",
-  "registerValidation": "Please fill in all fields, password must be at least 6 characters",
+  "registerValidation": "Please fill in all fields",
+  "registerPasswordRules": "Password does not meet requirements",
   "registerPasswordMismatch": "Passwords do not match",
   "registerFailed": "Registration failed",
   "passwordRuleLength": "6–20 characters",
@@ -85,13 +86,21 @@
   },
   "skuSearchTip": "Try a shorter keyword or ignore separators",
   "skuNoStock": "No stock",
-  "unitBox": "box",
+  "unitBox": "carton",
   "unitPiece": "pcs",
   "skuTotalQty": "{qty} {unit} total",
   "@skuTotalQty": {
     "placeholders": {
       "qty": { "type": "int" },
       "unit": { "type": "String" }
+    }
+  },
+  "skuNoSpec": "(no spec)",
+
+  "skuLoosePcs": "{qty} loose",
+  "@skuLoosePcs": {
+    "placeholders": {
+      "qty": { "type": "int" }
     }
   },
 
@@ -169,8 +178,6 @@
   "historyEmpty": "No records",
   "historyFilterDate": "Date",
   "historyFilterAction": "Action",
-  "historyFilterAll": "All",
-  "historyToday": "Today",
   "historyThisWeek": "This Week",
   "historyThisMonth": "This Month",
   "historyCustom": "Custom",
@@ -184,6 +191,8 @@
   "settingsChangePassword": "Change Password",
   "settingsOldPassword": "Current Password",
   "settingsNewPassword": "New Password (min. 6 characters)",
+  "settingsConfirmNewPassword": "Confirm New Password",
+  "settingsPasswordMismatch": "Passwords do not match",
   "settingsPasswordChanged": "Password changed successfully",
   "settingsPasswordChangeFailed": "Change failed",
   "settingsSwitchAccount": "Switch Account",
@@ -229,7 +238,7 @@
   "skuFormSkuCode": "SKU Code",
   "skuFormName": "Name (optional)",
   "skuFormBarcode": "Barcode (optional)",
-  "skuFormCartonQty": "Carton Qty (pcs/box, optional)",
+  "skuFormCartonQty": "Carton Qty (pcs/carton, optional)",
   "skuFormSkuEmpty": "SKU code cannot be empty",
   "skuFormSaveSuccess": "Saved successfully",
   "skuFormArchive": "Archive",
@@ -271,7 +280,7 @@
   "skuFormBarcodeLabel": "Barcode",
   "skuFormBarcodeAdminOnly": "Only admin can edit barcode",
   "skuFormViewBarcodeHistory": "View barcode history",
-  "skuFormCartonQtyLabel": "Pcs per box",
+  "skuFormCartonQtyLabel": "Pcs per carton",
   "skuFormCreateButton": "Create",
   "skuFormSaveButton": "Save",
   "barcodeHistoryTitle": "Barcode Change History",
@@ -337,6 +346,7 @@
   "pwdResetStatusUnknown": "Unknown",
 
   "historyAllTime": "All Time",
+  "historyToday": "Today",
   "historyLast7Days": "Last 7 Days",
   "historyLast30Days": "Last 30 Days",
   "historyCustomRange": "Custom",
@@ -410,11 +420,11 @@
   "inventoryPendingTitle": "Pending / To Count",
   "inventoryPendingSubtitle": "Goods arrived, quantity not yet confirmed",
   "inventoryModeCarton": "By carton",
-  "inventoryModeBoxOnly": "Boxes only",
+  "inventoryModeBoxOnly": "Cartons only",
   "inventoryModeQty": "By total qty",
-  "inventoryBoxesLabel": "Boxes *",
-  "inventoryBoxesSuffix": "box(es)",
-  "inventoryUnitsLabel": "Pcs/box *",
+  "inventoryBoxesLabel": "Cartons *",
+  "inventoryBoxesSuffix": "carton(s)",
+  "inventoryUnitsLabel": "Pcs/carton *",
   "inventoryTotalQtyLabel": "Total qty *",
   "inventoryTotalQtySuffix": "pcs",
   "inventoryNoteLabel": "Note (optional)",
@@ -426,11 +436,11 @@
   "inventorySkuCodeEmpty": "SKU code cannot be empty",
   "inventorySelectLocation": "Please select a location",
   "inventoryLocationCodeEmpty": "Location code cannot be empty",
-  "inventoryValidBoxCount": "Please enter a valid box count",
-  "inventoryValidUnits": "Please enter pcs per box",
+  "inventoryValidBoxCount": "Please enter a valid carton count",
+  "inventoryValidUnits": "Please enter pcs per carton",
   "inventoryValidQty": "Please enter a valid quantity",
   "inventoryTotal": "Total",
-  "inventoryBoxesTotal": "{boxes} box(es) · carton qty TBD",
+  "inventoryBoxesTotal": "{boxes} carton(s) · qty TBD",
   "@inventoryBoxesTotal": {
     "placeholders": {
       "boxes": { "type": "int" }
@@ -461,21 +471,21 @@
   "skuDetailPendingTitle": "Pending / To Count",
   "skuDetailPendingSubtitle": "Goods arrived, quantity not yet confirmed",
   "skuDetailModeCarton": "By carton",
-  "skuDetailModeBoxOnly": "Boxes only",
+  "skuDetailModeBoxOnly": "Cartons only",
   "skuDetailModeQty": "By total qty",
-  "skuDetailBoxesLabel": "Boxes",
-  "skuDetailBoxesSuffix": "box(es)",
-  "skuDetailUnitsLabel": "Pcs/box",
-  "skuDetailUnitsSuffix": "pcs/box",
-  "skuDetailBoxesOnlyHelp": "Record boxes only, pcs/box can be filled in later",
+  "skuDetailBoxesLabel": "Cartons",
+  "skuDetailBoxesSuffix": "carton(s)",
+  "skuDetailUnitsLabel": "Pcs/carton",
+  "skuDetailUnitsSuffix": "pcs/carton",
+  "skuDetailBoxesOnlyHelp": "Record cartons only, pcs/carton can be filled in later",
   "skuDetailTotalLabel": "Total pcs",
   "skuDetailTotalSuffix": "pcs",
   "skuDetailNoteLabel": "Note (optional)",
   "skuDetailCancel": "Cancel",
   "skuDetailCreate": "Create",
   "skuDetailSelectSku": "Please select a SKU",
-  "skuDetailValidBoxes": "Please enter valid boxes and pcs/box",
-  "skuDetailValidBoxesOnly": "Please enter valid box count",
+  "skuDetailValidBoxes": "Please enter valid cartons and pcs/carton",
+  "skuDetailValidBoxesOnly": "Please enter valid carton count",
   "skuDetailValidQty": "Please enter a valid quantity",
   "skuDetailConfirmPending": "Confirm Pending",
   "skuDetailSave": "Save",
@@ -537,7 +547,7 @@
   },
   "skuDetailArchivedNotice": "This SKU is archived. No new stock in allowed. Existing stock can still be viewed and shipped.",
   "skuDetailTotalStock": "Total Stock",
-  "skuDetailTotalBoxes": "{boxes} box(es)",
+  "skuDetailTotalBoxes": "{boxes} carton(s)",
   "@skuDetailTotalBoxes": {
     "placeholders": {
       "boxes": { "type": "int" }
@@ -550,18 +560,24 @@
     }
   },
   "skuDetailLocationCol": "Location",
-  "skuDetailBoxesCol": "Boxes",
+  "skuDetailBoxesCol": "Cartons",
   "skuDetailDefaultCarton": "Default Carton",
-  "skuDetailCartonQtyDisplay": "{qty} pcs/box",
+  "skuDetailCartonQtyDisplay": "{qty} pcs/carton",
   "@skuDetailCartonQtyDisplay": {
     "placeholders": {
       "qty": { "type": "int" }
     }
   },
+  "skuDetailSpecCount": "{count} carton specs",
+  "@skuDetailSpecCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "skuDetailStockLocations": "Stock Locations",
   "skuDetailAddLocation": "Add Location",
   "skuDetailBadgePending": "To Count",
-  "skuDetailBadgeBoxOnly": "Boxes Only",
+  "skuDetailBadgeBoxOnly": "Cartons Only",
   "skuDetailBadgeCarton": "By Carton",
   "skuDetailUnknownLocation": "Unknown Location",
   "skuDetailStockDelete": "Delete",
@@ -594,7 +610,7 @@
   "skuDetailNoCheckRecord": "No check record",
   "skuDetailLastChange": "Last change",
   "skuDetailNoChangeRecord": "No change record",
-  "skuDetailTotalBoxesLabel": "Total Boxes",
+  "skuDetailTotalBoxesLabel": "Total Cartons",
   "skuDetailTotalPiecesLabel": "Total Pcs",
   "skuDetailChangeRecords": "{locationCode} Change Records",
   "@skuDetailChangeRecords": {
@@ -643,13 +659,13 @@
   },
   "skuDetailNoInventory": "No inventory SKUs",
   "skuDetailQtyLinePending": "Qty to be filled in",
-  "skuDetailQtyLineBoxes": "{boxes} box(es) · carton qty TBD",
+  "skuDetailQtyLineBoxes": "{boxes} carton(s) · qty TBD",
   "@skuDetailQtyLineBoxes": {
     "placeholders": {
       "boxes": { "type": "int" }
     }
   },
-  "skuDetailQtyLineCarton": "{boxes} box(es) · {qty} pcs",
+  "skuDetailQtyLineCarton": "{boxes} carton(s) · {qty} pcs",
   "@skuDetailQtyLineCarton": {
     "placeholders": {
       "boxes": { "type": "int" },
@@ -972,11 +988,11 @@
   "@auditQtyPcs": {
     "placeholders": { "qty": { "type": "int" } }
   },
-  "auditQtyBoxes": "{boxes} box(es)",
+  "auditQtyBoxes": "{boxes} carton(s)",
   "@auditQtyBoxes": {
     "placeholders": { "boxes": { "type": "int" } }
   },
-  "auditQtyPcsPerBox": "{qty} pcs/box",
+  "auditQtyPcsPerBox": "{qty} pcs/carton",
   "@auditQtyPcsPerBox": {
     "placeholders": { "qty": { "type": "int" } }
   },
@@ -1060,7 +1076,7 @@
   "auditBusinessActionEditSku": "Edit SKU",
   "auditBusinessActionDeleteSku": "Delete SKU",
 
-  "skuDetailInitialPreviewCarton": "Initial: {boxes} box × {units} pcs/box = {qty} pcs",
+  "skuDetailInitialPreviewCarton": "Initial: {boxes} carton × {units} pcs/carton = {qty} pcs",
   "@skuDetailInitialPreviewCarton": {
     "placeholders": {
       "boxes": { "type": "int" },
@@ -1068,7 +1084,7 @@
       "qty": { "type": "int" }
     }
   },
-  "skuDetailInitialPreviewBoxOnly": "Initial: {qty} box(es) (pcs/box TBD)",
+  "skuDetailInitialPreviewBoxOnly": "Initial: {qty} carton(s) (pcs/carton TBD)",
   "@skuDetailInitialPreviewBoxOnly": {
     "placeholders": {
       "qty": { "type": "int" }
@@ -1094,7 +1110,7 @@
       "qty": { "type": "int" }
     }
   },
-  "locDetailConfigCarton": "{boxes} box × {units} pcs/box",
+  "locDetailConfigCarton": "{boxes} carton × {units} pcs/carton",
   "@locDetailConfigCarton": {
     "placeholders": {
       "boxes": { "type": "int" },
@@ -1114,9 +1130,9 @@
   "errOperationFailed": "Operation failed, please retry",
 
   "invDetailQtyUnknown": "Qty not filled",
-  "invDetailBoxesSuffix": "box(es)",
+  "invDetailBoxesSuffix": "carton(s)",
   "invDetailPieceSuffix": "pcs",
-  "invDetailUnitsPerBoxSuffix": "pcs/box",
+  "invDetailUnitsPerBoxSuffix": "pcs/carton",
 
   "invDetailCurrentStatusPending": "Current status: To Count",
   "invDetailCurrentStock": "Current stock: {label}",
@@ -1124,14 +1140,15 @@
     "placeholders": { "label": { "type": "String" } }
   },
 
+  "invDetailQtyEntryMode": "Entry mode",
   "invDetailModeByCarton": "By carton",
-  "invDetailModeBoxesOnly": "Boxes only",
+  "invDetailModeBoxesOnly": "Cartons only",
   "invDetailModeByQty": "By total qty",
 
-  "invDetailBoxesLabel": "Boxes *",
-  "invDetailPendingBoxes": "Pending boxes: ",
-  "invDetailStockInBoxes": "Stock in boxes: ",
-  "invDetailBoxesValue": "{boxes} box(es)",
+  "invDetailBoxesLabel": "Cartons *",
+  "invDetailPendingBoxes": "Pending cartons: ",
+  "invDetailStockInBoxes": "Stock in cartons: ",
+  "invDetailBoxesValue": "{boxes} carton(s)",
   "@invDetailBoxesValue": {
     "placeholders": { "boxes": { "type": "int" } }
   },
@@ -1148,11 +1165,12 @@
   },
 
   "invDetailStockInQtyLabel": "Stock in qty *",
+  "invDetailAddConfigRow": "+ Add spec",
 
   "invDetailPendingMarkNote": "Will mark this inventory as \"To Count\". Current qty unchanged. Update qty later via \"Adjust\".",
 
-  "invDetailErrInvalidBoxes": "Please enter a valid box count",
-  "invDetailErrInvalidBoxesAndUnits": "Please enter valid boxes and pcs/box",
+  "invDetailErrInvalidBoxes": "Please enter a valid carton count",
+  "invDetailErrInvalidBoxesAndUnits": "Please enter valid cartons and pcs/carton",
   "invDetailErrInvalidQty": "Please enter a valid qty",
 
   "invDetailConfirmPendingBtn": "Confirm Pending",
@@ -1162,7 +1180,7 @@
   "invDetailStockOutTitle": "Stock Out",
 
   "invDetailOutTotal": "Stock out total: ",
-  "invDetailOutBoxesValue": "{boxes} box(es)",
+  "invDetailOutBoxesValue": "{boxes} carton(s)",
   "@invDetailOutBoxesValue": {
     "placeholders": { "boxes": { "type": "int" } }
   },
@@ -1170,11 +1188,11 @@
   "@invDetailOutPcsValue": {
     "placeholders": { "qty": { "type": "int" } }
   },
-  "invDetailRemainCartonBoxes": "  →  {boxes} box(es) remaining",
+  "invDetailRemainCartonBoxes": "  →  {boxes} carton(s) remaining",
   "@invDetailRemainCartonBoxes": {
     "placeholders": { "boxes": { "type": "int" } }
   },
-  "invDetailRemainBoxes": "  →  {boxes} box(es) remaining",
+  "invDetailRemainBoxes": "  →  {boxes} carton(s) remaining",
   "@invDetailRemainBoxes": {
     "placeholders": { "boxes": { "type": "int" } }
   },
@@ -1185,19 +1203,20 @@
 
   "invDetailNoCartonData": "No carton data, please use another mode",
   "invDetailSelectOutBoxes": "Select qty to ship:",
-  "invDetailUnitsPerBoxDisplay": "{units} pcs/box",
+  "invDetailOutBoxesColHeader": "Out cartons",
+  "invDetailUnitsPerBoxDisplay": "{units} pcs/carton",
   "@invDetailUnitsPerBoxDisplay": {
     "placeholders": { "units": { "type": "int" } }
   },
-  "invDetailTotalBoxesDisplay": "{boxes} boxes total",
+  "invDetailTotalBoxesDisplay": "{boxes} cartons total",
   "@invDetailTotalBoxesDisplay": {
     "placeholders": { "boxes": { "type": "int" } }
   },
-  "invDetailOutMaxBoxes": "Out (max {boxes} boxes)",
+  "invDetailOutMaxBoxes": "Out (max {boxes} cartons)",
   "@invDetailOutMaxBoxes": {
     "placeholders": { "boxes": { "type": "int" } }
   },
-  "invDetailExceedBoxes": "Exceeds available {boxes} boxes",
+  "invDetailExceedBoxes": "Exceeds available {boxes} cartons",
   "@invDetailExceedBoxes": {
     "placeholders": { "boxes": { "type": "int" } }
   },
@@ -1206,15 +1225,15 @@
     "placeholders": { "qty": { "type": "int" } }
   },
 
-  "invDetailOutBoxesLabel": "Out boxes * (max {boxes})",
+  "invDetailOutBoxesLabel": "Out cartons * (max {boxes})",
   "@invDetailOutBoxesLabel": {
     "placeholders": { "boxes": { "type": "int" } }
   },
   "invDetailBoxesOnlyHelp": "Suitable when carton qty is unknown — ship by boxes only.",
   "invDetailOutQtyLabel": "Stock out qty *",
 
-  "invDetailErrNegativeBoxes": "Out box count cannot be negative",
-  "invDetailErrExceedCartonBoxes": "{units} pcs/box: exceeds available ({boxes} boxes)",
+  "invDetailErrNegativeBoxes": "Out carton count cannot be negative",
+  "invDetailErrExceedCartonBoxes": "{units} pcs/carton: exceeds available ({boxes} cartons)",
   "@invDetailErrExceedCartonBoxes": {
     "placeholders": {
       "units": { "type": "int" },
@@ -1222,7 +1241,7 @@
     }
   },
   "invDetailErrAtLeastOneCarton": "Please enter at least one carton qty",
-  "invDetailErrExceedStockBoxes": "Out qty cannot exceed current stock ({boxes} boxes)",
+  "invDetailErrExceedStockBoxes": "Out qty cannot exceed current stock ({boxes} cartons)",
   "@invDetailErrExceedStockBoxes": {
     "placeholders": { "boxes": { "type": "int" } }
   },
@@ -1235,7 +1254,7 @@
   "invDetailAdjustTitle": "Adjust Inventory",
   "invDetailAdjustedTotalLabel": "Adjusted total qty *",
   "invDetailAdjustQtyHelp": "Suitable for: inventory variance, loss, etc. Directly correct total qty.",
-  "invDetailBoxesOnlyPanelHelp": "Keep pcs/box unchanged, only edit box count for each spec:",
+  "invDetailBoxesOnlyPanelHelp": "Keep pcs/carton unchanged, only edit carton count for each spec:",
   "invDetailSubtotalPcs": "={qty} pcs",
   "@invDetailSubtotalPcs": {
     "placeholders": { "qty": { "type": "int" } }
@@ -1243,8 +1262,8 @@
   "invDetailCartonGroupsLabel": "Carton groups (max 3):",
   "invDetailAddCarton": "Add carton",
   "invDetailAddFirstCarton": "Add first carton group",
-  "invDetailUnitsPerBoxLabel": "Pcs/box",
-  "invDetailBoxesAdjustLabel": "Boxes",
+  "invDetailUnitsPerBoxLabel": "Pcs/carton",
+  "invDetailBoxesAdjustLabel": "Cartons",
 
   "invDetailSkuCorrectCurrent": "Current:",
   "invDetailSkuCorrectSelectHint": "(select below)",
@@ -1254,8 +1273,9 @@
     "placeholders": { "label": { "type": "String" } }
   },
 
+  "invDetailAdjustModeMixed": "Mixed",
   "invDetailAdjustModeQty": "By qty",
-  "invDetailAdjustModeBoxesOnly": "Boxes only",
+  "invDetailAdjustModeBoxesOnly": "Cartons only",
   "invDetailAdjustModeCarton": "By carton",
   "invDetailAdjustModeSkuCorrect": "SKU Correct",
 
@@ -1268,26 +1288,30 @@
   "invDetailErrSelectNewSku": "Please select a new SKU from the dropdown",
   "invDetailErrSameSkuNotAllowed": "New and old SKU cannot be the same",
   "invDetailErrNoInventoryId": "Cannot get inventory record ID, please close and retry",
-  "invDetailErrAtLeastOneBoxesGroup": "Please enter at least one box count (> 0)",
+  "invDetailErrAtLeastOneBoxesGroup": "Please enter at least one carton count (> 0)",
   "invDetailErrAtLeastOneCartonGroup": "At least one carton group is required",
-  "invDetailErrValidCartonGroup": "Please enter valid boxes and pcs/box (both > 0)",
+  "invDetailErrValidCartonGroup": "Please enter valid cartons and pcs/carton (both > 0)",
   "invDetailErrValidQtyGte0": "Please enter a valid qty (≥ 0)",
+  "invDetailErrMixedEmpty": "Enter at least one carton spec or loose pcs",
+  "invDetailErrMixedInvalidSpec": "All carton specs need valid cartons and pcs/carton (both > 0)",
+  "invDetailLoosePcsLabel": "Loose pcs",
+  "invDetailCartonSpecsLabel": "Carton specs",
 
   "invDetailConfirmSkuCorrect": "Confirm Correction",
-  "invDetailConfirmBoxesAdjust": "Confirm Boxes Adjust",
+  "invDetailConfirmBoxesAdjust": "Confirm Cartons Adjust",
   "invDetailConfirmAdjust": "Confirm Adjust",
 
   "invDetailAdjustedTotalRow": "Adjusted total stock: ",
-  "invDetailBoxesLabelStar": "Boxes *",
-  "invDetailUnitsLabelStar": "Pcs/box *",
+  "invDetailBoxesLabelStar": "Cartons *",
+  "invDetailUnitsLabelStar": "Pcs/carton *",
   "invDetailNoteOptional": "Note (optional)",
 
   "invDetailQtyUnknownHeader": "Qty to be filled",
-  "invDetailBoxesOnlyHeader": "{boxes} boxes · carton qty TBD",
+  "invDetailBoxesOnlyHeader": "{boxes} cartons · qty TBD",
   "@invDetailBoxesOnlyHeader": {
     "placeholders": { "boxes": { "type": "int" } }
   },
-  "invDetailBoxesAndPcs": "{boxes} boxes · {qty} pcs",
+  "invDetailBoxesAndPcs": "{boxes} cartons · {qty} pcs",
   "@invDetailBoxesAndPcs": {
     "placeholders": {
       "boxes": { "type": "int" },
@@ -1349,13 +1373,13 @@
   },
   "invDetailSplitNoSku": "No SKU selected",
   "invDetailSplitModeByCarton": "By carton",
-  "invDetailSplitModeBoxesOnly": "Boxes only",
+  "invDetailSplitModeBoxesOnly": "Cartons only",
   "invDetailSplitModeByQty": "By total qty",
   "invDetailSplitSearchSku": "Search SKU",
-  "invDetailSplitBoxesLabel": "Boxes",
-  "invDetailSplitBoxesSuffix": "box(es)",
-  "invDetailSplitUnitsLabel": "Pcs/box",
-  "invDetailSplitUnitsSuffix": "pcs/box",
+  "invDetailSplitBoxesLabel": "Cartons",
+  "invDetailSplitBoxesSuffix": "carton(s)",
+  "invDetailSplitUnitsLabel": "Pcs/carton",
+  "invDetailSplitUnitsSuffix": "pcs/carton",
   "invDetailSplitCartonTBD": "· Carton qty TBD",
   "invDetailSplitTotalQtyLabel": "Total qty",
   "invDetailSplitTotalQtySuffix": "pcs",
@@ -1371,11 +1395,11 @@
   "@invDetailErrSplitSelectSku": {
     "placeholders": { "index": { "type": "int" } }
   },
-  "invDetailErrSplitBoxesMustBePositive": "Entry {index}: boxes must be > 0",
+  "invDetailErrSplitBoxesMustBePositive": "Entry {index}: cartons must be > 0",
   "@invDetailErrSplitBoxesMustBePositive": {
     "placeholders": { "index": { "type": "int" } }
   },
-  "invDetailErrSplitUnitsMustBePositive": "Entry {index}: pcs/box must be > 0",
+  "invDetailErrSplitUnitsMustBePositive": "Entry {index}: pcs/carton must be > 0",
   "@invDetailErrSplitUnitsMustBePositive": {
     "placeholders": { "index": { "type": "int" } }
   },
@@ -1394,7 +1418,7 @@
   "invDetailSplitSuccess": "Split successful, official SKUs created",
   "invDetailConfirmSplit": "Confirm Split",
 
-  "invDetailSourceModeBoxesOnly": "Boxes only",
+  "invDetailSourceModeBoxesOnly": "Cartons only",
   "invDetailSourceModeQty": "By total qty",
   "invDetailSourceModeCarton": "By carton",
 

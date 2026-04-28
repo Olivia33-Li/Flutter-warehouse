@@ -89,6 +89,87 @@ class AuditLogDetailSheet extends StatelessWidget {
     }
   }
 
+  static String translateEntity(String entity, AppLocalizations l10n) {
+    switch (entity.toLowerCase()) {
+      case 'sku': return 'SKU';
+      case '库存':
+      case 'inventory': return l10n.historyEntityInventory;
+      case '库位':
+      case 'location': return l10n.historyEntityLocation;
+      default: return entity;
+    }
+  }
+
+  static String? localizedDescription(
+      Map<String, dynamic>? d, String? ba, AppLocalizations l10n) {
+    if (d == null || ba == null) return null;
+    final pcs = l10n.unitPiece;
+    final skuCode = d['skuCode']?.toString() ?? '';
+    final locCode = d['locationCode']?.toString() ?? '';
+    switch (ba) {
+      case '入库':
+        if (d['boxesOnlyMode'] == true) {
+          return '$skuCode @ $locCode · +${d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+        }
+        return '$skuCode @ $locCode · +${d['addedQty'] ?? 0}$pcs';
+      case '出库':
+        final unconfiguredOut = (d['unconfiguredCartons'] as num?) ?? 0;
+        if (unconfiguredOut > 0) {
+          return '$skuCode @ $locCode · -$unconfiguredOut ${l10n.unitBox}';
+        }
+        return '$skuCode @ $locCode · -${d['reducedQty'] ?? 0}$pcs';
+      case '调整':
+        final bQty   = (d['beforeQty']  as num?) ?? 0;
+        final aQty   = (d['afterQty']   as num?) ?? 0;
+        final bBoxes = (d['beforeBoxes'] as num?) ?? 0;
+        final aBoxes = (d['afterBoxes']  as num?) ?? 0;
+        final ctn    = l10n.unitBox;
+        // boxesOnly records have quantity=0; fall back to box count for display
+        final bDisplay = bQty > 0 ? '$bQty$pcs' : (bBoxes > 0 ? '$bBoxes $ctn' : '0$pcs');
+        final aDisplay = aQty > 0 ? '$aQty$pcs' : (aBoxes > 0 ? '$aBoxes $ctn' : '0$pcs');
+        return '$skuCode @ $locCode · $bDisplay→$aDisplay';
+      case '录入':
+        return '$skuCode @ $locCode · ${d['quantity'] ?? 0}$pcs';
+      default:
+        return null;
+    }
+  }
+
+  /// Cleans a raw backend-generated (possibly Chinese) description:
+  /// 1. Takes only the first line (strips any trailing Chinese audit detail)
+  /// 2. Strips Chinese action prefix up to the first ': '
+  /// 3. Converts common Chinese quantity patterns to English
+  static String cleanDesc(String raw) {
+    // Step 1: first line only (backend sometimes appends a Chinese detail on line 2)
+    String s = raw.split('\n').first.trim();
+    // Step 2: strip Chinese action prefix, e.g. "出库: " or "箱规调整: "
+    final colonIdx = s.indexOf(': ');
+    if (colonIdx != -1) s = s.substring(colonIdx + 2).trim();
+    // Step 3: convert Chinese quantity/label patterns to English
+    // e.g. "-3箱×144件/箱=-432件" → "-3 cartons × 144 pcs/carton = -432 pcs"
+    s = s.replaceAllMapped(
+      RegExp(r'(-?\d+)箱×(\d+)件/箱=(-?\d+)件'),
+      (m) => '${m[1]} cartons × ${m[2]} pcs/carton = ${m[3]} pcs',
+    );
+    // e.g. "+6件" or "-100件" → "+6 pcs" / "-100 pcs"
+    s = s.replaceAllMapped(
+      RegExp(r'([+-]?\d+)件'),
+      (m) => '${m[1]} pcs',
+    );
+    // e.g. "12箱" standalone → "12 cartons"
+    s = s.replaceAllMapped(
+      RegExp(r'(\d+)箱'),
+      (m) => '${m[1]} cartons',
+    );
+    // label translations
+    s = s.replaceAll('（无箱规）', '(no carton qty)');
+    s = s.replaceAll('无箱规', 'no carton qty');
+    s = s.replaceAll('调前', 'Before');
+    s = s.replaceAll('调后', 'After');
+    s = s.replaceAll('原因', 'Reason');
+    return s.trim();
+  }
+
   static String badgeLabel(ChangeRecord r, AppLocalizations l10n) {
     if (r.businessAction != null) return translateAction(r.businessAction, l10n);
     switch (r.action) {
@@ -177,7 +258,7 @@ class AuditLogDetailSheet extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              record.entity.toLowerCase(),
+                              translateEntity(record.entity, l10n),
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -236,7 +317,7 @@ class AuditLogDetailSheet extends StatelessWidget {
       icon: Icons.info_outline,
       children: [
         _row(l10n.auditActionType, label),
-        _row(l10n.auditEntity, record.entity),
+        _row(l10n.auditEntity, translateEntity(record.entity, l10n)),
         if (record.entityId != null) _row(l10n.auditEntityId, record.entityId!),
         _row(l10n.auditOperator, record.userName),
         _row(l10n.auditTime, _formatFull(record.createdAt)),
@@ -244,11 +325,13 @@ class AuditLogDetailSheet extends StatelessWidget {
     ));
     widgets.add(const SizedBox(height: 12));
 
+    final descText = localizedDescription(d, ba, l10n) ??
+        (l10n.localeName == 'en' ? cleanDesc(record.description) : record.description);
     widgets.add(_sectionCard(
       title: l10n.auditDescription,
       icon: Icons.description_outlined,
       children: [
-        Text(record.description,
+        Text(descText,
             style: const TextStyle(fontSize: 13, height: 1.5)),
       ],
     ));
@@ -347,11 +430,16 @@ class AuditLogDetailSheet extends StatelessWidget {
   // ── 入库 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildStockInDetail(
       Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
+    final isBoxesOnly = d['boxesOnlyMode'] == true;
     final boxes = (d['boxes'] ?? 0) as num;
     final upb = (d['unitsPerBox'] ?? 1) as num;
     final addedQty = (d['addedQty'] ?? boxes * upb) as num;
-    final beforeQty = (d['beforeQty'] as num?) ?? 0;
+    // beforeQty/beforeBoxes now captured by backend; fall back to 0 for old records
+    final beforeQty   = (d['beforeQty']   as num?) ?? 0;
+    final beforeBoxes = (d['beforeBoxes'] as num?) ?? 0;
     final afterQty = (d['afterQty'] as num?) ?? beforeQty + addedQty;
+    // For boxesOnly stockIn: use box counts for before/after display
+    final addedBoxes = (d['unconfiguredCartons'] as num?) ?? boxes;
 
     return [
       _sectionCard(
@@ -361,11 +449,14 @@ class AuditLogDetailSheet extends StatelessWidget {
           _row('SKU', d['skuCode']),
           _row(l10n.auditLocation, d['locationCode']),
           const SizedBox(height: 8),
-          _configsBlock(
-            [{'boxes': boxes, 'unitsPerBox': upb}],
-            highlightColor: Colors.green.shade600,
-            l10n: l10n,
-          ),
+          if (isBoxesOnly)
+            _qtyHighlight('+${boxes.toInt()} ${l10n.invDetailBoxesSuffix}  (${l10n.invDetailCartonTBD.trim()})', Colors.green.shade600)
+          else
+            _configsBlock(
+              [{'boxes': boxes, 'unitsPerBox': upb}],
+              highlightColor: Colors.green.shade600,
+              l10n: l10n,
+            ),
         ],
       ),
       const SizedBox(height: 12),
@@ -373,13 +464,22 @@ class AuditLogDetailSheet extends StatelessWidget {
         title: l10n.auditBeforeAfterChange,
         icon: Icons.show_chart,
         children: [
-          _inventoryChangeWidget(
-            beforeLabel: l10n.auditQtyPcs(beforeQty.toInt()),
-            changeLabel: l10n.auditQtyAdded(addedQty.toInt()),
-            afterLabel: l10n.auditQtyPcs(afterQty.toInt()),
-            changeColor: Colors.green.shade600,
-            l10n: l10n,
-          ),
+          if (isBoxesOnly)
+            _inventoryChangeWidget(
+              beforeLabel: '$beforeBoxes ${l10n.unitBox}',
+              changeLabel: '+$addedBoxes ${l10n.unitBox}',
+              afterLabel: '${(beforeBoxes + addedBoxes).toInt()} ${l10n.unitBox}',
+              changeColor: Colors.green.shade600,
+              l10n: l10n,
+            )
+          else
+            _inventoryChangeWidget(
+              beforeLabel: l10n.auditQtyPcs(beforeQty.toInt()),
+              changeLabel: l10n.auditQtyAdded(addedQty.toInt()),
+              afterLabel: l10n.auditQtyPcs(afterQty.toInt()),
+              changeColor: Colors.green.shade600,
+              l10n: l10n,
+            ),
         ],
       ),
     ];
@@ -388,9 +488,44 @@ class AuditLogDetailSheet extends StatelessWidget {
   // ── 出库 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildStockOutDetail(
       Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
-    final reduced = (d['reducedQty'] ?? 0) as num;
+    final unconfiguredOut = (d['unconfiguredCartons'] as num?) ?? 0;
+    final ctn = l10n.unitBox;
+
+    // ── boxesOnly (unconfiguredCartons) stockOut ──────────────────────────────
+    if (unconfiguredOut > 0) {
+      final beforeBoxes = (d['beforeBoxes'] as num?) ?? unconfiguredOut;
+      final afterBoxes  = (d['afterBoxes']  as num?) ?? (beforeBoxes - unconfiguredOut);
+      return [
+        _sectionCard(
+          title: l10n.auditStockOutTitle,
+          icon: Icons.outbox_outlined,
+          children: [
+            _row('SKU', d['skuCode']),
+            _row(l10n.auditLocation, d['locationCode']),
+            const SizedBox(height: 8),
+            _qtyHighlight('-$unconfiguredOut $ctn', Colors.orange.shade700),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _sectionCard(
+          title: l10n.auditBeforeAfterChange,
+          icon: Icons.show_chart,
+          children: [
+            _beforeAfterWidget(
+              '$beforeBoxes $ctn',
+              '$afterBoxes $ctn',
+              l10n,
+            ),
+          ],
+        ),
+      ];
+    }
+
+    // ── pcs / carton-spec stockOut ────────────────────────────────────────────
+    final reduced   = (d['reducedQty']   ?? 0) as num;
     final remaining = (d['remainingQty'] as num?) ?? 0;
-    final beforeQty = reduced + remaining;
+    // Use beforeQty from details when available (more accurate than reduced+remaining for mixed records)
+    final beforeQty = (d['beforeQty'] as num?) ?? reduced + remaining;
 
     return [
       _sectionCard(
@@ -423,10 +558,22 @@ class AuditLogDetailSheet extends StatelessWidget {
   // ── 调整 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildAdjustDetail(
       Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
-    final beforeQty = d['beforeQty'] as num?;
-    final afterQty = d['afterQty'] as num?;
+    final beforeQty   = (d['beforeQty']   as num?) ?? 0;
+    final afterQty    = (d['afterQty']    as num?) ?? 0;
+    final beforeBoxes = (d['beforeBoxes'] as num?) ?? 0;
+    final afterBoxes  = (d['afterBoxes']  as num?) ?? 0;
     final mode = d['mode'] == 'config' ? l10n.auditAdjustModeConfig : l10n.auditAdjustModeQty;
     final note = d['note']?.toString();
+    final ctn = l10n.unitBox;
+    final pcs = l10n.unitPiece;
+
+    // For boxesOnly records quantity is always 0; use box count for display
+    final beforeLabel = beforeQty > 0
+        ? '$beforeQty $pcs'
+        : (beforeBoxes > 0 ? '$beforeBoxes $ctn' : '0 $pcs');
+    final afterLabel = afterQty > 0
+        ? '$afterQty $pcs'
+        : (afterBoxes > 0 ? '$afterBoxes $ctn' : '0 $pcs');
 
     return [
       _sectionCard(
@@ -439,20 +586,14 @@ class AuditLogDetailSheet extends StatelessWidget {
           if (note != null && note.isNotEmpty) _row(l10n.auditNote, note),
         ],
       ),
-      if (beforeQty != null && afterQty != null) ...[
-        const SizedBox(height: 12),
-        _sectionCard(
-          title: l10n.auditBeforeAfterChange,
-          icon: Icons.show_chart,
-          children: [
-            _beforeAfterWidget(
-              l10n.auditQtyPcs(beforeQty.toInt()),
-              l10n.auditQtyPcs(afterQty.toInt()),
-              l10n,
-            ),
-          ],
-        ),
-      ],
+      const SizedBox(height: 12),
+      _sectionCard(
+        title: l10n.auditBeforeAfterChange,
+        icon: Icons.show_chart,
+        children: [
+          _beforeAfterWidget(beforeLabel, afterLabel, l10n),
+        ],
+      ),
     ];
   }
 

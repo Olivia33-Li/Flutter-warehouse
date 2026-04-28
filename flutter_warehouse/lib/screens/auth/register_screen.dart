@@ -43,10 +43,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _register() async {
-    if (_usernameCtrl.text.trim().isEmpty ||
-        _nameCtrl.text.trim().isEmpty ||
-        _passwordCtrl.text.length < 6) {
+    if (_usernameCtrl.text.trim().isEmpty || _nameCtrl.text.trim().isEmpty) {
       setState(() => _error = AppLocalizations.of(context)!.registerValidation);
+      return;
+    }
+    if (!_ruleLength || !_ruleLowercase || !_ruleDigit || !_ruleOnlyAlnum) {
+      setState(() => _error = AppLocalizations.of(context)!.registerPasswordRules);
       return;
     }
     if (_passwordCtrl.text != _confirmPasswordCtrl.text) {

@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/sku_service.dart';
 import '../../models/sku.dart';
 import '../../utils/search_utils.dart';
+import '../../utils/stock_display_utils.dart';
 import '../../widgets/error_view.dart';
 import '../inventory/inventory_add_screen.dart';
 
@@ -473,7 +474,7 @@ class _SkuCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 4,
                 children: [
-                  ...shownLocs.map((loc) => _LocChip(loc: loc, dimmed: dimmed)),
+                  ...shownLocs.map((loc) => _LocChip(loc: loc, dimmed: dimmed, cartonQty: sku.cartonQty)),
                   if (moreCount > 0)
                     _LocChip(label: '+$moreCount', dimmed: dimmed),
                 ],
@@ -490,6 +491,8 @@ class _SkuCard extends StatelessWidget {
   }
 }
 
+// ── Stock display helper — see utils/stock_display_utils.dart ─────────────────
+
 // ── Stock label ───────────────────────────────────────────────────────────────
 
 class _StockLabel extends StatelessWidget {
@@ -498,26 +501,35 @@ class _StockLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final qty  = sku.allBoxesOnly
-        ? sku.locations.fold(0, (s, l) => s + l.boxes)
-        : sku.totalQty;
     final l10n = AppLocalizations.of(context)!;
-    final unit = sku.allBoxesOnly ? l10n.unitBox : l10n.unitPiece;
     final min  = sku.minStock;
+
+    final configuredCartons   = sku.totalConfiguredCartons;
+    final noSpecCartons        = sku.totalUnconfiguredCartons;
+    final loosePcs             = sku.totalLoosePcs;
+    final hasStock             = configuredCartons > 0 || noSpecCartons > 0 || loosePcs > 0;
 
     Color color;
     IconData? icon;
 
-    if (qty == 0) {
+    if (!hasStock) {
       color = Colors.grey.shade400;
       icon  = Icons.warning_amber_rounded;
-    } else if (min != null && qty <= min) {
+    } else if (min != null && sku.totalQty > 0 && sku.totalQty <= min) {
       color = Colors.orange.shade600;
       icon  = Icons.trending_down;
     } else {
       color = _stockGreen;
       icon  = null;
     }
+
+    final label = buildStockLabel(
+      configuredCartons: configuredCartons,
+      noSpecCartons:     noSpecCartons,
+      loosePcs:          loosePcs,
+      cartonQty:         sku.cartonQty,
+      l10n:              l10n,
+    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -526,11 +538,12 @@ class _StockLabel extends StatelessWidget {
           Icon(icon, size: 13, color: color),
           const SizedBox(width: 2),
         ],
-        Text(
-          l10n.skuTotalQty(qty, unit),
-          style: TextStyle(
-            fontSize: 13,
-            color: color,
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 13, color: color),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
       ],
@@ -544,16 +557,27 @@ class _LocChip extends StatelessWidget {
   final SkuLocation? loc;
   final String? label;
   final bool dimmed;
+  final int? cartonQty;
 
-  const _LocChip({this.loc, this.label, required this.dimmed});
+  const _LocChip({this.loc, this.label, required this.dimmed, this.cartonQty});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final text = label ??
-        (loc!.boxesOnly
-            ? '${loc!.locationCode} · ${loc!.boxes}${l10n.unitBox}'
-            : '${loc!.locationCode} · ${loc!.totalQty}${l10n.unitPiece}');
+    String text;
+    if (label != null) {
+      text = label!;
+    } else {
+      final l   = loc!;
+      final qty = buildStockLabel(
+        configuredCartons: l.configuredCartons,
+        noSpecCartons:     l.unconfiguredCartons,
+        loosePcs:          l.loosePcs,
+        cartonQty:         cartonQty,
+        l10n:              l10n,
+      );
+      text = '${l.locationCode} · $qty';
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

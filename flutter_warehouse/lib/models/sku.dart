@@ -5,6 +5,10 @@ class SkuLocation {
   final int unitsPerBox;
   final int totalQty;
   final bool boxesOnly;
+  /// Pieces that are not in a full-box configuration (mixed mode).
+  final int loosePcs;
+  /// Cartons that have no per-box spec (boxesOnly portion).
+  final int unconfiguredCartons;
 
   SkuLocation({
     required this.locationId,
@@ -13,7 +17,12 @@ class SkuLocation {
     required this.unitsPerBox,
     required this.totalQty,
     this.boxesOnly = false,
+    this.loosePcs = 0,
+    this.unconfiguredCartons = 0,
   });
+
+  /// Cartons that have a known per-box spec.
+  int get configuredCartons => boxes - unconfiguredCartons;
 
   factory SkuLocation.fromJson(Map<String, dynamic> json) => SkuLocation(
         locationId: json['locationId'] ?? '',
@@ -22,6 +31,8 @@ class SkuLocation {
         unitsPerBox: (json['unitsPerBox'] as num?)?.toInt() ?? 1,
         totalQty: (json['totalQty'] as num?)?.toInt() ?? 0,
         boxesOnly: json['boxesOnly'] == true,
+        loosePcs: (json['loosePcs'] as num?)?.toInt() ?? 0,
+        unconfiguredCartons: (json['unconfiguredCartons'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -79,4 +90,16 @@ class Sku {
 
   /// True when every location for this SKU is in boxes-only mode (no per-box qty known).
   bool get allBoxesOnly => locations.isNotEmpty && locations.every((l) => l.boxesOnly);
+
+  /// Total boxes across all locations.
+  int get totalBoxes => locations.fold(0, (s, l) => s + l.boxes);
+
+  /// Total loose pieces (not in a full box) across all locations.
+  int get totalLoosePcs => locations.fold(0, (s, l) => s + l.loosePcs);
+
+  /// Total cartons without a per-box spec across all locations.
+  int get totalUnconfiguredCartons => locations.fold(0, (s, l) => s + l.unconfiguredCartons);
+
+  /// Total cartons with a known per-box spec across all locations.
+  int get totalConfiguredCartons => locations.fold(0, (s, l) => s + l.configuredCartons);
 }

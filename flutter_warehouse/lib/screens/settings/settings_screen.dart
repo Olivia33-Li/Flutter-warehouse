@@ -133,64 +133,127 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // ── Change Password ─────────────────────────────────────────────────────────
 
   Future<void> _showChangePasswordDialog() async {
-    final oldCtrl = TextEditingController();
-    final newCtrl = TextEditingController();
+    final oldCtrl     = TextEditingController();
+    final newCtrl     = TextEditingController();
+    final confirmCtrl = TextEditingController();
     String? err;
+
+    bool ruleLength(String s)    => s.length >= 6 && s.length <= 20;
+    bool ruleLowercase(String s) => s.contains(RegExp(r'[a-z]'));
+    bool ruleDigit(String s)     => s.contains(RegExp(r'[0-9]'));
+    bool ruleAlnum(String s)     => s.isEmpty || RegExp(r'^[a-z0-9]+$').hasMatch(s);
+    bool allRulesPassed(String s) =>
+        ruleLength(s) && ruleLowercase(s) && ruleDigit(s) && ruleAlnum(s);
+
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(AppLocalizations.of(context)!.settingsChangePassword,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
-                const SizedBox(height: 16),
-                _RoundedInput(controller: oldCtrl, hint: AppLocalizations.of(context)!.settingsOldPassword, obscure: true),
-                const SizedBox(height: 16),
-                _RoundedInput(controller: newCtrl, hint: AppLocalizations.of(context)!.settingsNewPassword, obscure: true),
-                if (err != null) ...[
-                  const SizedBox(height: 8),
-                  Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-                ],
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => ctx.pop(),
-                      child: Text(AppLocalizations.of(ctx)!.cancel, style: const TextStyle(color: Color(0xFF6E6E80))),
+        builder: (ctx, setS) {
+          final newPwd = newCtrl.text;
+          final l10n   = AppLocalizations.of(context)!;
+
+          Widget ruleRow(String label, bool passed) {
+            final color = passed ? const Color(0xFF43A047) : const Color(0xFFB5B5C0);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(children: [
+                Container(
+                  width: 13, height: 13,
+                  decoration: BoxDecoration(
+                    color: passed
+                        ? const Color(0xFF43A047).withValues(alpha: 0.12)
+                        : const Color(0xFFF7F6F4),
+                    border: Border.all(
+                      color: passed
+                          ? const Color(0xFF43A047).withValues(alpha: 0.5)
+                          : const Color(0xFFD4D2CE),
                     ),
-                    const SizedBox(width: 8),
-                    _PrimaryButton(
-                      label: AppLocalizations.of(ctx)!.confirm,
-                      onPressed: () async {
-                        try {
-                          await AuthService().changePassword(
-                            oldPassword: oldCtrl.text,
-                            newPassword: newCtrl.text,
-                          );
-                          if (ctx.mounted) ctx.pop();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(AppLocalizations.of(context)!.settingsPasswordChanged)));
-                          }
-                        } on DioException catch (e) {
-                          final msg = e.response?.data?['message'];
-                          setS(() => err = msg is List ? msg.join(', ') : (msg ?? AppLocalizations.of(ctx)!.settingsPasswordChangeFailed));
-                        }
-                      },
-                    ),
-                  ],
+                    shape: BoxShape.circle,
+                  ),
+                  child: passed
+                      ? const Icon(Icons.check, size: 8, color: Color(0xFF43A047))
+                      : null,
                 ),
-              ],
+                const SizedBox(width: 7),
+                Text(label, style: TextStyle(fontSize: 12, color: color)),
+              ]),
+            );
+          }
+
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsChangePassword,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primary)),
+                  const SizedBox(height: 16),
+                  _PasswordInput(controller: oldCtrl, hint: l10n.settingsOldPassword),
+                  const SizedBox(height: 12),
+                  _PasswordInput(
+                    controller: newCtrl,
+                    hint: l10n.settingsNewPassword,
+                    onChanged: (_) => setS(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  _PasswordInput(controller: confirmCtrl, hint: l10n.settingsConfirmNewPassword),
+                  if (newPwd.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    ruleRow(l10n.passwordRuleLength,    ruleLength(newPwd)),
+                    ruleRow(l10n.passwordRuleLowercase, ruleLowercase(newPwd)),
+                    ruleRow(l10n.passwordRuleDigit,     ruleDigit(newPwd)),
+                    ruleRow(l10n.passwordRuleAlnum,     ruleAlnum(newPwd)),
+                  ],
+                  if (err != null) ...[
+                    const SizedBox(height: 8),
+                    Text(err!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  ],
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => ctx.pop(),
+                        child: Text(l10n.cancel, style: const TextStyle(color: Color(0xFF6E6E80))),
+                      ),
+                      const SizedBox(width: 8),
+                      _PrimaryButton(
+                        label: l10n.confirm,
+                        onPressed: () async {
+                          if (!allRulesPassed(newCtrl.text)) {
+                            setS(() => err = l10n.registerPasswordRules);
+                            return;
+                          }
+                          if (newCtrl.text != confirmCtrl.text) {
+                            setS(() => err = l10n.settingsPasswordMismatch);
+                            return;
+                          }
+                          try {
+                            await AuthService().changePassword(
+                              oldPassword: oldCtrl.text,
+                              newPassword: newCtrl.text,
+                            );
+                            if (ctx.mounted) ctx.pop();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(l10n.settingsPasswordChanged)));
+                            }
+                          } on DioException catch (e) {
+                            final msg = e.response?.data?['message'];
+                            setS(() => err = msg is List ? msg.join(', ') : (msg ?? l10n.settingsPasswordChangeFailed));
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -659,6 +722,50 @@ class _CardItemSub extends StatelessWidget {
               const Icon(Icons.chevron_right, size: 14, color: _muted),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordInput extends StatefulWidget {
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String>? onChanged;
+  const _PasswordInput({required this.controller, required this.hint, this.onChanged});
+
+  @override
+  State<_PasswordInput> createState() => _PasswordInputState();
+}
+
+class _PasswordInputState extends State<_PasswordInput> {
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    const inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(20)),
+      borderSide: BorderSide(color: Color(0xFFD5D3CF), width: 1.2),
+    );
+    return TextField(
+      controller: widget.controller,
+      obscureText: _obscure,
+      onChanged: widget.onChanged,
+      style: const TextStyle(fontSize: 14, color: _primary),
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        hintStyle: const TextStyle(color: _muted, fontSize: 14),
+        contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+        border: inputBorder,
+        enabledBorder: inputBorder,
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(20)),
+          borderSide: BorderSide(color: Color(0xFF8090A8), width: 1.2),
+        ),
+        suffixIcon: IconButton(
+          icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              size: 18, color: _muted),
+          onPressed: () => setState(() => _obscure = !_obscure),
         ),
       ),
     );

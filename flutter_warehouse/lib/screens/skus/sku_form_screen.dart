@@ -63,6 +63,7 @@ class _SkuFormScreenState extends ConsumerState<SkuFormScreen> {
           // Only send barcode if admin and it changed
           barcode: (isAdmin && newBarcode != originalBarcode) ? newBarcode : null,
           cartonQty: int.tryParse(_cartonQtyCtrl.text),
+          setCartonQty: true, // always send, null means clear
         );
       } else {
         await service.create(

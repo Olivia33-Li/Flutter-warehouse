@@ -229,14 +229,25 @@ class _InventoryAddScreenState extends State<InventoryAddScreen> {
       } on DioException catch (e) {
         final statusCode = e.response?.statusCode;
         if (statusCode == 409) {
-          await InventoryService().stockIn(
-            skuCode: skuCode,
-            locationId: locationId,
-            boxes: boxes,
-            unitsPerBox: unitsPerBox,
-            note: note.isEmpty ? null : note,
-            boxesOnlyMode: boxesOnlyMode,
-          );
+          if (_inputMode == 'qty') {
+            // qty mode: stockIn as loose pcs, not as a carton spec
+            final total = int.tryParse(_totalQtyCtrl.text) ?? 0;
+            await InventoryService().stockIn(
+              skuCode: skuCode,
+              locationId: locationId,
+              addQuantity: total,
+              note: note.isEmpty ? null : note,
+            );
+          } else {
+            await InventoryService().stockIn(
+              skuCode: skuCode,
+              locationId: locationId,
+              boxes: boxes,
+              unitsPerBox: unitsPerBox,
+              note: note.isEmpty ? null : note,
+              boxesOnlyMode: boxesOnlyMode,
+            );
+          }
         } else {
           rethrow;
         }

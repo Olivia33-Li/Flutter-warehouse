@@ -69,17 +69,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       final resp = await ApiService.instance.dio.get('/users');
       final list = resp.data as List;
       if (!mounted) return;
-      final l10n = AppLocalizations.of(context)!;
       setState(() {
-        _userOptions = [
-          _FilterOption(label: l10n.historyAllUsersTab, value: null),
-          ...list.map((u) {
-            final name = (u['name'] as String? ?? '').isNotEmpty
-                ? u['name'] as String
-                : u['username'] as String;
-            return _FilterOption(label: name, value: u['username'] as String);
-          }),
-        ];
+        // Do NOT include the "All Users" option here — it is injected
+        // dynamically in build() so its label updates on locale change.
+        _userOptions = list.map((u) {
+          final name = (u['name'] as String? ?? '').isNotEmpty
+              ? u['name'] as String
+              : u['username'] as String;
+          return _FilterOption(label: name, value: u['username'] as String);
+        }).toList();
       });
     } catch (_) {}
   }
@@ -304,14 +302,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final d = r.details;
     final ba = r.businessAction;
     if (d == null || ba == null) {
-      // Strip Chinese action prefix (e.g. "入库: SKU @ LOC detail" → "SKU @ LOC detail")
-      final desc = r.description;
-      final colonIdx = desc.indexOf(': ');
-      return colonIdx != -1 ? desc.substring(colonIdx + 2).trim() : desc;
+      if (l10n.localeName == 'en') return AuditLogDetailSheet.cleanDesc(r.description);
+      final colonIdx = r.description.indexOf(': ');
+      return colonIdx != -1
+          ? r.description.substring(colonIdx + 2).trim()
+          : r.description;
     }
     final pcs = l10n.unitPiece;
     switch (ba) {
       case '入库':
+        if (d['boxesOnlyMode'] == true) {
+          return '${d['skuCode']} @ ${d['locationCode']} · +${d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+        }
         return '${d['skuCode']} @ ${d['locationCode']} · +${d['addedQty'] ?? 0}$pcs';
       case '出库':
         return '${d['skuCode']} @ ${d['locationCode']} · -${d['reducedQty'] ?? 0}$pcs';
@@ -332,7 +334,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       case '删除库位':
         return d['locationCode'] ?? '';
       default:
-        return r.description;
+        return l10n.localeName == 'en'
+            ? AuditLogDetailSheet.cleanDesc(r.description)
+            : r.description;
     }
   }
 
@@ -341,7 +345,28 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ── Label helpers ───────────────────────────────────────────────────────────
 
-  String _actionLabel(AppLocalizations l10n) => _filterBusinessAction ?? l10n.historyActionTypeLabel;
+  // Returns the full list of action filter options (translated); used both
+  // to build the dropdown and to look up the current selection's label.
+  List<_FilterOption> _actionOptions(AppLocalizations l10n) => [
+    _FilterOption(label: l10n.historyFilterAll, value: null),
+    _FilterOption(label: l10n.historyFilterImport, value: '导入'),
+    _FilterOption(label: l10n.historyFilterNew, value: '新增SKU'),
+    _FilterOption(label: l10n.historyFilterEntry, value: '录入'),
+    _FilterOption(label: l10n.historyFilterAdjust, value: '调整'),
+    _FilterOption(label: l10n.historyFilterTransfer, value: '批量转移'),
+    _FilterOption(label: l10n.historyFilterCopy, value: '批量复制'),
+    _FilterOption(label: l10n.historyFilterCheck, value: '标记已检查'),
+    _FilterOption(label: l10n.historyFilterIn, value: '入库'),
+    _FilterOption(label: l10n.historyFilterOut, value: '出库'),
+  ];
+
+  String _actionLabel(AppLocalizations l10n) {
+    if (_filterBusinessAction == null) return l10n.historyActionTypeLabel;
+    final match = _actionOptions(l10n)
+        .where((o) => o.value == _filterBusinessAction)
+        .firstOrNull;
+    return match?.label ?? _filterBusinessAction!;
+  }
 
   String _entityLabel(AppLocalizations l10n) => switch (_filterEntity) {
     'sku'       => 'SKU',
@@ -513,18 +538,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     _FilterDropdown(
                       label: _actionLabel(l10n),
                       active: _filterBusinessAction != null,
-                      options: [
-                        _FilterOption(label: l10n.historyFilterAll, value: null),
-                        _FilterOption(label: l10n.historyFilterImport, value: '导入'),
-                        _FilterOption(label: l10n.historyFilterNew, value: '新增SKU'),
-                        _FilterOption(label: l10n.historyFilterEntry, value: '录入'),
-                        _FilterOption(label: l10n.historyFilterAdjust, value: '调整'),
-                        _FilterOption(label: l10n.historyFilterTransfer, value: '批量转移'),
-                        _FilterOption(label: l10n.historyFilterCopy, value: '批量复制'),
-                        _FilterOption(label: l10n.historyFilterCheck, value: '标记已检查'),
-                        _FilterOption(label: l10n.historyFilterIn, value: '入库'),
-                        _FilterOption(label: l10n.historyFilterOut, value: '出库'),
-                      ],
+                      options: _actionOptions(l10n),
                       selected: _filterBusinessAction,
                       onSelect: (v) {
                         setState(() => _filterBusinessAction = v);
@@ -555,7 +569,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         label: _userLabel(l10n),
                         active: _filterUserName != null &&
                             _filterUserName != ref.read(currentUserProvider)?.username,
-                        options: _userOptions,
+                        options: [
+                          _FilterOption(label: l10n.historyAllUsersTab, value: null),
+                          ..._userOptions,
+                        ],
                         selected: _filterUserName,
                         onSelect: (v) {
                           setState(() => _filterUserName = v);
@@ -934,16 +951,22 @@ class _RecordTile extends StatelessWidget {
   });
 
   (Color, Color) _entityColors() {
-    switch (record.entity) {
-      case 'SKU':
+    switch (record.entity.toLowerCase()) {
+      case 'sku':
         return (Colors.teal.shade700, Colors.teal.shade50);
       case '库存':
+      case 'inventory':
         return (Colors.green.shade700, Colors.green.shade50);
       case '库位':
+      case 'location':
         return (Colors.blue.shade700, Colors.blue.shade50);
       default:
         return (Colors.grey.shade600, Colors.grey.shade100);
     }
+  }
+
+  String _entityDisplayLabel(BuildContext context) {
+    return AuditLogDetailSheet.translateEntity(record.entity, AppLocalizations.of(context)!);
   }
 
   @override
@@ -997,7 +1020,7 @@ class _RecordTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            record.entity.toLowerCase(),
+                            _entityDisplayLabel(context),
                             style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,

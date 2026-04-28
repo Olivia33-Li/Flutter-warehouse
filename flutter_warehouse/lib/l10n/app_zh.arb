@@ -31,7 +31,8 @@
   "registerConfirmPassword": "确认密码",
   "registerButton": "注册",
   "registerHaveAccount": "已有账号？",
-  "registerValidation": "请填写完整信息，密码至少6位",
+  "registerValidation": "请填写完整信息",
+  "registerPasswordRules": "密码不符合要求",
   "registerPasswordMismatch": "两次输入的密码不一致",
   "registerFailed": "注册失败",
   "passwordRuleLength": "6–20 位字符",
@@ -92,6 +93,14 @@
     "placeholders": {
       "qty": { "type": "int" },
       "unit": { "type": "String" }
+    }
+  },
+  "skuNoSpec": "（无箱规）",
+
+  "skuLoosePcs": "散{qty}件",
+  "@skuLoosePcs": {
+    "placeholders": {
+      "qty": { "type": "int" }
     }
   },
 
@@ -169,8 +178,6 @@
   "historyEmpty": "暂无记录",
   "historyFilterDate": "日期",
   "historyFilterAction": "操作",
-  "historyFilterAll": "全部",
-  "historyToday": "今天",
   "historyThisWeek": "本周",
   "historyThisMonth": "本月",
   "historyCustom": "自定义",
@@ -184,6 +191,8 @@
   "settingsChangePassword": "修改密码",
   "settingsOldPassword": "原密码",
   "settingsNewPassword": "新密码（至少6位）",
+  "settingsConfirmNewPassword": "确认新密码",
+  "settingsPasswordMismatch": "两次密码不一致",
   "settingsPasswordChanged": "密码修改成功",
   "settingsPasswordChangeFailed": "修改失败",
   "settingsSwitchAccount": "切换账号",
@@ -337,6 +346,7 @@
   "pwdResetStatusUnknown": "未知",
 
   "historyAllTime": "全部时间",
+  "historyToday": "今天",
   "historyLast7Days": "近7天",
   "historyLast30Days": "近30天",
   "historyCustomRange": "自定义时间",
@@ -556,6 +566,12 @@
   "@skuDetailCartonQtyDisplay": {
     "placeholders": {
       "qty": { "type": "int" }
+    }
+  },
+  "skuDetailSpecCount": "{count} 种箱规",
+  "@skuDetailSpecCount": {
+    "placeholders": {
+      "count": { "type": "int" }
     }
   },
   "skuDetailStockLocations": "库存位置",
@@ -1124,6 +1140,7 @@
     "placeholders": { "label": { "type": "String" } }
   },
 
+  "invDetailQtyEntryMode": "录入方式",
   "invDetailModeByCarton": "按箱规",
   "invDetailModeBoxesOnly": "仅箱数",
   "invDetailModeByQty": "按总数量",
@@ -1148,6 +1165,7 @@
   },
 
   "invDetailStockInQtyLabel": "入库件数 *",
+  "invDetailAddConfigRow": "+ 添加规格",
 
   "invDetailPendingMarkNote": "将标记此库存为【待清点】，当前数量不变。后续确认后可通过【调整】更新数量。",
 
@@ -1185,6 +1203,7 @@
 
   "invDetailNoCartonData": "当前无箱规数据，请使用其他模式",
   "invDetailSelectOutBoxes": "选择出库箱数:",
+  "invDetailOutBoxesColHeader": "出库箱数",
   "invDetailUnitsPerBoxDisplay": "{units}件/箱",
   "@invDetailUnitsPerBoxDisplay": {
     "placeholders": { "units": { "type": "int" } }
@@ -1254,6 +1273,7 @@
     "placeholders": { "label": { "type": "String" } }
   },
 
+  "invDetailAdjustModeMixed": "混合",
   "invDetailAdjustModeQty": "总数量",
   "invDetailAdjustModeBoxesOnly": "仅箱数",
   "invDetailAdjustModeCarton": "按箱规",
@@ -1272,6 +1292,10 @@
   "invDetailErrAtLeastOneCartonGroup": "至少需要一组箱规",
   "invDetailErrValidCartonGroup": "请输入有效的箱数和每箱件数（均需 > 0）",
   "invDetailErrValidQtyGte0": "请输入有效件数（≥ 0）",
+  "invDetailErrMixedEmpty": "请至少输入一条箱规或散件数",
+  "invDetailErrMixedInvalidSpec": "所有箱规的箱数和每箱件数均需大于 0",
+  "invDetailLoosePcsLabel": "散件（不足整箱）",
+  "invDetailCartonSpecsLabel": "箱规",
 
   "invDetailConfirmSkuCorrect": "确认更正",
   "invDetailConfirmBoxesAdjust": "确认箱数调整",

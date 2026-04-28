@@ -37,6 +37,12 @@ class InventoryRecord {
   /// Display as "X 箱" without piece count.
   final bool boxesOnlyMode;
 
+  /// Pieces not belonging to any box configuration (mixed mode).
+  final int loosePcs;
+
+  /// Boxes without a per-box spec (boxesOnly portion in mixed mode).
+  final int unconfiguredCartons;
+
   InventoryRecord({
     required this.id,
     required this.skuCode,
@@ -50,17 +56,17 @@ class InventoryRecord {
     this.stockStatus = 'confirmed',
     this.quantityUnknown = false,
     this.boxesOnlyMode = false,
+    this.loosePcs = 0,
+    this.unconfiguredCartons = 0,
   });
 
   int get totalQty {
     if (boxesOnlyMode || quantityUnknown) return 0;
-    if (configurations.isNotEmpty) return configurations.fold(0, (s, c) => s + c.qty);
-    return boxes * unitsPerBox;
+    if (configurations.isNotEmpty) return configurations.fold(0, (s, c) => s + c.qty) + loosePcs;
+    return boxes * unitsPerBox + loosePcs;
   }
 
-  int get totalBoxes => configurations.isNotEmpty
-      ? configurations.fold(0, (s, c) => s + c.boxes)
-      : boxes;
+  int get totalBoxes => boxes;
 
   /// Human-readable quantity string with localization support.
   String qtyDisplayL10n(AppLocalizations l10n) {
@@ -69,10 +75,10 @@ class InventoryRecord {
     if (quantityUnknown) return l10n.skuDetailQtyLinePending;
     if (boxesOnlyMode) return '$totalBoxes $box';
     if (configurations.length > 1) {
-      final parts = configurations.map((c) => '${c.boxes}$box·${c.unitsPerBox}$pcs/$box').join(' + ');
+      final parts = configurations.map((c) => '${c.boxes} $box · ${c.unitsPerBox} $pcs/$box').join(' + ');
       return '$parts = $totalQty $pcs';
     }
-    if (unitsPerBox > 1) return '$totalBoxes$box · $totalQty$pcs';
+    if (unitsPerBox > 1) return '$totalBoxes $box · $totalQty $pcs';
     return '$totalQty $pcs';
   }
 
@@ -112,6 +118,8 @@ class InventoryRecord {
           (pendingCount ? 'pending_count' : 'confirmed'),
       quantityUnknown: json['quantityUnknown'] == true,
       boxesOnlyMode: json['boxesOnlyMode'] == true,
+      loosePcs: (json['loosePcs'] as num?)?.toInt() ?? 0,
+      unconfiguredCartons: (json['unconfiguredCartons'] as num?)?.toInt() ?? 0,
     );
   }
 }

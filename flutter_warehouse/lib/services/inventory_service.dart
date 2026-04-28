@@ -101,8 +101,9 @@ class InventoryService {
     required String locationId,
     int? quantity,
     List<Map<String, int>>? configurations,
-    int loosePcs = 0,  // pcs not in any carton spec
-    String adjustMode = 'qty', // 'qty' | 'mixed'
+    int loosePcs = 0,           // pcs not in any carton spec
+    int unconfiguredCartons = 0, // cartons without a pcs/carton spec
+    String adjustMode = 'qty',  // 'qty' | 'mixed'
     String? note,
   }) async {
     await _api.post('/transactions/adjust', data: {
@@ -111,6 +112,7 @@ class InventoryService {
       if (quantity != null) 'quantity': quantity,
       if (configurations != null && configurations.isNotEmpty) 'configurations': configurations,
       if (loosePcs > 0) 'loosePcs': loosePcs,
+      if (unconfiguredCartons > 0) 'unconfiguredCartons': unconfiguredCartons,
       'adjustMode': adjustMode,
       if (note != null && note.isNotEmpty) 'note': note,
     });

@@ -263,8 +263,14 @@ abstract class AppLocalizations {
   /// No description provided for @registerValidation.
   ///
   /// In zh, this message translates to:
-  /// **'请填写完整信息，密码至少6位'**
+  /// **'请填写完整信息'**
   String get registerValidation;
+
+  /// No description provided for @registerPasswordRules.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码不符合要求'**
+  String get registerPasswordRules;
 
   /// No description provided for @registerPasswordMismatch.
   ///
@@ -548,6 +554,18 @@ abstract class AppLocalizations {
   /// **'共 {qty} {unit}'**
   String skuTotalQty(int qty, String unit);
 
+  /// No description provided for @skuNoSpec.
+  ///
+  /// In zh, this message translates to:
+  /// **'（无箱规）'**
+  String get skuNoSpec;
+
+  /// No description provided for @skuLoosePcs.
+  ///
+  /// In zh, this message translates to:
+  /// **'散{qty}件'**
+  String skuLoosePcs(int qty);
+
   /// No description provided for @locationScreenTitle.
   ///
   /// In zh, this message translates to:
@@ -770,18 +788,6 @@ abstract class AppLocalizations {
   /// **'操作'**
   String get historyFilterAction;
 
-  /// No description provided for @historyFilterAll.
-  ///
-  /// In zh, this message translates to:
-  /// **'全部'**
-  String get historyFilterAll;
-
-  /// No description provided for @historyToday.
-  ///
-  /// In zh, this message translates to:
-  /// **'今天'**
-  String get historyToday;
-
   /// No description provided for @historyThisWeek.
   ///
   /// In zh, this message translates to:
@@ -853,6 +859,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'新密码（至少6位）'**
   String get settingsNewPassword;
+
+  /// No description provided for @settingsConfirmNewPassword.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认新密码'**
+  String get settingsConfirmNewPassword;
+
+  /// No description provided for @settingsPasswordMismatch.
+  ///
+  /// In zh, this message translates to:
+  /// **'两次密码不一致'**
+  String get settingsPasswordMismatch;
 
   /// No description provided for @settingsPasswordChanged.
   ///
@@ -1520,6 +1538,12 @@ abstract class AppLocalizations {
   /// **'全部时间'**
   String get historyAllTime;
 
+  /// No description provided for @historyToday.
+  ///
+  /// In zh, this message translates to:
+  /// **'今天'**
+  String get historyToday;
+
   /// No description provided for @historyLast7Days.
   ///
   /// In zh, this message translates to:
@@ -1639,6 +1663,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'我的记录'**
   String get historyMyRecords;
+
+  /// No description provided for @historyFilterAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部'**
+  String get historyFilterAll;
 
   /// No description provided for @historyFilterImport.
   ///
@@ -2299,6 +2329,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'{qty} 件/箱'**
   String skuDetailCartonQtyDisplay(int qty);
+
+  /// No description provided for @skuDetailSpecCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 种箱规'**
+  String skuDetailSpecCount(int count);
 
   /// No description provided for @skuDetailStockLocations.
   ///
@@ -3962,6 +3998,12 @@ abstract class AppLocalizations {
   /// **'当前库存: {label}'**
   String invDetailCurrentStock(String label);
 
+  /// No description provided for @invDetailQtyEntryMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'录入方式'**
+  String get invDetailQtyEntryMode;
+
   /// No description provided for @invDetailModeByCarton.
   ///
   /// In zh, this message translates to:
@@ -4033,6 +4075,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'入库件数 *'**
   String get invDetailStockInQtyLabel;
+
+  /// No description provided for @invDetailAddConfigRow.
+  ///
+  /// In zh, this message translates to:
+  /// **'+ 添加规格'**
+  String get invDetailAddConfigRow;
 
   /// No description provided for @invDetailPendingMarkNote.
   ///
@@ -4129,6 +4177,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'选择出库箱数:'**
   String get invDetailSelectOutBoxes;
+
+  /// No description provided for @invDetailOutBoxesColHeader.
+  ///
+  /// In zh, this message translates to:
+  /// **'出库箱数'**
+  String get invDetailOutBoxesColHeader;
 
   /// No description provided for @invDetailUnitsPerBoxDisplay.
   ///
@@ -4298,6 +4352,12 @@ abstract class AppLocalizations {
   /// **'库存数量 {label} 将保留不变'**
   String invDetailQtyRetained(String label);
 
+  /// No description provided for @invDetailAdjustModeMixed.
+  ///
+  /// In zh, this message translates to:
+  /// **'混合'**
+  String get invDetailAdjustModeMixed;
+
   /// No description provided for @invDetailAdjustModeQty.
   ///
   /// In zh, this message translates to:
@@ -4393,6 +4453,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'请输入有效件数（≥ 0）'**
   String get invDetailErrValidQtyGte0;
+
+  /// No description provided for @invDetailErrMixedEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'请至少输入一条箱规或散件数'**
+  String get invDetailErrMixedEmpty;
+
+  /// No description provided for @invDetailErrMixedInvalidSpec.
+  ///
+  /// In zh, this message translates to:
+  /// **'所有箱规的箱数和每箱件数均需大于 0'**
+  String get invDetailErrMixedInvalidSpec;
+
+  /// No description provided for @invDetailLoosePcsLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'散件（不足整箱）'**
+  String get invDetailLoosePcsLabel;
+
+  /// No description provided for @invDetailCartonSpecsLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'箱规'**
+  String get invDetailCartonSpecsLabel;
 
   /// No description provided for @invDetailConfirmSkuCorrect.
   ///

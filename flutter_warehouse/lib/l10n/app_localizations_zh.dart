@@ -90,7 +90,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get registerHaveAccount => '已有账号？';
 
   @override
-  String get registerValidation => '请填写完整信息，密码至少6位';
+  String get registerValidation => '请填写完整信息';
+
+  @override
+  String get registerPasswordRules => '密码不符合要求';
 
   @override
   String get registerPasswordMismatch => '两次输入的密码不一致';
@@ -239,6 +242,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get skuNoSpec => '（无箱规）';
+
+  @override
+  String skuLoosePcs(int qty) {
+    return '散$qty件';
+  }
+
+  @override
   String get locationScreenTitle => '位置管理';
 
   @override
@@ -364,12 +375,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get historyFilterAction => '操作';
 
   @override
-  String get historyFilterAll => '全部';
-
-  @override
-  String get historyToday => '今天';
-
-  @override
   String get historyThisWeek => '本周';
 
   @override
@@ -404,6 +409,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsNewPassword => '新密码（至少6位）';
+
+  @override
+  String get settingsConfirmNewPassword => '确认新密码';
+
+  @override
+  String get settingsPasswordMismatch => '两次密码不一致';
 
   @override
   String get settingsPasswordChanged => '密码修改成功';
@@ -754,6 +765,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get historyAllTime => '全部时间';
 
   @override
+  String get historyToday => '今天';
+
+  @override
   String get historyLast7Days => '近7天';
 
   @override
@@ -814,6 +828,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get historyMyRecords => '我的记录';
+
+  @override
+  String get historyFilterAll => '全部';
 
   @override
   String get historyFilterImport => '导入';
@@ -1175,6 +1192,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String skuDetailCartonQtyDisplay(int qty) {
     return '$qty 件/箱';
+  }
+
+  @override
+  String skuDetailSpecCount(int count) {
+    return '$count 种箱规';
   }
 
   @override
@@ -2126,6 +2148,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get invDetailQtyEntryMode => '录入方式';
+
+  @override
   String get invDetailModeByCarton => '按箱规';
 
   @override
@@ -2166,6 +2191,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get invDetailStockInQtyLabel => '入库件数 *';
+
+  @override
+  String get invDetailAddConfigRow => '+ 添加规格';
 
   @override
   String get invDetailPendingMarkNote =>
@@ -2225,6 +2253,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get invDetailSelectOutBoxes => '选择出库箱数:';
+
+  @override
+  String get invDetailOutBoxesColHeader => '出库箱数';
 
   @override
   String invDetailUnitsPerBoxDisplay(int units) {
@@ -2333,6 +2364,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get invDetailAdjustModeMixed => '混合';
+
+  @override
   String get invDetailAdjustModeQty => '总数量';
 
   @override
@@ -2379,6 +2413,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get invDetailErrValidQtyGte0 => '请输入有效件数（≥ 0）';
+
+  @override
+  String get invDetailErrMixedEmpty => '请至少输入一条箱规或散件数';
+
+  @override
+  String get invDetailErrMixedInvalidSpec => '所有箱规的箱数和每箱件数均需大于 0';
+
+  @override
+  String get invDetailLoosePcsLabel => '散件（不足整箱）';
+
+  @override
+  String get invDetailCartonSpecsLabel => '箱规';
 
   @override
   String get invDetailConfirmSkuCorrect => '确认更正';

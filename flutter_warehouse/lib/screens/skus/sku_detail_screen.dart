@@ -11,6 +11,7 @@ import '../../models/location.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/inventory_detail_sheet.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/stock_display_utils.dart';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const _bgColor    = Color(0xFFF5F3F0);
@@ -36,6 +37,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
   String? _error;
+  bool _specsExpanded = false;
 
   @override
   void initState() {
@@ -553,7 +555,8 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                     setS(() => sheetError = sl10n.inventorySelectOrCreate);
                                     return;
                                   }
-                                  int boxes, units;
+                                  int boxes = 0, units = 0;
+                                  int? initialQty; // for qty mode only
                                   if (isPending) {
                                     boxes = 0;
                                     units = 1;
@@ -576,13 +579,13 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                       return;
                                     }
                                   } else {
+                                    // qty mode: store as loosePcs via stockIn after create
                                     final qty = int.tryParse(qtyCtrl.text) ?? 0;
                                     if (qty <= 0) {
                                       setS(() => sheetError = sl10n.skuDetailValidQty);
                                       return;
                                     }
-                                    boxes = 1;
-                                    units = qty;
+                                    initialQty = qty;
                                   }
                                   setS(() { saving = true; sheetError = null; });
                                   try {
@@ -600,17 +603,26 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                       );
                                       locId = newLoc.id;
                                     }
+                                    final note = noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim();
+                                    final skuCode = _data!['sku'] as String;
                                     await _inventoryService.create(
-                                      skuCode: _data!['sku'],
+                                      skuCode: skuCode,
                                       locationId: locId!,
-                                      boxes: boxes,
-                                      unitsPerBox: units,
-                                      note: noteCtrl.text.trim().isEmpty
-                                          ? null
-                                          : noteCtrl.text.trim(),
+                                      boxes: initialQty != null ? 0 : boxes,
+                                      unitsPerBox: initialQty != null ? null : units,
+                                      note: note,
                                       pendingCount: isPending,
                                       boxesOnlyMode: inputMode == 'boxesOnly',
                                     );
+                                    // qty mode: add the initial stock as loosePcs
+                                    if (initialQty != null) {
+                                      await _inventoryService.stockIn(
+                                        skuCode: skuCode,
+                                        locationId: locId!,
+                                        addQuantity: initialQty,
+                                        note: note,
+                                      );
+                                    }
                                     if (ctx.mounted) ctx.pop();
                                     _load();
                                   } catch (e) {
@@ -890,11 +902,19 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
         ?.map((e) => InventoryRecord.fromJson(e))
         .toList() ?? [];
 
-    final totalQty    = data['totalQty'] ?? 0;
-    final totalBoxes  = data['totalBoxes'] ?? 0;
-    final locCount    = inventory.length;
-    final cartonQty   = data['cartonQty'];
-    final allBoxesOnly = inventory.isNotEmpty && inventory.every((r) => r.boxesOnlyMode);
+    final locCount     = inventory.length;
+    final cartonQty    = data['cartonQty'] as int?;
+    final totalConfiguredCartons = inventory.fold(0, (int s, r) => s + (r.boxes - r.unconfiguredCartons));
+    final totalNoSpecCartons     = inventory.fold(0, (int s, r) => s + r.unconfiguredCartons);
+    final totalLoosePcs          = inventory.fold(0, (int s, r) => s + r.loosePcs);
+    // Map<unitsPerBox, totalBoxes> aggregated across all locations
+    final specMap = <int, int>{};
+    for (final r in inventory) {
+      for (final c in r.configurations) {
+        specMap[c.unitsPerBox] = (specMap[c.unitsPerBox] ?? 0) + c.boxes;
+      }
+    }
+    final distinctSpecCount = specMap.length;
 
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
@@ -949,14 +969,14 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                     ),
                     child: Column(
                       children: [
-                        // Stats grid: left big + right 2 small
+                        // Stats grid: left big + right small
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Left: total inventory
+                            // Left: total boxes (always boxes, not pieces)
                             Expanded(
                               child: Container(
-                                height: 121,
+                                constraints: const BoxConstraints(minHeight: 98),
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: _inputBg,
@@ -964,6 +984,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Row(
                                       children: [
@@ -980,122 +1001,140 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                                         ),
                                       ],
                                     ),
-                                    const Spacer(),
+                                    const SizedBox(height: 10),
                                     Text(
-                                      allBoxesOnly
-                                          ? l10n.skuDetailTotalBoxes(totalBoxes as int)
-                                          : l10n.skuDetailTotalQtyPieces(totalQty as int),
+                                      buildStockLabel(
+                                        configuredCartons: totalConfiguredCartons,
+                                        noSpecCartons:     totalNoSpecCartons,
+                                        loosePcs:          totalLoosePcs,
+                                        cartonQty:         cartonQty,
+                                        l10n:              l10n,
+                                      ),
                                       style: const TextStyle(
-                                        fontSize: 22,
+                                        fontSize: 18,
                                         fontWeight: FontWeight.w600,
                                         color: _titleColor,
-                                        letterSpacing: -0.44,
+                                        letterSpacing: -0.3,
                                       ),
                                     ),
+                                    if (distinctSpecCount > 0) ...[
+                                      const SizedBox(height: 6),
+                                      GestureDetector(
+                                        onTap: () => setState(() => _specsExpanded = !_specsExpanded),
+                                        behavior: HitTestBehavior.opaque,
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              l10n.skuDetailSpecCount(distinctSpecCount),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: _mutedColor,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            AnimatedRotation(
+                                              turns: _specsExpanded ? 0.5 : 0,
+                                              duration: const Duration(milliseconds: 200),
+                                              child: const Icon(
+                                                Icons.expand_more,
+                                                size: 14,
+                                                color: _mutedColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      AnimatedSize(
+                                        duration: const Duration(milliseconds: 200),
+                                        curve: Curves.easeInOut,
+                                        child: _specsExpanded
+                                            ? Padding(
+                                                padding: const EdgeInsets.only(top: 8),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: specMap.entries.map((e) {
+                                                    return Padding(
+                                                      padding: const EdgeInsets.only(bottom: 3),
+                                                      child: Text(
+                                                        l10n.locDetailConfigCarton(e.value, e.key),
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          color: _mutedColor,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              )
+                                            : const SizedBox.shrink(),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // Right: location count + box count
-                            SizedBox(
-                              width: 100,
-                              height: 121,
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      padding: const EdgeInsets.only(left: 14),
-                                      decoration: BoxDecoration(
-                                        color: _inputBg,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.location_on_outlined,
-                                              size: 12, color: _hintColor),
-                                          const SizedBox(width: 10),
-                                          Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                l10n.skuDetailLocationCol,
-                                                style: const TextStyle(fontSize: 10, color: _hintColor),
-                                              ),
-                                              Text(
-                                                '$locCount',
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: _titleColor,
-                                                ),
-                                              ),
-                                            ],
+                            // Right: location count only (fixed 98px, top-aligned)
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: Container(
+                                width: 100,
+                                height: 98,
+                                padding: const EdgeInsets.only(left: 14),
+                                decoration: BoxDecoration(
+                                  color: _inputBg,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.location_on_outlined,
+                                        size: 12, color: _hintColor),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          l10n.skuDetailLocationCol,
+                                          style: const TextStyle(fontSize: 10, color: _hintColor),
+                                        ),
+                                        Text(
+                                          '$locCount',
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                            color: _titleColor,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Expanded(
-                                    child: Container(
-                                      padding: const EdgeInsets.only(left: 14),
-                                      decoration: BoxDecoration(
-                                        color: _inputBg,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.inventory_2_outlined,
-                                              size: 12, color: _hintColor),
-                                          const SizedBox(width: 10),
-                                          Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                l10n.skuDetailBoxesCol,
-                                                style: const TextStyle(fontSize: 10, color: _hintColor),
-                                              ),
-                                              Text(
-                                                '$totalBoxes',
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: _titleColor,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        const Divider(height: 1, color: Color(0xFFF2F1EF)),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Text(
-                              l10n.skuDetailDefaultCarton,
-                              style: const TextStyle(fontSize: 12, color: _hintColor),
-                            ),
-                            const Spacer(),
-                            Text(
-                              cartonQty != null ? l10n.skuDetailCartonQtyDisplay(cartonQty as int) : '-',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF5A5A6E),
+                        if (cartonQty != null) ...[
+                          const SizedBox(height: 16),
+                          const Divider(height: 1, color: Color(0xFFF2F1EF)),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Text(
+                                l10n.skuDetailDefaultCarton,
+                                style: const TextStyle(fontSize: 12, color: _hintColor),
                               ),
-                            ),
-                          ],
-                        ),
+                              const Spacer(),
+                              Text(
+                                l10n.skuDetailCartonQtyDisplay(cartonQty as int),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF5A5A6E),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1121,6 +1160,7 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       record: record,
                       location: loc,
                       canEdit: user?.canEdit == true,
+                      cartonQty: cartonQty,
                       onTap: locId != null
                           ? () => showModalBottomSheet(
                               context: context,
@@ -1201,6 +1241,7 @@ class _LocationCard extends StatelessWidget {
   final InventoryRecord record;
   final Location? location;
   final bool canEdit;
+  final int? cartonQty;
   final VoidCallback? onTap;
   final VoidCallback onDelete;
 
@@ -1208,6 +1249,7 @@ class _LocationCard extends StatelessWidget {
     required this.record,
     required this.location,
     required this.canEdit,
+    this.cartonQty,
     required this.onTap,
     required this.onDelete,
   });
@@ -1215,23 +1257,18 @@ class _LocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    // Mode badge
-    final String badgeLabel;
-    final Color badgeBg;
-    final Color badgeText;
 
+    final String subtitle;
     if (record.quantityUnknown) {
-      badgeLabel = l10n.skuDetailBadgePending;
-      badgeBg    = const Color(0xFFFFF3E0);
-      badgeText  = const Color(0xFFD4820A);
-    } else if (record.boxesOnlyMode) {
-      badgeLabel = l10n.skuDetailBadgeBoxOnly;
-      badgeBg    = const Color(0xFFE8F3FF);
-      badgeText  = const Color(0xFF4A9EFF);
+      subtitle = l10n.skuDetailQtyLinePending;
     } else {
-      badgeLabel = l10n.skuDetailBadgeCarton;
-      badgeBg    = _greenBg;
-      badgeText  = _greenText;
+      subtitle = buildStockLabel(
+        configuredCartons: record.boxes - record.unconfiguredCartons,
+        noSpecCartons:     record.unconfiguredCartons,
+        loosePcs:          record.loosePcs,
+        cartonQty:         cartonQty,
+        l10n:              l10n,
+      );
     }
 
     return Container(
@@ -1273,7 +1310,7 @@ class _LocationCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
 
-                // Code + badge + stats
+                // Code + (pending badge only) + subtitle
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1288,27 +1325,29 @@ class _LocationCard extends StatelessWidget {
                               color: _titleColor,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: badgeBg,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              badgeLabel,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w500,
-                                color: badgeText,
+                          if (record.quantityUnknown) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF3E0),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                l10n.skuDetailBadgePending,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFFD4820A),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        record.qtyDisplayL10n(l10n),
+                        subtitle,
                         style: const TextStyle(fontSize: 12, color: _mutedColor),
                       ),
                     ],

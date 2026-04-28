@@ -92,8 +92,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get registerHaveAccount => 'Already have an account?';
 
   @override
-  String get registerValidation =>
-      'Please fill in all fields, password must be at least 6 characters';
+  String get registerValidation => 'Please fill in all fields';
+
+  @override
+  String get registerPasswordRules => 'Password does not meet requirements';
 
   @override
   String get registerPasswordMismatch => 'Passwords do not match';
@@ -236,7 +238,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuNoStock => 'No stock';
 
   @override
-  String get unitBox => 'box';
+  String get unitBox => 'carton';
 
   @override
   String get unitPiece => 'pcs';
@@ -244,6 +246,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String skuTotalQty(int qty, String unit) {
     return '$qty $unit total';
+  }
+
+  @override
+  String get skuNoSpec => '(no spec)';
+
+  @override
+  String skuLoosePcs(int qty) {
+    return '$qty loose';
   }
 
   @override
@@ -372,12 +382,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyFilterAction => 'Action';
 
   @override
-  String get historyFilterAll => 'All';
-
-  @override
-  String get historyToday => 'Today';
-
-  @override
   String get historyThisWeek => 'This Week';
 
   @override
@@ -412,6 +416,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsNewPassword => 'New Password (min. 6 characters)';
+
+  @override
+  String get settingsConfirmNewPassword => 'Confirm New Password';
+
+  @override
+  String get settingsPasswordMismatch => 'Passwords do not match';
 
   @override
   String get settingsPasswordChanged => 'Password changed successfully';
@@ -537,7 +547,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuFormBarcode => 'Barcode (optional)';
 
   @override
-  String get skuFormCartonQty => 'Carton Qty (pcs/box, optional)';
+  String get skuFormCartonQty => 'Carton Qty (pcs/carton, optional)';
 
   @override
   String get skuFormSkuEmpty => 'SKU code cannot be empty';
@@ -642,7 +652,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuFormViewBarcodeHistory => 'View barcode history';
 
   @override
-  String get skuFormCartonQtyLabel => 'Pcs per box';
+  String get skuFormCartonQtyLabel => 'Pcs per carton';
 
   @override
   String get skuFormCreateButton => 'Create';
@@ -771,6 +781,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyAllTime => 'All Time';
 
   @override
+  String get historyToday => 'Today';
+
+  @override
   String get historyLast7Days => 'Last 7 Days';
 
   @override
@@ -831,6 +844,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyMyRecords => 'My Records';
+
+  @override
+  String get historyFilterAll => 'All';
 
   @override
   String get historyFilterImport => 'Import';
@@ -946,19 +962,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inventoryModeCarton => 'By carton';
 
   @override
-  String get inventoryModeBoxOnly => 'Boxes only';
+  String get inventoryModeBoxOnly => 'Cartons only';
 
   @override
   String get inventoryModeQty => 'By total qty';
 
   @override
-  String get inventoryBoxesLabel => 'Boxes *';
+  String get inventoryBoxesLabel => 'Cartons *';
 
   @override
-  String get inventoryBoxesSuffix => 'box(es)';
+  String get inventoryBoxesSuffix => 'carton(s)';
 
   @override
-  String get inventoryUnitsLabel => 'Pcs/box *';
+  String get inventoryUnitsLabel => 'Pcs/carton *';
 
   @override
   String get inventoryTotalQtyLabel => 'Total qty *';
@@ -991,10 +1007,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inventoryLocationCodeEmpty => 'Location code cannot be empty';
 
   @override
-  String get inventoryValidBoxCount => 'Please enter a valid box count';
+  String get inventoryValidBoxCount => 'Please enter a valid carton count';
 
   @override
-  String get inventoryValidUnits => 'Please enter pcs per box';
+  String get inventoryValidUnits => 'Please enter pcs per carton';
 
   @override
   String get inventoryValidQty => 'Please enter a valid quantity';
@@ -1004,7 +1020,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String inventoryBoxesTotal(int boxes) {
-    return '$boxes box(es) · carton qty TBD';
+    return '$boxes carton(s) · qty TBD';
   }
 
   @override
@@ -1056,26 +1072,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuDetailModeCarton => 'By carton';
 
   @override
-  String get skuDetailModeBoxOnly => 'Boxes only';
+  String get skuDetailModeBoxOnly => 'Cartons only';
 
   @override
   String get skuDetailModeQty => 'By total qty';
 
   @override
-  String get skuDetailBoxesLabel => 'Boxes';
+  String get skuDetailBoxesLabel => 'Cartons';
 
   @override
-  String get skuDetailBoxesSuffix => 'box(es)';
+  String get skuDetailBoxesSuffix => 'carton(s)';
 
   @override
-  String get skuDetailUnitsLabel => 'Pcs/box';
+  String get skuDetailUnitsLabel => 'Pcs/carton';
 
   @override
-  String get skuDetailUnitsSuffix => 'pcs/box';
+  String get skuDetailUnitsSuffix => 'pcs/carton';
 
   @override
   String get skuDetailBoxesOnlyHelp =>
-      'Record boxes only, pcs/box can be filled in later';
+      'Record cartons only, pcs/carton can be filled in later';
 
   @override
   String get skuDetailTotalLabel => 'Total pcs';
@@ -1096,10 +1112,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuDetailSelectSku => 'Please select a SKU';
 
   @override
-  String get skuDetailValidBoxes => 'Please enter valid boxes and pcs/box';
+  String get skuDetailValidBoxes => 'Please enter valid cartons and pcs/carton';
 
   @override
-  String get skuDetailValidBoxesOnly => 'Please enter valid box count';
+  String get skuDetailValidBoxesOnly => 'Please enter valid carton count';
 
   @override
   String get skuDetailValidQty => 'Please enter a valid quantity';
@@ -1177,7 +1193,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String skuDetailTotalBoxes(int boxes) {
-    return '$boxes box(es)';
+    return '$boxes carton(s)';
   }
 
   @override
@@ -1189,14 +1205,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuDetailLocationCol => 'Location';
 
   @override
-  String get skuDetailBoxesCol => 'Boxes';
+  String get skuDetailBoxesCol => 'Cartons';
 
   @override
   String get skuDetailDefaultCarton => 'Default Carton';
 
   @override
   String skuDetailCartonQtyDisplay(int qty) {
-    return '$qty pcs/box';
+    return '$qty pcs/carton';
+  }
+
+  @override
+  String skuDetailSpecCount(int count) {
+    return '$count carton specs';
   }
 
   @override
@@ -1209,7 +1230,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuDetailBadgePending => 'To Count';
 
   @override
-  String get skuDetailBadgeBoxOnly => 'Boxes Only';
+  String get skuDetailBadgeBoxOnly => 'Cartons Only';
 
   @override
   String get skuDetailBadgeCarton => 'By Carton';
@@ -1279,7 +1300,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuDetailNoChangeRecord => 'No change record';
 
   @override
-  String get skuDetailTotalBoxesLabel => 'Total Boxes';
+  String get skuDetailTotalBoxesLabel => 'Total Cartons';
 
   @override
   String get skuDetailTotalPiecesLabel => 'Total Pcs';
@@ -1351,12 +1372,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String skuDetailQtyLineBoxes(int boxes) {
-    return '$boxes box(es) · carton qty TBD';
+    return '$boxes carton(s) · qty TBD';
   }
 
   @override
   String skuDetailQtyLineCarton(int boxes, int qty) {
-    return '$boxes box(es) · $qty pcs';
+    return '$boxes carton(s) · $qty pcs';
   }
 
   @override
@@ -1873,12 +1894,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String auditQtyBoxes(int boxes) {
-    return '$boxes box(es)';
+    return '$boxes carton(s)';
   }
 
   @override
   String auditQtyPcsPerBox(int qty) {
-    return '$qty pcs/box';
+    return '$qty pcs/carton';
   }
 
   @override
@@ -2074,12 +2095,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String skuDetailInitialPreviewCarton(int boxes, int units, int qty) {
-    return 'Initial: $boxes box × $units pcs/box = $qty pcs';
+    return 'Initial: $boxes carton × $units pcs/carton = $qty pcs';
   }
 
   @override
   String skuDetailInitialPreviewBoxOnly(int qty) {
-    return 'Initial: $qty box(es) (pcs/box TBD)';
+    return 'Initial: $qty carton(s) (pcs/carton TBD)';
   }
 
   @override
@@ -2116,7 +2137,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String locDetailConfigCarton(int boxes, int units) {
-    return '$boxes box × $units pcs/box';
+    return '$boxes carton × $units pcs/carton';
   }
 
   @override
@@ -2148,13 +2169,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailQtyUnknown => 'Qty not filled';
 
   @override
-  String get invDetailBoxesSuffix => 'box(es)';
+  String get invDetailBoxesSuffix => 'carton(s)';
 
   @override
   String get invDetailPieceSuffix => 'pcs';
 
   @override
-  String get invDetailUnitsPerBoxSuffix => 'pcs/box';
+  String get invDetailUnitsPerBoxSuffix => 'pcs/carton';
 
   @override
   String get invDetailCurrentStatusPending => 'Current status: To Count';
@@ -2165,26 +2186,29 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get invDetailQtyEntryMode => 'Entry mode';
+
+  @override
   String get invDetailModeByCarton => 'By carton';
 
   @override
-  String get invDetailModeBoxesOnly => 'Boxes only';
+  String get invDetailModeBoxesOnly => 'Cartons only';
 
   @override
   String get invDetailModeByQty => 'By total qty';
 
   @override
-  String get invDetailBoxesLabel => 'Boxes *';
+  String get invDetailBoxesLabel => 'Cartons *';
 
   @override
-  String get invDetailPendingBoxes => 'Pending boxes: ';
+  String get invDetailPendingBoxes => 'Pending cartons: ';
 
   @override
-  String get invDetailStockInBoxes => 'Stock in boxes: ';
+  String get invDetailStockInBoxes => 'Stock in cartons: ';
 
   @override
   String invDetailBoxesValue(int boxes) {
-    return '$boxes box(es)';
+    return '$boxes carton(s)';
   }
 
   @override
@@ -2207,15 +2231,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailStockInQtyLabel => 'Stock in qty *';
 
   @override
+  String get invDetailAddConfigRow => '+ Add spec';
+
+  @override
   String get invDetailPendingMarkNote =>
       'Will mark this inventory as \"To Count\". Current qty unchanged. Update qty later via \"Adjust\".';
 
   @override
-  String get invDetailErrInvalidBoxes => 'Please enter a valid box count';
+  String get invDetailErrInvalidBoxes => 'Please enter a valid carton count';
 
   @override
   String get invDetailErrInvalidBoxesAndUnits =>
-      'Please enter valid boxes and pcs/box';
+      'Please enter valid cartons and pcs/carton';
 
   @override
   String get invDetailErrInvalidQty => 'Please enter a valid qty';
@@ -2237,7 +2264,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String invDetailOutBoxesValue(int boxes) {
-    return '$boxes box(es)';
+    return '$boxes carton(s)';
   }
 
   @override
@@ -2247,12 +2274,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String invDetailRemainCartonBoxes(int boxes) {
-    return '  →  $boxes box(es) remaining';
+    return '  →  $boxes carton(s) remaining';
   }
 
   @override
   String invDetailRemainBoxes(int boxes) {
-    return '  →  $boxes box(es) remaining';
+    return '  →  $boxes carton(s) remaining';
   }
 
   @override
@@ -2267,23 +2294,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailSelectOutBoxes => 'Select qty to ship:';
 
   @override
+  String get invDetailOutBoxesColHeader => 'Out cartons';
+
+  @override
   String invDetailUnitsPerBoxDisplay(int units) {
-    return '$units pcs/box';
+    return '$units pcs/carton';
   }
 
   @override
   String invDetailTotalBoxesDisplay(int boxes) {
-    return '$boxes boxes total';
+    return '$boxes cartons total';
   }
 
   @override
   String invDetailOutMaxBoxes(int boxes) {
-    return 'Out (max $boxes boxes)';
+    return 'Out (max $boxes cartons)';
   }
 
   @override
   String invDetailExceedBoxes(int boxes) {
-    return 'Exceeds available $boxes boxes';
+    return 'Exceeds available $boxes cartons';
   }
 
   @override
@@ -2293,7 +2323,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String invDetailOutBoxesLabel(int boxes) {
-    return 'Out boxes * (max $boxes)';
+    return 'Out cartons * (max $boxes)';
   }
 
   @override
@@ -2304,11 +2334,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailOutQtyLabel => 'Stock out qty *';
 
   @override
-  String get invDetailErrNegativeBoxes => 'Out box count cannot be negative';
+  String get invDetailErrNegativeBoxes => 'Out carton count cannot be negative';
 
   @override
   String invDetailErrExceedCartonBoxes(int units, int boxes) {
-    return '$units pcs/box: exceeds available ($boxes boxes)';
+    return '$units pcs/carton: exceeds available ($boxes cartons)';
   }
 
   @override
@@ -2317,7 +2347,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String invDetailErrExceedStockBoxes(int boxes) {
-    return 'Out qty cannot exceed current stock ($boxes boxes)';
+    return 'Out qty cannot exceed current stock ($boxes cartons)';
   }
 
   @override
@@ -2340,7 +2370,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invDetailBoxesOnlyPanelHelp =>
-      'Keep pcs/box unchanged, only edit box count for each spec:';
+      'Keep pcs/carton unchanged, only edit carton count for each spec:';
 
   @override
   String invDetailSubtotalPcs(int qty) {
@@ -2357,10 +2387,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailAddFirstCarton => 'Add first carton group';
 
   @override
-  String get invDetailUnitsPerBoxLabel => 'Pcs/box';
+  String get invDetailUnitsPerBoxLabel => 'Pcs/carton';
 
   @override
-  String get invDetailBoxesAdjustLabel => 'Boxes';
+  String get invDetailBoxesAdjustLabel => 'Cartons';
 
   @override
   String get invDetailSkuCorrectCurrent => 'Current:';
@@ -2377,10 +2407,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get invDetailAdjustModeMixed => 'Mixed';
+
+  @override
   String get invDetailAdjustModeQty => 'By qty';
 
   @override
-  String get invDetailAdjustModeBoxesOnly => 'Boxes only';
+  String get invDetailAdjustModeBoxesOnly => 'Cartons only';
 
   @override
   String get invDetailAdjustModeCarton => 'By carton';
@@ -2419,7 +2452,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invDetailErrAtLeastOneBoxesGroup =>
-      'Please enter at least one box count (> 0)';
+      'Please enter at least one carton count (> 0)';
 
   @override
   String get invDetailErrAtLeastOneCartonGroup =>
@@ -2427,16 +2460,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invDetailErrValidCartonGroup =>
-      'Please enter valid boxes and pcs/box (both > 0)';
+      'Please enter valid cartons and pcs/carton (both > 0)';
 
   @override
   String get invDetailErrValidQtyGte0 => 'Please enter a valid qty (≥ 0)';
 
   @override
+  String get invDetailErrMixedEmpty =>
+      'Enter at least one carton spec or loose pcs';
+
+  @override
+  String get invDetailErrMixedInvalidSpec =>
+      'All carton specs need valid cartons and pcs/carton (both > 0)';
+
+  @override
+  String get invDetailLoosePcsLabel => 'Loose pcs';
+
+  @override
+  String get invDetailCartonSpecsLabel => 'Carton specs';
+
+  @override
   String get invDetailConfirmSkuCorrect => 'Confirm Correction';
 
   @override
-  String get invDetailConfirmBoxesAdjust => 'Confirm Boxes Adjust';
+  String get invDetailConfirmBoxesAdjust => 'Confirm Cartons Adjust';
 
   @override
   String get invDetailConfirmAdjust => 'Confirm Adjust';
@@ -2445,10 +2492,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailAdjustedTotalRow => 'Adjusted total stock: ';
 
   @override
-  String get invDetailBoxesLabelStar => 'Boxes *';
+  String get invDetailBoxesLabelStar => 'Cartons *';
 
   @override
-  String get invDetailUnitsLabelStar => 'Pcs/box *';
+  String get invDetailUnitsLabelStar => 'Pcs/carton *';
 
   @override
   String get invDetailNoteOptional => 'Note (optional)';
@@ -2458,12 +2505,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String invDetailBoxesOnlyHeader(int boxes) {
-    return '$boxes boxes · carton qty TBD';
+    return '$boxes cartons · qty TBD';
   }
 
   @override
   String invDetailBoxesAndPcs(int boxes, int qty) {
-    return '$boxes boxes · $qty pcs';
+    return '$boxes cartons · $qty pcs';
   }
 
   @override
@@ -2563,7 +2610,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailSplitModeByCarton => 'By carton';
 
   @override
-  String get invDetailSplitModeBoxesOnly => 'Boxes only';
+  String get invDetailSplitModeBoxesOnly => 'Cartons only';
 
   @override
   String get invDetailSplitModeByQty => 'By total qty';
@@ -2572,16 +2619,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailSplitSearchSku => 'Search SKU';
 
   @override
-  String get invDetailSplitBoxesLabel => 'Boxes';
+  String get invDetailSplitBoxesLabel => 'Cartons';
 
   @override
-  String get invDetailSplitBoxesSuffix => 'box(es)';
+  String get invDetailSplitBoxesSuffix => 'carton(s)';
 
   @override
-  String get invDetailSplitUnitsLabel => 'Pcs/box';
+  String get invDetailSplitUnitsLabel => 'Pcs/carton';
 
   @override
-  String get invDetailSplitUnitsSuffix => 'pcs/box';
+  String get invDetailSplitUnitsSuffix => 'pcs/carton';
 
   @override
   String get invDetailSplitCartonTBD => '· Carton qty TBD';
@@ -2617,12 +2664,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String invDetailErrSplitBoxesMustBePositive(int index) {
-    return 'Entry $index: boxes must be > 0';
+    return 'Entry $index: cartons must be > 0';
   }
 
   @override
   String invDetailErrSplitUnitsMustBePositive(int index) {
-    return 'Entry $index: pcs/box must be > 0';
+    return 'Entry $index: pcs/carton must be > 0';
   }
 
   @override
@@ -2642,7 +2689,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invDetailConfirmSplit => 'Confirm Split';
 
   @override
-  String get invDetailSourceModeBoxesOnly => 'Boxes only';
+  String get invDetailSourceModeBoxesOnly => 'Cartons only';
 
   @override
   String get invDetailSourceModeQty => 'By total qty';
