@@ -350,16 +350,9 @@ class _TypeChip extends StatelessWidget {
 
 // ─── History tile ─────────────────────────────────────────────────────────────
 
-class _HistoryTile extends StatefulWidget {
+class _HistoryTile extends StatelessWidget {
   final ChangeRecord record;
   const _HistoryTile({required this.record});
-
-  @override
-  State<_HistoryTile> createState() => _HistoryTileState();
-}
-
-class _HistoryTileState extends State<_HistoryTile> {
-  bool _expanded = false;
 
   static const _actionColor = <String, Color>{
     '入库': Colors.green,
@@ -393,32 +386,40 @@ class _HistoryTileState extends State<_HistoryTile> {
     '暂存拆分': Icons.call_split,
   };
 
-  Color get _color {
-    final action = widget.record.businessAction ?? '';
-    return _actionColor[action] ?? Colors.grey.shade500;
-  }
+  Color get _color => _actionColor[record.businessAction ?? ''] ?? Colors.grey.shade500;
+  IconData get _icon => _actionIcon[record.businessAction ?? ''] ?? Icons.history;
 
-  IconData get _icon {
-    final action = widget.record.businessAction ?? '';
-    return _actionIcon[action] ?? Icons.history;
-  }
-
-  /// 取 "@ LOC " 之后的部分作为摘要行
   String _buildSummary(AppLocalizations l10n) {
-    final d = widget.record.details;
-    final ba = widget.record.businessAction;
+    final d = record.details;
+    final ba = record.businessAction;
     final pcs = l10n.unitPiece;
     if (d != null && ba != null) {
       switch (ba) {
         case '入库':
+          if (d['boxesOnlyMode'] == true) {
+            return '+${d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+          }
           return '+${d['addedQty'] ?? 0}$pcs';
         case '出库':
+          final uncOut = (d['unconfiguredCartons'] as num?) ?? 0;
+          if (uncOut > 0) return '-$uncOut ${l10n.unitBox}';
           return '-${d['reducedQty'] ?? 0}$pcs';
         case '调整':
+          final adjMode = d['mode']?.toString() ?? 'qty';
           final note = d['note'];
-          final noteStr = (note != null && note.toString().isNotEmpty) ? '  ${l10n.auditNote}: $note' : '';
-          return '${d['beforeQty'] ?? 0}→${d['afterQty'] ?? 0}$pcs$noteStr';
+          final noteStr = (note != null && note.toString().isNotEmpty) ? '  ($note)' : '';
+          final bQty = (d['beforeQty'] as num?) ?? 0;
+          final aQty = (d['afterQty']  as num?) ?? 0;
+          final bBoxes = (d['beforeBoxes'] as num?) ?? 0;
+          final aBoxes = (d['afterBoxes']  as num?) ?? 0;
+          if (adjMode == 'boxes_only' || (bQty == aQty && bBoxes != aBoxes)) {
+            return '$bBoxes→$aBoxes ${l10n.unitBox}$noteStr';
+          }
+          return '$bQty→$aQty$pcs$noteStr';
         case '录入':
+          if (d['boxesOnlyMode'] == true) {
+            return '${d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+          }
           return '${d['quantity'] ?? 0}$pcs';
         case '删除库存':
           return '${d['quantity'] ?? 0}$pcs';
@@ -431,7 +432,7 @@ class _HistoryTileState extends State<_HistoryTile> {
       }
     }
     // fallback: strip leading "action @ loc " prefix from server description
-    final desc = widget.record.description;
+    final desc = record.description;
     if (l10n.localeName == 'en') return AuditLogDetailSheet.cleanDesc(desc);
     final atIdx = desc.indexOf(' @ ');
     if (atIdx == -1) return '';
@@ -441,140 +442,22 @@ class _HistoryTileState extends State<_HistoryTile> {
     return desc.substring(spaceAfterLoc + 1).trim();
   }
 
-  // ── 展开区域：结构化 details（暂存拆分）或完整 description ──────────────────
-
-  Widget _buildExpandedBody(Color color) {
-    final details = widget.record.details;
-    if (details != null && details['targets'] is List) {
-      return _buildSplitDetails(details, color);
-    }
-    // 通用：完整 description 文本
-    return _buildDescriptionText(color);
-  }
-
-  Widget _buildSplitDetails(Map<String, dynamic> details, Color color) {
-    final l10n = AppLocalizations.of(context)!;
-    final src = details['source'] as Map<String, dynamic>?;
-    final targets = (details['targets'] as List).cast<Map<String, dynamic>>();
-    final note = details['note'] as String? ?? '';
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Source pending
-          if (src != null) ...[
-            _detailRow(l10n.invHistorySplitSrc, '${src['skuCode']}  ${src['qtyDesc']}',
-                icon: Icons.inventory_2_outlined, color: Colors.grey.shade600),
-            const SizedBox(height: 6),
-          ],
-          // Split targets list
-          _detailLabel(l10n.invHistorySplitTargets, color),
-          const SizedBox(height: 4),
-          ...targets.map((t) => Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 3),
-                child: Row(
-                  children: [
-                    Icon(Icons.subdirectory_arrow_right,
-                        size: 13, color: color.withValues(alpha: 0.6)),
-                    const SizedBox(width: 4),
-                    Text(t['skuCode'] as String,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(width: 8),
-                    Text(t['qtyDesc'] as String,
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey.shade700)),
-                  ],
-                ),
-              )),
-          // Source record disposition
-          const SizedBox(height: 6),
-          _detailRow(l10n.invHistorySplitSrc, l10n.invHistorySplitCleared,
-              icon: Icons.check_circle_outline, color: Colors.green.shade700),
-          // Reason
-          if (note.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            _detailRow(l10n.invHistoryReason, note,
-                icon: Icons.notes_outlined, color: Colors.grey.shade600),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDescriptionText(Color color) {
-    final l10n = AppLocalizations.of(context)!;
-    final desc = l10n.localeName == 'en'
-        ? AuditLogDetailSheet.cleanDesc(widget.record.description)
-        : widget.record.description;
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Text(
-        desc,
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.5),
-      ),
-    );
-  }
-
-  Widget _detailLabel(String label, Color color) => Text(
-        label,
-        style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: color.withValues(alpha: 0.8),
-            letterSpacing: 0.3),
-      );
-
-  Widget _detailRow(String label, String value,
-      {IconData? icon, Color? color}) {
-    final c = color ?? Colors.grey.shade600;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, size: 13, color: c),
-          const SizedBox(width: 4),
-        ],
-        Text('$label：',
-            style: TextStyle(fontSize: 12, color: c, fontWeight: FontWeight.w500)),
-        Expanded(
-          child: Text(value,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800)),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final color = _color;
-    final action = AuditLogDetailSheet.translateAction(widget.record.businessAction, l10n).isNotEmpty
-        ? AuditLogDetailSheet.translateAction(widget.record.businessAction, l10n)
+    final action = AuditLogDetailSheet.translateAction(record.businessAction, l10n).isNotEmpty
+        ? AuditLogDetailSheet.translateAction(record.businessAction, l10n)
         : l10n.invDetailDefaultAction;
     final summary = _buildSummary(l10n);
     final fmt = DateFormat('yyyy-MM-dd HH:mm');
 
     return InkWell(
-      onTap: () => setState(() => _expanded = !_expanded),
+      onTap: () => AuditLogDetailSheet.show(context, record),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Icon circle
             Container(
@@ -594,7 +477,7 @@ class _HistoryTileState extends State<_HistoryTile> {
                 children: [
                   // Action badge + summary
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -602,8 +485,7 @@ class _HistoryTileState extends State<_HistoryTile> {
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: color.withValues(alpha: 0.4)),
+                          border: Border.all(color: color.withValues(alpha: 0.4)),
                         ),
                         child: Text(action,
                             style: TextStyle(
@@ -619,31 +501,21 @@ class _HistoryTileState extends State<_HistoryTile> {
                             summary,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 13),
-                            maxLines: _expanded ? null : 1,
-                            overflow: _expanded
-                                ? TextOverflow.visible
-                                : TextOverflow.ellipsis,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
-                      // Expand toggle
-                      Icon(
-                        _expanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        size: 18,
-                        color: Colors.grey.shade400,
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 4),
                   // Operator + time
                   Row(
                     children: [
                       Icon(Icons.person_outline,
                           size: 12, color: Colors.grey.shade400),
                       const SizedBox(width: 3),
-                      Text(widget.record.userName,
+                      Text(record.userName,
                           style: TextStyle(
                               color: Colors.grey.shade500, fontSize: 12)),
                       const SizedBox(width: 10),
@@ -651,16 +523,16 @@ class _HistoryTileState extends State<_HistoryTile> {
                           size: 12, color: Colors.grey.shade400),
                       const SizedBox(width: 3),
                       Text(
-                          fmt.format(widget.record.createdAt.toLocal()),
+                          fmt.format(record.createdAt.toLocal()),
                           style: TextStyle(
                               color: Colors.grey.shade500, fontSize: 12)),
                     ],
                   ),
-                  // Expanded body
-                  if (_expanded) _buildExpandedBody(color),
                 ],
               ),
             ),
+            // Chevron hint
+            Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade300),
           ],
         ),
       ),

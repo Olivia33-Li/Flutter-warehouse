@@ -1934,6 +1934,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auditAdjustModeQty => 'By total qty';
 
   @override
+  String get auditAdjustModeMixed => 'Mixed (cartons + pcs)';
+
+  @override
+  String get auditAdjustModeBoxesOnly => 'Cartons only';
+
+  @override
   String auditFirstEntry(int qty) {
     return 'First entry · $qty pcs total';
   }
@@ -2738,6 +2744,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invHistoryReason => 'Reason';
+
+  @override
+  String get invHistoryPendingCount => 'Qty pending count';
 
   @override
   String get errApiNotFound => 'API not found, contact admin';

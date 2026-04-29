@@ -123,11 +123,18 @@ class AuditLogDetailSheet extends StatelessWidget {
         final aQty   = (d['afterQty']   as num?) ?? 0;
         final bBoxes = (d['beforeBoxes'] as num?) ?? 0;
         final aBoxes = (d['afterBoxes']  as num?) ?? 0;
+        final adjMode = d['mode']?.toString() ?? 'qty';
         final ctn    = l10n.unitBox;
-        // boxesOnly records have quantity=0; fall back to box count for display
-        final bDisplay = bQty > 0 ? '$bQty$pcs' : (bBoxes > 0 ? '$bBoxes $ctn' : '0$pcs');
-        final aDisplay = aQty > 0 ? '$aQty$pcs' : (aBoxes > 0 ? '$aBoxes $ctn' : '0$pcs');
-        return '$skuCode @ $locCode · $bDisplay→$aDisplay';
+        // When pcs didn't change but box count did (e.g. only unconfigured cartons
+        // were adjusted), show the box change rather than the misleading "48→48pcs".
+        if (bQty == aQty && bBoxes != aBoxes) {
+          return '$skuCode @ $locCode · $bBoxes→$aBoxes $ctn';
+        }
+        // boxesOnly: quantity is always 0, use box count
+        if (adjMode == 'boxes_only' || (bQty == 0 && aQty == 0)) {
+          return '$skuCode @ $locCode · $bBoxes→$aBoxes $ctn';
+        }
+        return '$skuCode @ $locCode · $bQty$pcs→$aQty$pcs';
       case '录入':
         return '$skuCode @ $locCode · ${d['quantity'] ?? 0}$pcs';
       default:
@@ -161,12 +168,35 @@ class AuditLogDetailSheet extends StatelessWidget {
       RegExp(r'(\d+)箱'),
       (m) => '${m[1]} cartons',
     );
-    // label translations
+    // label translations — must come before shorter replacements to avoid partial matches
     s = s.replaceAll('（无箱规）', '(no carton qty)');
     s = s.replaceAll('无箱规', 'no carton qty');
+    s = s.replaceAll('[调前:', '[Before:');
+    s = s.replaceAll('[调后:', '[After:');
+    s = s.replaceAll('[原:', '[Before:');
     s = s.replaceAll('调前', 'Before');
     s = s.replaceAll('调后', 'After');
     s = s.replaceAll('原因', 'Reason');
+    // quantity-unknown / pending count tag
+    s = s.replaceAll('[待清点]', '[pending count]');
+    s = s.replaceAll('待清点', 'pending count');
+    // entry mode labels used inside brackets: e.g. "[攻略数]", "[仅箱数]"
+    s = s.replaceAll('[攻略数]', '[estimated]');
+    s = s.replaceAll('攻略数', 'estimated');
+    s = s.replaceAll('[仅箱数]', '[cartons only]');
+    s = s.replaceAll('[按箱规]', '[by carton spec]');
+    s = s.replaceAll('[按数量]', '[by qty]');
+    s = s.replaceAll('[混合]', '[mixed]');
+    // adjust mode prefixes (already stripped by step 2, but handle if prefix was kept)
+    s = s.replaceAll('数量调整', 'Qty Adjust');
+    s = s.replaceAll('箱规调整', 'Config Adjust');
+    s = s.replaceAll('箱数调整', 'Carton Adjust');
+    s = s.replaceAll('结构调整', 'Structure Adjust');
+    // pending / staging status
+    s = s.replaceAll('(暂存)', '(pending)');
+    s = s.replaceAll('暂存', 'Pending');
+    // misc labels
+    s = s.replaceAll('库存', 'stock');
     return s.trim();
   }
 
@@ -432,14 +462,17 @@ class AuditLogDetailSheet extends StatelessWidget {
       Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
     final isBoxesOnly = d['boxesOnlyMode'] == true;
     final boxes = (d['boxes'] ?? 0) as num;
-    final upb = (d['unitsPerBox'] ?? 1) as num;
-    final addedQty = (d['addedQty'] ?? boxes * upb) as num;
+    final addedQty = (d['addedQty'] ?? 0) as num;
     // beforeQty/beforeBoxes now captured by backend; fall back to 0 for old records
     final beforeQty   = (d['beforeQty']   as num?) ?? 0;
     final beforeBoxes = (d['beforeBoxes'] as num?) ?? 0;
     final afterQty = (d['afterQty'] as num?) ?? beforeQty + addedQty;
     // For boxesOnly stockIn: use box counts for before/after display
     final addedBoxes = (d['unconfiguredCartons'] as num?) ?? boxes;
+
+    // Use stored configurations when available; fall back to legacy boxes/unitsPerBox fields.
+    final configs = _toMapList(d['configurations']);
+    final hasConfigs = configs.isNotEmpty;
 
     return [
       _sectionCard(
@@ -451,9 +484,12 @@ class AuditLogDetailSheet extends StatelessWidget {
           const SizedBox(height: 8),
           if (isBoxesOnly)
             _qtyHighlight('+${boxes.toInt()} ${l10n.invDetailBoxesSuffix}  (${l10n.invDetailCartonTBD.trim()})', Colors.green.shade600)
+          else if (hasConfigs)
+            _configsBlock(configs, highlightColor: Colors.green.shade600, l10n: l10n)
           else
+            // Legacy record: boxes + unitsPerBox stored at top level
             _configsBlock(
-              [{'boxes': boxes, 'unitsPerBox': upb}],
+              [{'boxes': boxes, 'unitsPerBox': (d['unitsPerBox'] ?? 1) as num}],
               highlightColor: Colors.green.shade600,
               l10n: l10n,
             ),
@@ -558,22 +594,68 @@ class AuditLogDetailSheet extends StatelessWidget {
   // ── 调整 ─────────────────────────────────────────────────────────────────────
   List<Widget> _buildAdjustDetail(
       Map<String, dynamic> d, Color fg, Color bg, AppLocalizations l10n) {
+    final mode        = d['mode']?.toString() ?? 'qty';
     final beforeQty   = (d['beforeQty']   as num?) ?? 0;
     final afterQty    = (d['afterQty']    as num?) ?? 0;
     final beforeBoxes = (d['beforeBoxes'] as num?) ?? 0;
     final afterBoxes  = (d['afterBoxes']  as num?) ?? 0;
-    final mode = d['mode'] == 'config' ? l10n.auditAdjustModeConfig : l10n.auditAdjustModeQty;
+    final beforeUnconfiguredCartons = (d['beforeUnconfiguredCartons'] as num?) ?? 0;
+    final afterUnconfiguredCartons  = (d['afterUnconfiguredCartons']  as num?) ?? 0;
+    final afterLoosePcs             = (d['afterLoosePcs']             as num?) ?? 0;
     final note = d['note']?.toString();
-    final ctn = l10n.unitBox;
-    final pcs = l10n.unitPiece;
+    final ctn  = l10n.unitBox;
+    final pcs  = l10n.unitPiece;
 
-    // For boxesOnly records quantity is always 0; use box count for display
-    final beforeLabel = beforeQty > 0
-        ? '$beforeQty $pcs'
-        : (beforeBoxes > 0 ? '$beforeBoxes $ctn' : '0 $pcs');
-    final afterLabel = afterQty > 0
-        ? '$afterQty $pcs'
-        : (afterBoxes > 0 ? '$afterBoxes $ctn' : '0 $pcs');
+    // Mode label
+    final modeLabel = switch (mode) {
+      'mixed'      => l10n.auditAdjustModeMixed,
+      'configs'    => l10n.auditAdjustModeConfig,
+      'boxes_only' => l10n.auditAdjustModeBoxesOnly,
+      _            => l10n.auditAdjustModeQty,
+    };
+
+    // Before / after configurations (rich mode)
+    final beforeConfigs = _toMapList(d['beforeConfigurations']);
+    final afterConfigs  = _toMapList(d['afterConfigurations']);
+
+    final beforeLoosePcs = (d['beforeLoosePcs'] as num?) ?? 0;
+
+    // Build before/after section based on mode
+    Widget beforeAfterWidget;
+
+    if (mode == 'boxes_only') {
+      // Cartons-only adjust: show box counts with delta badge
+      final delta = afterBoxes - beforeBoxes;
+      beforeAfterWidget = _inventoryChangeWidget(
+        beforeLabel: '$beforeBoxes $ctn',
+        changeLabel: delta >= 0 ? '+$delta $ctn' : '$delta $ctn',
+        afterLabel: '$afterBoxes $ctn',
+        changeColor: delta >= 0 ? Colors.blue.shade600 : Colors.orange.shade700,
+        l10n: l10n,
+      );
+    } else if (mode == 'mixed' || mode == 'configs') {
+      // Show the FULL inventory state on both sides:
+      // configurations + unconfiguredCartons + loosePcs
+      beforeAfterWidget = _fullStockStateBeforeAfter(
+        beforeConfigs: beforeConfigs,
+        afterConfigs: afterConfigs,
+        beforeUnconfiguredCartons: beforeUnconfiguredCartons,
+        afterUnconfiguredCartons: afterUnconfiguredCartons,
+        beforeLoosePcs: beforeLoosePcs,
+        afterLoosePcs: afterLoosePcs,
+        l10n: l10n,
+      );
+    } else {
+      // qty mode: plain pcs counts with delta badge
+      final delta = afterQty - beforeQty;
+      beforeAfterWidget = _inventoryChangeWidget(
+        beforeLabel: '$beforeQty $pcs',
+        changeLabel: delta >= 0 ? '+$delta $pcs' : '$delta $pcs',
+        afterLabel: '$afterQty $pcs',
+        changeColor: delta >= 0 ? Colors.blue.shade600 : Colors.orange.shade700,
+        l10n: l10n,
+      );
+    }
 
     return [
       _sectionCard(
@@ -582,7 +664,7 @@ class AuditLogDetailSheet extends StatelessWidget {
         children: [
           _row('SKU', d['skuCode']),
           _row(l10n.auditLocation, d['locationCode']),
-          _row(l10n.auditAdjustMode, mode),
+          _row(l10n.auditAdjustMode, modeLabel),
           if (note != null && note.isNotEmpty) _row(l10n.auditNote, note),
         ],
       ),
@@ -590,9 +672,7 @@ class AuditLogDetailSheet extends StatelessWidget {
       _sectionCard(
         title: l10n.auditBeforeAfterChange,
         icon: Icons.show_chart,
-        children: [
-          _beforeAfterWidget(beforeLabel, afterLabel, l10n),
-        ],
+        children: [beforeAfterWidget],
       ),
     ];
   }
@@ -1114,6 +1194,99 @@ class AuditLogDetailSheet extends StatelessWidget {
           ],
         ),
       );
+
+  // ── Full stock state before/after (mixed/configs adjust) ──────────────────
+  // Shows configs + unconfiguredCartons + loosePcs for both sides so nothing
+  // is hidden when only the carton count (not pcs) changes.
+  Widget _fullStockStateBeforeAfter({
+    required List<dynamic> beforeConfigs,
+    required List<dynamic> afterConfigs,
+    required num beforeUnconfiguredCartons,
+    required num afterUnconfiguredCartons,
+    required num beforeLoosePcs,
+    required num afterLoosePcs,
+    required AppLocalizations l10n,
+  }) {
+    final ctn = l10n.unitBox;
+    final pcs = l10n.unitPiece;
+
+    List<Widget> buildSide(
+        List<dynamic> configs, num unconfiguredCartons, num loosePcs, bool isAfter) {
+      final highlight = isAfter ? Colors.blue.shade700 : null;
+      final widgets = <Widget>[];
+
+      if (configs.isNotEmpty) {
+        widgets.add(_configsBlock(configs, highlightColor: highlight, l10n: l10n));
+      }
+      if (unconfiguredCartons > 0) {
+        if (widgets.isNotEmpty) widgets.add(const SizedBox(height: 6));
+        widgets.add(_pill(
+          '$unconfiguredCartons $ctn  (${l10n.invDetailCartonTBD.trim()})',
+          isAfter ? Colors.blue.shade600 : Colors.grey.shade600,
+        ));
+      }
+      if (loosePcs > 0) {
+        if (widgets.isNotEmpty) widgets.add(const SizedBox(height: 6));
+        widgets.add(_pill(
+          '$loosePcs $pcs',
+          isAfter ? Colors.blue.shade600 : Colors.grey.shade600,
+        ));
+      }
+      if (widgets.isEmpty) {
+        widgets.add(Text(
+          '0 $pcs',
+          style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+        ));
+      }
+      return widgets;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.auditBeforeLabel,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                const SizedBox(height: 8),
+                ...buildSide(beforeConfigs, beforeUnconfiguredCartons, beforeLoosePcs, false),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Column(
+              children: [
+                Icon(Icons.arrow_forward, color: Colors.grey.shade400, size: 20),
+                Text(l10n.auditChangeLabel,
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.auditAfterLabel,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                const SizedBox(height: 8),
+                ...buildSide(afterConfigs, afterUnconfiguredCartons, afterLoosePcs, true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── Before / after with change badge (for 入库/出库) ───────────────────────
   Widget _inventoryChangeWidget({

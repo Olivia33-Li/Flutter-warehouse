@@ -3560,6 +3560,18 @@ abstract class AppLocalizations {
   /// **'按总数量调整'**
   String get auditAdjustModeQty;
 
+  /// No description provided for @auditAdjustModeMixed.
+  ///
+  /// In zh, this message translates to:
+  /// **'混合调整（箱+散件）'**
+  String get auditAdjustModeMixed;
+
+  /// No description provided for @auditAdjustModeBoxesOnly.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅箱数调整'**
+  String get auditAdjustModeBoxesOnly;
+
   /// No description provided for @auditFirstEntry.
   ///
   /// In zh, this message translates to:
@@ -4945,6 +4957,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'原因'**
   String get invHistoryReason;
+
+  /// No description provided for @invHistoryPendingCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'待清点'**
+  String get invHistoryPendingCount;
 
   /// No description provided for @errApiNotFound.
   ///

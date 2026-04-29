@@ -93,7 +93,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/history',
             builder: (_, state) {
               final extra = state.extra as Map<String, dynamic>?;
-              return HistoryScreen(initialLocationCode: extra?['locationCode'] as String?);
+              return HistoryScreen(
+                initialLocationCode: extra?['locationCode'] as String?,
+                initialSkuCode: extra?['skuCode'] as String?,
+              );
             },
           ),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),

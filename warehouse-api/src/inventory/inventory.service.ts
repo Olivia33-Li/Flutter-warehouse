@@ -227,6 +227,17 @@ export class InventoryService {
       entity: 'inventory',
       businessAction: stockStatus === 'pending_count' ? '暂存' : '录入',
       description: `录入: ${sku.sku} @ ${location.code} [${modeLabel}] ${qtyDesc}${statusTag}`,
+      details: {
+        skuCode: sku.sku,
+        locationCode: location.code,
+        boxesOnlyMode: (record as any).boxesOnlyMode ?? false,
+        boxes: record.boxes,
+        unitsPerBox: record.unitsPerBox,
+        configurations: record.configurations ?? [],
+        unconfiguredCartons: initUnconfiguredCartons,
+        quantity: record.quantity,
+        quantityUnknown: record.quantityUnknown,
+      },
     });
 
     const populated = await this.inventoryModel
@@ -705,6 +716,8 @@ export class InventoryService {
       quantity: record.quantity,
       boxes: record.boxes,
       unitsPerBox: record.unitsPerBox,
+      loosePcs: record.loosePcs ?? 0,
+      unconfiguredCartons: record.unconfiguredCartons ?? 0,
       configurations: JSON.stringify(record.configurations ?? []),
     };
 
@@ -762,10 +775,17 @@ export class InventoryService {
       details: {
         skuCode: sku.sku,
         locationCode: location.code,
+        mode: dto.adjustMode ?? 'qty',
         beforeQty: before.quantity,
         afterQty: record.quantity,
         beforeBoxes: before.boxes,
         afterBoxes: record.boxes,
+        beforeConfigurations: JSON.parse(before.configurations ?? '[]'),
+        afterConfigurations: record.configurations ?? [],
+        beforeLoosePcs: before.loosePcs,
+        beforeUnconfiguredCartons: before.unconfiguredCartons,
+        afterLoosePcs: record.loosePcs ?? 0,
+        afterUnconfiguredCartons: record.unconfiguredCartons ?? 0,
         note: dto.note,
       },
     });

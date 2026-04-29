@@ -11,7 +11,8 @@ import '../../l10n/app_localizations.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   final String? initialLocationCode;
-  const HistoryScreen({super.key, this.initialLocationCode});
+  final String? initialSkuCode;
+  const HistoryScreen({super.key, this.initialLocationCode, this.initialSkuCode});
 
   @override
   ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
@@ -20,6 +21,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final _historyService = HistoryService();
   String? _filterLocationCode;
+  String? _filterSkuCode;
   final _keywordCtrl = TextEditingController();
   List<ChangeRecord> _records = [];
   bool _loading = true;
@@ -49,6 +51,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     if (!_userFilterInitialized) {
       _userFilterInitialized = true;
       _filterLocationCode = widget.initialLocationCode;
+      _filterSkuCode = widget.initialSkuCode;
       final user = ref.read(currentUserProvider);
       if (user != null && !user.canViewAllHistory) {
         _filterUserName = user.username;
@@ -285,6 +288,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         startDate: startDate,
         endDate: endDate,
         userName: isCheckFilter ? null : _filterUserName,
+        skuCode: _filterSkuCode,
         locationCode: _filterLocationCode,
         page: _page,
         limit: _limit,
@@ -316,9 +320,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         }
         return '${d['skuCode']} @ ${d['locationCode']} · +${d['addedQty'] ?? 0}$pcs';
       case '出库':
+        final uncOut = (d['unconfiguredCartons'] as num?) ?? 0;
+        if (uncOut > 0) {
+          return '${d['skuCode']} @ ${d['locationCode']} · -$uncOut ${l10n.unitBox}';
+        }
         return '${d['skuCode']} @ ${d['locationCode']} · -${d['reducedQty'] ?? 0}$pcs';
       case '调整':
-        return '${d['skuCode']} @ ${d['locationCode']} · ${d['beforeQty'] ?? 0}→${d['afterQty'] ?? 0}$pcs';
+        final adjMode = d['mode']?.toString() ?? 'qty';
+        final bQty = (d['beforeQty'] as num?) ?? 0;
+        final aQty = (d['afterQty']  as num?) ?? 0;
+        final bBoxes = (d['beforeBoxes'] as num?) ?? 0;
+        final aBoxes = (d['afterBoxes']  as num?) ?? 0;
+        if (adjMode == 'boxes_only' || (bQty == aQty && bBoxes != aBoxes)) {
+          return '${d['skuCode']} @ ${d['locationCode']} · $bBoxes→$aBoxes ${l10n.unitBox}';
+        }
+        return '${d['skuCode']} @ ${d['locationCode']} · $bQty→$aQty$pcs';
       case '录入':
         return '${d['skuCode']} @ ${d['locationCode']} · ${d['quantity'] ?? 0}$pcs';
       case '删除库存':

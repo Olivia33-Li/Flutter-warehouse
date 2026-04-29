@@ -1006,6 +1006,8 @@
   "auditAdjustMode": "Adjust mode",
   "auditAdjustModeConfig": "By carton",
   "auditAdjustModeQty": "By total qty",
+  "auditAdjustModeMixed": "Mixed (cartons + pcs)",
+  "auditAdjustModeBoxesOnly": "Cartons only",
   "auditFirstEntry": "First entry · {qty} pcs total",
   "@auditFirstEntry": {
     "placeholders": { "qty": { "type": "int" } }
@@ -1438,6 +1440,7 @@
   "invHistorySplitTargets": "Split Targets",
   "invHistorySplitCleared": "Source cleared (split complete)",
   "invHistoryReason": "Reason",
+  "invHistoryPendingCount": "Qty pending count",
 
   "errApiNotFound": "API not found, contact admin",
   "errPermission": "No permission to view",

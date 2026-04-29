@@ -2617,13 +2617,29 @@ class _AuditCard extends StatelessWidget {
       case '出库':
         return '-${d['reducedQty'] ?? 0}$pcs';
       case '调整':
-        final before = d['beforeQty'] ?? 0;
-        final after = d['afterQty'] ?? 0;
+        final adjMode = d['mode']?.toString() ?? 'qty';
         final note = d['note'];
-        final noteStr = (note != null && note.toString().isNotEmpty) ? '  ${l10n.auditNote}: $note' : '';
-        return '$before→$after$pcs$noteStr';
+        final noteStr = (note != null && note.toString().isNotEmpty) ? '  ($note)' : '';
+        final bQty = (d['beforeQty'] as num?) ?? 0;
+        final aQty = (d['afterQty']  as num?) ?? 0;
+        final bBoxes = (d['beforeBoxes'] as num?) ?? 0;
+        final aBoxes = (d['afterBoxes']  as num?) ?? 0;
+        if (adjMode == 'boxes_only' || (bQty == aQty && bBoxes != aBoxes)) {
+          return '$bBoxes→$aBoxes ${l10n.unitBox}$noteStr';
+        }
+        return '$bQty→$aQty$pcs$noteStr';
       case '录入':
-        return '${d['quantity'] ?? 0}$pcs';
+      case '暂存':
+        if (d['quantityUnknown'] == true) return l10n.invHistoryPendingCount;
+        if (d['boxesOnlyMode'] == true) {
+          return '${d['unconfiguredCartons'] ?? d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+        }
+        final entryQty = (d['quantity'] as num?) ?? 0;
+        final entryBoxes = (d['boxes'] as num?) ?? 0;
+        final entryUpb = (d['unitsPerBox'] as num?) ?? 1;
+        if (entryQty > 0) return '+$entryQty$pcs';
+        if (entryBoxes > 0) return '+$entryBoxes × $entryUpb$pcs';
+        return '$entryQty$pcs';
       case '删除库存':
         return '${d['quantity'] ?? 0}$pcs';
       case '批量转移':

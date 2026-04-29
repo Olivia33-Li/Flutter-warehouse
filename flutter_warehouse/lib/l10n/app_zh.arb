@@ -1006,6 +1006,8 @@
   "auditAdjustMode": "调整方式",
   "auditAdjustModeConfig": "按箱规调整",
   "auditAdjustModeQty": "按总数量调整",
+  "auditAdjustModeMixed": "混合调整（箱+散件）",
+  "auditAdjustModeBoxesOnly": "仅箱数调整",
   "auditFirstEntry": "首次录入 · 共{qty}件",
   "@auditFirstEntry": {
     "placeholders": { "qty": { "type": "int" } }
@@ -1438,6 +1440,7 @@
   "invHistorySplitTargets": "拆分目标",
   "invHistorySplitCleared": "原记录已清零（拆分完成）",
   "invHistoryReason": "原因",
+  "invHistoryPendingCount": "待清点",
 
   "errApiNotFound": "接口不存在，请联系管理员",
   "errPermission": "无权限查看此记录",

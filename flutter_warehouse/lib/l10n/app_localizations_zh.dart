@@ -1902,6 +1902,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get auditAdjustModeQty => '按总数量调整';
 
   @override
+  String get auditAdjustModeMixed => '混合调整（箱+散件）';
+
+  @override
+  String get auditAdjustModeBoxesOnly => '仅箱数调整';
+
+  @override
   String auditFirstEntry(int qty) {
     return '首次录入 · 共$qty件';
   }
@@ -2683,6 +2689,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get invHistoryReason => '原因';
+
+  @override
+  String get invHistoryPendingCount => '待清点';
 
   @override
   String get errApiNotFound => '接口不存在，请联系管理员';

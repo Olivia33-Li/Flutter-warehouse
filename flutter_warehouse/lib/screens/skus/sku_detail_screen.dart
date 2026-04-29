@@ -10,8 +10,12 @@ import '../../models/inventory.dart';
 import '../../models/location.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/inventory_detail_sheet.dart';
+import '../../widgets/audit_log_detail_sheet.dart';
+import '../../services/history_service.dart';
+import '../../models/change_record.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/stock_display_utils.dart';
+import 'package:intl/intl.dart';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const _bgColor    = Color(0xFFF5F3F0);
@@ -34,10 +38,12 @@ class SkuDetailScreen extends ConsumerStatefulWidget {
 class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
   final _skuService = SkuService();
   final _inventoryService = InventoryService();
+  final _historyService = HistoryService();
   Map<String, dynamic>? _data;
   bool _loading = true;
   String? _error;
   bool _specsExpanded = false;
+  List<ChangeRecord>? _recentRecords;
 
   @override
   void initState() {
@@ -53,6 +59,24 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
       _error = e.toString();
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+    if (_data != null) _loadRecentHistory();
+  }
+
+  Future<void> _loadRecentHistory() async {
+    final skuCode = _data?['sku'] as String?;
+    if (skuCode == null || skuCode.isEmpty) return;
+    try {
+      final result = await _historyService.getAll(
+        skuCode: skuCode,
+        inventoryChangingOnly: true,
+        limit: 3,
+      );
+      if (mounted) {
+        setState(() => _recentRecords = result['records'] as List<ChangeRecord>);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _recentRecords = []);
     }
   }
 
@@ -1225,12 +1249,95 @@ class _SkuDetailScreenState extends ConsumerState<SkuDetailScreen> {
                       ),
                     ),
                   ],
+
+                  // ── Recent Operations section ────────────────────────────
+                  const SizedBox(height: 16),
+                  _buildRecentOpsSection(l10n),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRecentOpsSection(AppLocalizations l10n) {
+    final skuCode = _data?['sku'] as String? ?? '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.invDetailRecentOps,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _titleColor,
+              ),
+            ),
+            GestureDetector(
+              onTap: () => context.push('/history', extra: {'skuCode': skuCode}),
+              child: Text(
+                l10n.invDetailViewAll,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: _primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_recentRecords == null)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (_recentRecords!.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              l10n.invDetailNoRecords,
+              style: TextStyle(fontSize: 12, color: _mutedColor),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFECEAE6), width: 1),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Column(
+              children: _recentRecords!.map((r) {
+                final isLast = r == _recentRecords!.last;
+                return Column(
+                  children: [
+                    _SkuAuditTile(
+                      record: r,
+                      onTap: () => AuditLogDetailSheet.show(context, r),
+                    ),
+                    if (!isLast)
+                      Divider(height: 1, color: Colors.grey.shade100),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1551,6 +1658,143 @@ class _LabeledInput extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Compact audit tile for SKU Recent Operations ───────────────────────────────
+
+class _SkuAuditTile extends StatelessWidget {
+  final ChangeRecord record;
+  final VoidCallback onTap;
+
+  const _SkuAuditTile({required this.record, required this.onTap});
+
+  static const _actionColor = <String, Color>{
+    '入库': Colors.green,
+    '录入': Colors.green,
+    '暂存': Colors.teal,
+    '出库': Colors.red,
+    '删除库存': Colors.red,
+    '调整': Colors.orange,
+    '结构修改': Colors.orange,
+    '批量转移': Colors.blue,
+    '批量复制': Colors.indigo,
+    'SKU更正': Colors.purple,
+    'SKU更正并合并': Colors.deepOrange,
+    '暂存转正式': Colors.teal,
+    '暂存拆分': Colors.deepPurple,
+  };
+
+  Color get _color =>
+      _actionColor[record.businessAction ?? ''] ?? Colors.grey.shade500;
+
+  String _buildDetail(AppLocalizations l10n) {
+    final d = record.details;
+    final ba = record.businessAction;
+    final pcs = l10n.unitPiece;
+    if (d == null || ba == null) return '';
+    switch (ba) {
+      case '入库':
+        if (d['boxesOnlyMode'] == true) {
+          return '+${d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+        }
+        return '+${d['addedQty'] ?? 0}$pcs';
+      case '出库':
+        final uncOut = (d['unconfiguredCartons'] as num?) ?? 0;
+        if (uncOut > 0) return '-$uncOut ${l10n.unitBox}';
+        return '-${d['reducedQty'] ?? 0}$pcs';
+      case '调整':
+        final adjMode = d['mode']?.toString() ?? 'qty';
+        final bQty = (d['beforeQty'] as num?) ?? 0;
+        final aQty = (d['afterQty']  as num?) ?? 0;
+        final bBoxes = (d['beforeBoxes'] as num?) ?? 0;
+        final aBoxes = (d['afterBoxes']  as num?) ?? 0;
+        if (adjMode == 'boxes_only' || (bQty == aQty && bBoxes != aBoxes)) {
+          return '$bBoxes→$aBoxes ${l10n.unitBox}';
+        }
+        return '$bQty→$aQty$pcs';
+      case '录入':
+      case '暂存':
+        if (d['quantityUnknown'] == true) return l10n.invHistoryPendingCount;
+        if (d['boxesOnlyMode'] == true) {
+          return '${d['unconfiguredCartons'] ?? d['boxes'] ?? 0} ${l10n.invDetailBoxesSuffix}';
+        }
+        final entryQty = (d['quantity'] as num?) ?? 0;
+        if (entryQty > 0) return '+$entryQty$pcs';
+        return '';
+      default:
+        return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final time = DateFormat('MM-dd HH:mm').format(record.createdAt.toLocal());
+    final color = _color;
+    final action = AuditLogDetailSheet.translateAction(record.businessAction, l10n)
+        .isNotEmpty
+        ? AuditLogDetailSheet.translateAction(record.businessAction, l10n)
+        : l10n.invDetailDefaultAction;
+    final detail = _buildDetail(l10n);
+    final locCode = record.details?['locationCode']?.toString() ?? '';
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: color.withValues(alpha: 0.4)),
+              ),
+              child: Text(action,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  )),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (detail.isNotEmpty)
+                    Text(detail,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13)),
+                  if (locCode.isNotEmpty)
+                    Text('@$locCode',
+                        style: TextStyle(
+                            color: Colors.grey.shade500, fontSize: 11)),
+                  Text(record.userName,
+                      style: TextStyle(
+                          color: Colors.grey.shade500, fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(time,
+                    style: TextStyle(
+                        color: Colors.grey.shade400, fontSize: 11)),
+                const Icon(Icons.chevron_right,
+                    size: 14, color: _hintColor),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
