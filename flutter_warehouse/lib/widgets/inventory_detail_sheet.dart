@@ -139,7 +139,15 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     final loose = _invRecord?.loosePcs ?? 0;
     if (loose > 0) parts.add('$loose ${l10n.unitPiece}');
 
-    if (parts.isNotEmpty) return parts.join('\n');
+    if (parts.isNotEmpty) {
+      final configuredBoxes = _configs.fold(0, (s, c) => s + c.boxes);
+      final noSpec = _invRecord?.unconfiguredCartons ?? 0;
+      final totalCartons = configuredBoxes + noSpec;
+      if (totalCartons > 0) {
+        parts.add('= $totalCartons ${l10n.unitBox} total');
+      }
+      return parts.join('\n');
+    }
 
     // Fallback for legacy records (flat boxes/unitsPerBox, no configurations)
     if (_boxesOnlyMode) return l10n.invDetailBoxesOnlyHeader(_boxes);

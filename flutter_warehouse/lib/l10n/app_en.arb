@@ -606,8 +606,25 @@
   "skuDetailFilterNormal": "Normal",
   "skuDetailFilterPending": "Pending",
   "skuDetailChecked": "Checked",
+  "skuDetailCheckNow": "Check",
+  "skuDetailCheckConfirm": "Mark {code} as checked?",
+  "@skuDetailCheckConfirm": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
   "skuDetailLastCheck": "Last check",
   "skuDetailNoCheckRecord": "No check record",
+  "skuDetailCheckHistory": "Check History",
+  "checkStatusToday": "Checked today",
+  "checkStatus3Days": "Within 3 days",
+  "checkStatus7Days": "7+ days ago",
+  "checkStatusNever": "Never checked",
+  "checkFilterAll": "All",
+  "checkFilterToday": "Today",
+  "checkFilter3Days": "≤ 3 days",
+  "checkFilter7Days": "7+ days",
+  "checkFilterNever": "Never",
   "skuDetailLastChange": "Last change",
   "skuDetailNoChangeRecord": "No change record",
   "skuDetailTotalBoxesLabel": "Total Cartons",

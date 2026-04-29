@@ -2462,6 +2462,18 @@ abstract class AppLocalizations {
   /// **'已检查'**
   String get skuDetailChecked;
 
+  /// No description provided for @skuDetailCheckNow.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查'**
+  String get skuDetailCheckNow;
+
+  /// No description provided for @skuDetailCheckConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认将 {code} 标记为已检查？'**
+  String skuDetailCheckConfirm(String code);
+
   /// No description provided for @skuDetailLastCheck.
   ///
   /// In zh, this message translates to:
@@ -2473,6 +2485,66 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'无检查记录'**
   String get skuDetailNoCheckRecord;
+
+  /// No description provided for @skuDetailCheckHistory.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查记录'**
+  String get skuDetailCheckHistory;
+
+  /// No description provided for @checkStatusToday.
+  ///
+  /// In zh, this message translates to:
+  /// **'今日已检查'**
+  String get checkStatusToday;
+
+  /// No description provided for @checkStatus3Days.
+  ///
+  /// In zh, this message translates to:
+  /// **'3天内已检查'**
+  String get checkStatus3Days;
+
+  /// No description provided for @checkStatus7Days.
+  ///
+  /// In zh, this message translates to:
+  /// **'超过7天未检查'**
+  String get checkStatus7Days;
+
+  /// No description provided for @checkStatusNever.
+  ///
+  /// In zh, this message translates to:
+  /// **'从未检查'**
+  String get checkStatusNever;
+
+  /// No description provided for @checkFilterAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部'**
+  String get checkFilterAll;
+
+  /// No description provided for @checkFilterToday.
+  ///
+  /// In zh, this message translates to:
+  /// **'今日'**
+  String get checkFilterToday;
+
+  /// No description provided for @checkFilter3Days.
+  ///
+  /// In zh, this message translates to:
+  /// **'3天内'**
+  String get checkFilter3Days;
+
+  /// No description provided for @checkFilter7Days.
+  ///
+  /// In zh, this message translates to:
+  /// **'7天以上'**
+  String get checkFilter7Days;
+
+  /// No description provided for @checkFilterNever.
+  ///
+  /// In zh, this message translates to:
+  /// **'从未'**
+  String get checkFilterNever;
 
   /// No description provided for @skuDetailLastChange.
   ///

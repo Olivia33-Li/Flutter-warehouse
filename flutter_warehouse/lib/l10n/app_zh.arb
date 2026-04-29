@@ -606,8 +606,25 @@
   "skuDetailFilterNormal": "正常",
   "skuDetailFilterPending": "暂存",
   "skuDetailChecked": "已检查",
+  "skuDetailCheckNow": "检查",
+  "skuDetailCheckConfirm": "确认将 {code} 标记为已检查？",
+  "@skuDetailCheckConfirm": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
   "skuDetailLastCheck": "上次检查",
   "skuDetailNoCheckRecord": "无检查记录",
+  "skuDetailCheckHistory": "检查记录",
+  "checkStatusToday": "今日已检查",
+  "checkStatus3Days": "3天内已检查",
+  "checkStatus7Days": "超过7天未检查",
+  "checkStatusNever": "从未检查",
+  "checkFilterAll": "全部",
+  "checkFilterToday": "今日",
+  "checkFilter3Days": "3天内",
+  "checkFilter7Days": "7天以上",
+  "checkFilterNever": "从未",
   "skuDetailLastChange": "上次变更",
   "skuDetailNoChangeRecord": "无变更记录",
   "skuDetailTotalBoxesLabel": "总箱数",

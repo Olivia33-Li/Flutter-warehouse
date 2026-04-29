@@ -1366,6 +1366,7 @@ class _LocationCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     final String subtitle;
+    int? totalCartons;
     if (record.quantityUnknown) {
       subtitle = l10n.skuDetailQtyLinePending;
     } else {
@@ -1376,6 +1377,11 @@ class _LocationCard extends StatelessWidget {
         cartonQty:         cartonQty,
         l10n:              l10n,
       );
+      final qty = cartonQty;
+      final convertedFromLoose = (qty != null && qty > 0 && record.loosePcs > 0)
+          ? record.loosePcs ~/ qty
+          : 0;
+      totalCartons = record.boxes + convertedFromLoose;
     }
 
     return Container(
@@ -1457,6 +1463,13 @@ class _LocationCard extends StatelessWidget {
                         subtitle,
                         style: const TextStyle(fontSize: 12, color: _mutedColor),
                       ),
+                      if (totalCartons != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '= $totalCartons ${l10n.unitBox} total',
+                          style: TextStyle(fontSize: 11, color: _mutedColor.withValues(alpha: 0.7)),
+                        ),
+                      ],
                     ],
                   ),
                 ),

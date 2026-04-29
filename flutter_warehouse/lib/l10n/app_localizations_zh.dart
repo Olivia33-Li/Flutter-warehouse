@@ -1267,10 +1267,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skuDetailChecked => '已检查';
 
   @override
+  String get skuDetailCheckNow => '检查';
+
+  @override
+  String skuDetailCheckConfirm(String code) {
+    return '确认将 $code 标记为已检查？';
+  }
+
+  @override
   String get skuDetailLastCheck => '上次检查';
 
   @override
   String get skuDetailNoCheckRecord => '无检查记录';
+
+  @override
+  String get skuDetailCheckHistory => '检查记录';
+
+  @override
+  String get checkStatusToday => '今日已检查';
+
+  @override
+  String get checkStatus3Days => '3天内已检查';
+
+  @override
+  String get checkStatus7Days => '超过7天未检查';
+
+  @override
+  String get checkStatusNever => '从未检查';
+
+  @override
+  String get checkFilterAll => '全部';
+
+  @override
+  String get checkFilterToday => '今日';
+
+  @override
+  String get checkFilter3Days => '3天内';
+
+  @override
+  String get checkFilter7Days => '7天以上';
+
+  @override
+  String get checkFilterNever => '从未';
 
   @override
   String get skuDetailLastChange => '上次变更';

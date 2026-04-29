@@ -16,6 +16,7 @@ import '../../widgets/inventory_detail_sheet.dart';
 import '../../widgets/audit_log_detail_sheet.dart';
 import '../history/history_screen.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/stock_display_utils.dart';
 
 class LocationDetailScreen extends ConsumerStatefulWidget {
   final String id;
@@ -34,6 +35,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
   ChangeRecord? _latestCheck;
   bool _loading = true;
   String? _error;
+  bool _checkInProgress = false; // 防止重复点击
 
   // ── SKU 列表筛选状态 ──────────────────────────────────────────────────────────
   // 库存状态: 'all' | 'has_stock' | 'zero_stock'
@@ -47,8 +49,8 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() { _loading = true; _error = null; });
     try {
       _data = await _locationService.getOne(widget.id);
       final locationCode = _data?['code'] as String?;
@@ -73,7 +75,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     } catch (e) {
       _error = e.toString();
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() { _loading = false; });
     }
   }
 
@@ -104,6 +106,7 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     final newCodeCtrl = TextEditingController();
     final newNameCtrl = TextEditingController();
     String? createError;
+    String? skuAutoSelectedInfo;
 
     await showDialog(
       context: context,
@@ -154,13 +157,35 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                                 skuSearchCtrl.clear();
                                 filteredSkus = [];
                                 showSkuResults = false;
+                                skuAutoSelectedInfo = null;
                               }),
                             ),
                           ],
                         ),
-                      )
+                      ),
+                    if (skuAutoSelectedInfo != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          border: Border.all(color: Colors.orange.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 16, color: Colors.orange.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(skuAutoSelectedInfo!,
+                                  style: TextStyle(fontSize: 12, color: Colors.orange.shade800)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     // State B: search field + results
-                    else if (!isCreatingNew) ...[
+                    if ((selectedSkuCode == null || showSkuResults) && !isCreatingNew) ...[
                       TextField(
                         controller: skuSearchCtrl,
                         decoration: InputDecoration(
@@ -262,9 +287,9 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                             }),
                           ),
                         ),
-                    ]
+                    ],
                     // State C: inline create-new form
-                    else ...[
+                    if (isCreatingNew) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -353,7 +378,37 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                                       createError = null;
                                     });
                                   } catch (e) {
-                                    setS(() => createError = l10n.skuDetailCreateFailed(e.toString()));
+                                    if (e is DioException &&
+                                        e.response?.statusCode == 409) {
+                                      // SKU already exists — find it and auto-select
+                                      try {
+                                        final existing = await SkuService()
+                                            .getAll(search: code);
+                                        final match = existing.firstWhere(
+                                          (s) => s.sku.toLowerCase() ==
+                                              code.toLowerCase(),
+                                          orElse: () => existing.first,
+                                        );
+                                        if (!skus.any((s) => s.sku == match.sku)) {
+                                          skus.add(match);
+                                        }
+                                        setS(() {
+                                          selectedSkuCode = match.sku;
+                                          selectedSkuName = match.name;
+                                          isCreatingNew = false;
+                                          createError = null;
+                                          skuAutoSelectedInfo = 'SKU "${match.sku}" 已存在，已自动选中';
+                                        });
+                                      } catch (_) {
+                                        setS(() => createError =
+                                            l10n.skuDetailCreateFailed(
+                                                e.toString()));
+                                      }
+                                    } else {
+                                      setS(() => createError =
+                                          l10n.skuDetailCreateFailed(
+                                              e.toString()));
+                                    }
                                   }
                                 },
                                 child: Text(l10n.skuDetailCreate),
@@ -721,21 +776,48 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
           const SizedBox(height: 16),
           const Divider(height: 1, color: Color(0xFFF2F1EF)),
           const SizedBox(height: 10),
-          // 已检查 toggle
+          // 已检查 — 状态标签 + 检查按钮
           Row(
             children: [
-              Text(l10n.skuDetailChecked, style: const TextStyle(fontSize: 12, color: _hintColor)),
+              _checkStatusBadge(l10n, data),
               const Spacer(),
-              Transform.scale(
-                scale: 0.75,
-                alignment: Alignment.centerRight,
-                child: Switch(
-                  value: data['checked'] == true,
-                  onChanged: (val) async {
-                    await _locationService.check(widget.id, checked: val);
-                    _load();
-                  },
-                  activeThumbColor: _primary,
+              TextButton.icon(
+                onPressed: _checkInProgress
+                    ? null
+                    : () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text(l10n.skuDetailCheckNow),
+                            content: Text(l10n.skuDetailCheckConfirm(data['code']?.toString() ?? '')),
+                            actions: [
+                              TextButton(
+                                onPressed: () => ctx.pop(false),
+                                child: Text(l10n.cancel),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(backgroundColor: Colors.green.shade600),
+                                onPressed: () => ctx.pop(true),
+                                child: Text(l10n.skuDetailCheckNow),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true) return;
+                        setState(() => _checkInProgress = true);
+                        await _locationService.check(widget.id);
+                        if (mounted) {
+                          setState(() => _checkInProgress = false);
+                          _load(silent: true);
+                        }
+                      },
+                icon: _checkInProgress
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.check_circle_outline, size: 16),
+                label: Text(l10n.skuDetailCheckNow, style: const TextStyle(fontSize: 13)),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.green.shade600,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 ),
               ),
             ],
@@ -744,8 +826,8 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
           _summaryInfoRow(
             l10n.skuDetailLastCheck,
             _latestCheck == null ? l10n.skuDetailNoCheckRecord : _formatDate(_latestCheck!.createdAt.toIso8601String()),
-            tappable: _latestCheck != null,
-            onTap: _latestCheck != null ? () => _traceRowTap(_latestCheck!) : null,
+            tappable: true,
+            onTap: _showCheckHistorySheet,
           ),
           const Divider(height: 1, color: Color(0xFFF5F4F2)),
           _summaryInfoRow(
@@ -759,8 +841,177 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     );
   }
 
+  /// 根据 checkedAt 计算检查状态标签
+  Widget _checkStatusBadge(AppLocalizations l10n, Map<String, dynamic> data) {
+    final raw = data['checkedAt']?.toString();
+    final dt = raw != null ? DateTime.tryParse(raw)?.toLocal() : null;
+    final String label;
+    final Color fg;
+    final Color bg;
+    if (dt == null) {
+      label = l10n.checkStatusNever;
+      fg = const Color(0xFF9E9E9E);
+      bg = const Color(0xFFF5F5F5);
+    } else {
+      final diff = DateTime.now().difference(dt);
+      if (diff.inHours < 24) {
+        label = l10n.checkStatusToday;
+        fg = Colors.green.shade700;
+        bg = Colors.green.shade50;
+      } else if (diff.inDays <= 3) {
+        label = l10n.checkStatus3Days;
+        fg = Colors.teal.shade700;
+        bg = Colors.teal.shade50;
+      } else if (diff.inDays >= 7) {
+        label = l10n.checkStatus7Days;
+        fg = Colors.orange.shade700;
+        bg = Colors.orange.shade50;
+      } else {
+        label = l10n.locationChecked(_formatDate(dt.toIso8601String()));
+        fg = Colors.blue.shade700;
+        bg = Colors.blue.shade50;
+      }
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: fg)),
+    );
+  }
+
   void _traceRowTap(ChangeRecord record) {
     AuditLogDetailSheet.show(context, record);
+  }
+
+  /// 检查历史弹窗（列表形式）
+  void _showCheckHistorySheet() {
+    final locationCode = _data?['code'] as String?;
+    if (locationCode == null) return;
+    final l10n = AppLocalizations.of(context)!;
+
+    final future = _historyService.getAll(
+      locationCode: locationCode,
+      businessAction: '标记已检查',
+      page: 1,
+      limit: 30,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => FutureBuilder<Map<String, dynamic>>(
+        future: future,
+        builder: (_, snap) {
+          final records = snap.hasData
+              ? (snap.data!['records'] as List<ChangeRecord>)
+              : <ChangeRecord>[];
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle_outline, size: 18, color: Colors.green.shade600),
+                        const SizedBox(width: 6),
+                        Text(l10n.skuDetailCheckHistory,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        Text(locationCode, style: const TextStyle(fontSize: 13, color: _hintColor)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1),
+                  if (snap.connectionState == ConnectionState.waiting)
+                    const Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator())
+                  else if (records.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Text(l10n.skuDetailNoCheckRecord,
+                          style: const TextStyle(color: Color(0xFF9E9E9E))),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(sheetCtx).size.height * 0.55,
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: records.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, indent: 56, endIndent: 16),
+                        itemBuilder: (_, i) {
+                          final r = records[i];
+                          final details = r.details ?? {};
+                          final checkedBy = details['checkedBy']?.toString() ?? r.userName;
+                          final snapshotQty = details['snapshotQty'];
+                          final note = details['note']?.toString();
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 32, height: 32,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.check_circle_outline, color: Colors.green.shade600, size: 16),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(checkedBy,
+                                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                          if (snapshotQty != null) ...[
+                                            const SizedBox(width: 8),
+                                            Text('· $snapshotQty pcs',
+                                                style: const TextStyle(fontSize: 12, color: _mutedColor)),
+                                          ],
+                                        ],
+                                      ),
+                                      if (note != null && note.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(note,
+                                            style: const TextStyle(fontSize: 12, color: _mutedColor),
+                                            maxLines: 2, overflow: TextOverflow.ellipsis),
+                                      ],
+                                      const SizedBox(height: 2),
+                                      Text(_formatDate(r.createdAt.toIso8601String()),
+                                          style: const TextStyle(fontSize: 11, color: _hintColor)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showLocationHistorySheet() {
@@ -1225,12 +1476,36 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
     }
 
     String qtyLine;
+    int? totalCartons;
     if (record.quantityUnknown) {
       qtyLine = l10n.skuDetailQtyLinePending;
     } else if (record.boxesOnlyMode) {
-      qtyLine = l10n.skuDetailQtyLineBoxes(record.boxes);
+      qtyLine = buildStockLabel(
+        configuredCartons: 0,
+        noSpecCartons: record.boxes,
+        loosePcs: 0,
+        cartonQty: null,
+        l10n: l10n,
+      );
     } else {
-      qtyLine = l10n.skuDetailQtyLineCarton(record.boxes, record.totalQty);
+      final upb = record.unitsPerBox > 0 ? record.unitsPerBox : null;
+      qtyLine = buildStockLabel(
+        configuredCartons: record.boxes - record.unconfiguredCartons,
+        noSpecCartons: record.unconfiguredCartons,
+        loosePcs: record.loosePcs,
+        cartonQty: upb,
+        l10n: l10n,
+      );
+      // 只在有多个组成部分时显示总箱数（单规格已足够清晰）
+      final hasMultipleParts = record.unconfiguredCartons > 0 ||
+          record.loosePcs > 0 ||
+          record.configurations.length > 1;
+      if (hasMultipleParts) {
+        final converted = upb != null && record.loosePcs > 0
+            ? record.loosePcs ~/ upb
+            : 0;
+        totalCartons = record.boxes + converted;
+      }
     }
 
     return Container(
@@ -1301,6 +1576,13 @@ class _LocationDetailScreenState extends ConsumerState<LocationDetailScreen> {
                         qtyLine,
                         style: TextStyle(fontSize: 12, color: dimmed ? const Color(0xFFD0D0D8) : _mutedColor),
                       ),
+                      if (totalCartons != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '= $totalCartons ${l10n.unitBox} total',
+                          style: TextStyle(fontSize: 11, color: dimmed ? const Color(0xFFD0D0D8) : _mutedColor.withValues(alpha: 0.7)),
+                        ),
+                      ],
                     ],
                   ),
                 ),

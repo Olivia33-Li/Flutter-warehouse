@@ -31,8 +31,9 @@ class LocationService {
     return Location.fromJson(response.data);
   }
 
-  Future<void> check(String id, {required bool checked}) async {
-    await _api.patch('/locations/$id/check', data: {'checked': checked});
+  /// 标记库位已检查（单向操作，每次调用均新增一条检查记录）
+  Future<void> check(String id) async {
+    await _api.patch('/locations/$id/check', data: {'checked': true});
   }
 
   Future<void> delete(String id) async {

@@ -1288,10 +1288,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuDetailChecked => 'Checked';
 
   @override
+  String get skuDetailCheckNow => 'Check';
+
+  @override
+  String skuDetailCheckConfirm(String code) {
+    return 'Mark $code as checked?';
+  }
+
+  @override
   String get skuDetailLastCheck => 'Last check';
 
   @override
   String get skuDetailNoCheckRecord => 'No check record';
+
+  @override
+  String get skuDetailCheckHistory => 'Check History';
+
+  @override
+  String get checkStatusToday => 'Checked today';
+
+  @override
+  String get checkStatus3Days => 'Within 3 days';
+
+  @override
+  String get checkStatus7Days => '7+ days ago';
+
+  @override
+  String get checkStatusNever => 'Never checked';
+
+  @override
+  String get checkFilterAll => 'All';
+
+  @override
+  String get checkFilterToday => 'Today';
+
+  @override
+  String get checkFilter3Days => '≤ 3 days';
+
+  @override
+  String get checkFilter7Days => '7+ days';
+
+  @override
+  String get checkFilterNever => 'Never';
 
   @override
   String get skuDetailLastChange => 'Last change';

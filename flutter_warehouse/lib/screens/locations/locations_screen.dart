@@ -37,7 +37,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   List<Location> _filtered     = [];
   bool   _loading = true;
   String? _error;
-  String _query   = '';
+  String _query       = '';
+  String _checkFilter = 'all'; // 'all' | 'today' | '3days' | '7days' | 'never'
   Timer? _debounce;
 
   @override
@@ -76,13 +77,30 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   void _applyFilter() {
-    if (_query.isEmpty) {
-      _filtered = _sort(_allLocations);
-    } else {
-      _filtered = _sort(_allLocations.where((loc) {
-        return fuzzyMatchAny([loc.code, loc.description ?? ''], _query);
-      }).toList());
+    var list = _query.isEmpty
+        ? _allLocations
+        : _allLocations.where((loc) => fuzzyMatchAny([loc.code, loc.description ?? ''], _query)).toList();
+
+    if (_checkFilter != 'all') {
+      final now = DateTime.now();
+      list = list.where((loc) {
+        final dt = loc.checkedAt;
+        switch (_checkFilter) {
+          case 'never':
+            return dt == null;
+          case 'today':
+            return dt != null && now.difference(dt).inHours < 24;
+          case '3days':
+            return dt != null && now.difference(dt).inDays <= 3;
+          case '7days':
+            return dt == null || now.difference(dt).inDays >= 7;
+          default:
+            return true;
+        }
+      }).toList();
     }
+
+    _filtered = _sort(list);
   }
 
   List<Location> _sort(List<Location> list) {
@@ -281,7 +299,14 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 onChanged: _onSearchChanged,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
+
+            // ── Check status filter ──────────────────────────────────────
+            _CheckFilterBar(
+              selected: _checkFilter,
+              onChanged: (v) => setState(() { _checkFilter = v; _applyFilter(); }),
+            ),
+            const SizedBox(height: 8),
 
             // ── List / states ────────────────────────────────────────────
             Expanded(
@@ -420,6 +445,105 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 }
 
+// ── Check status badge (inline in card top row) ────────────────────────────────
+
+class _CheckStatusBadge extends StatelessWidget {
+  final DateTime? checkedAt;
+  const _CheckStatusBadge({this.checkedAt});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final dt = checkedAt;
+    final String label;
+    final Color fg;
+    final Color bg;
+
+    if (dt == null) {
+      return const SizedBox.shrink(); // 从未检查时不显示徽标（保持简洁）
+    }
+    final diff = DateTime.now().difference(dt);
+    if (diff.inHours < 24) {
+      label = l10n.checkStatusToday;
+      fg = Colors.green.shade700;
+      bg = Colors.green.shade50;
+    } else if (diff.inDays <= 3) {
+      label = l10n.checkStatus3Days;
+      fg = Colors.teal.shade700;
+      bg = Colors.teal.shade50;
+    } else if (diff.inDays >= 7) {
+      label = l10n.checkStatus7Days;
+      fg = Colors.orange.shade700;
+      bg = Colors.orange.shade50;
+    } else {
+      // 4-6 天：不显示徽标，避免噪音
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(5)),
+        child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: fg)),
+      ),
+    );
+  }
+}
+
+// ── Check filter bar ───────────────────────────────────────────────────────────
+
+class _CheckFilterBar extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _CheckFilterBar({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final chips = [
+      ('all',    l10n.checkFilterAll),
+      ('today',  l10n.checkFilterToday),
+      ('3days',  l10n.checkFilter3Days),
+      ('7days',  l10n.checkFilter7Days),
+      ('never',  l10n.checkFilterNever),
+    ];
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: chips.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final (value, label) = chips[i];
+          final active = selected == value;
+          return GestureDetector(
+            onTap: () => onChanged(value),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: active ? _primary : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: active ? _primary : _borderColor),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                  color: active ? Colors.white : _mutedColor,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 // ── Search bar ─────────────────────────────────────────────────────────────────
 
 class _SearchBar extends StatelessWidget {
@@ -534,12 +658,7 @@ class _LocationCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (location.checkedAt != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Icon(Icons.check_circle_outline,
-                            size: 15, color: Colors.green.shade500),
-                      ),
+                    _CheckStatusBadge(checkedAt: location.checkedAt),
                     _stockBadge(context, isEmpty),
                   ],
                 ),
@@ -574,14 +693,6 @@ class _LocationCard extends StatelessWidget {
                         const SizedBox(width: 12),
                         _statItem(Icons.tag_rounded,
                             '${location.totalQty} ${AppLocalizations.of(context)!.unitPiece}'),
-                      ],
-                      if (location.checkedAt != null) ...[
-                        const SizedBox(width: 12),
-                        _statItem(
-                          Icons.schedule_outlined,
-                          AppLocalizations.of(context)!.locationChecked(_formatDate(context, location.checkedAt!)),
-                          color: Colors.green.shade600,
-                        ),
                       ],
                     ],
                   ),
